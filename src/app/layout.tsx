@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "당근 지역 플랫폼",
-  description: "지역 거래와 생활을 연결하는 당근 고도화 프로젝트",
+  title: "가지마켓",
+  description: "지역 거래와 생활을 연결하는 가지마켓 모바일 프로토타입",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b0b0d",
 };
 
 export default function RootLayout({

@@ -1,6 +1,11 @@
 :root {
-  color-scheme: light;
-  font-family: Arial, Helvetica, sans-serif;
+  color-scheme: dark;
+  font-family:
+    "Pretendard",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    system-ui,
+    sans-serif;
 }
 
 * {
@@ -14,24 +19,14 @@ body {
 }
 
 body {
-  background: #ffffff;
-  color: #212124;
+  background: #111114;
+  color: #f5f5f7;
+  overscroll-behavior: none;
 }
 
-main {
-  display: grid;
-  min-height: 100vh;
-  place-content: center;
-  padding: 24px;
-  text-align: center;
-}
-
-h1 {
-  margin: 0 0 12px;
-  font-size: 32px;
-}
-
-p {
-  margin: 0;
-  color: #868b94;
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
