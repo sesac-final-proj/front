@@ -4,6 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "ongaji-front"
         CONTAINER_NAME = "ongaji-front"
+        SLACK_CHANNEL = "#4조-빌드및-pr알림"
     }
 
     stages {
@@ -55,9 +56,19 @@ pipeline {
     post {
         success {
             echo 'Build & Deploy succeeded!'
+            slackSend(
+                channel: "${SLACK_CHANNEL}",
+                color: 'good',
+                message: "✅ *${env.JOB_NAME}* #${env.BUILD_NUMBER} Ongaji FrontEnd 배포 성공\n${env.BUILD_URL}"
+            )
         }
         failure {
             echo 'Build failed. Check console output.'
+            slackSend(
+                channel: "${SLACK_CHANNEL}",
+                color: 'danger',
+                message: "❌ *${env.JOB_NAME}* #${env.BUILD_NUMBER} Ongaji FrontEnd 배포 실패\n${env.BUILD_URL}console"
+            )
         }
     }
 }
