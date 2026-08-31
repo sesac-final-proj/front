@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
+import Image from "next/image";
 import {
+  Moon,
+  Sun,
   BadgePercent,
   Bell,
   BookOpen,
@@ -30,7 +33,6 @@ import {
   Menu,
   MessageCircle,
   MoreVertical,
-  Navigation,
   NotebookTabs,
   Plus,
   QrCode,
@@ -38,6 +40,7 @@ import {
   Search,
   Send,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   Shirt,
   ShoppingBag,
@@ -72,6 +75,8 @@ type SubPage =
   | { type: "community-form" }
   | { type: "chat-room"; id: string }
   | { type: "my-menu" }
+  | { type: "all-services" }
+  | { type: "dream-dashboard" }
   | { type: "settings" }
   | { type: "sales" }
   | { type: "favorites" }
@@ -138,6 +143,18 @@ type LocalBusiness = {
   lng: number;
 };
 
+type DonationFacility = {
+  id: string;
+  name: string;
+  facilityType: string;
+  neighborhoodName: string;
+  lat: number;
+  lng: number;
+  donationCount: number;
+  currentAmount: number;
+  targetAmount: number;
+};
+
 type LocalCategory = {
   id: string;
   name: string;
@@ -156,11 +173,17 @@ const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부�
 const COMMUNITY_TABS = ["동네생활", "모임", "카페", "아파트", "게임"];
 const COMMUNITY_FILTERS = ["추천", "인기", "취미/여가", "운동/스포츠", "맛집/음식", "동네친구", "일반"];
 const CHAT_FILTERS = ["전체", "판매", "구매", "안읽음", "모임", "알바"];
-const NEIGHBORHOODS = ["위례", "공릉", "당산 2동"];
+const NEIGHBORHOODS = ["송파삼성래미안", "위례", "공릉", "당산 2동"];
+
+type MapSearchBounds = { south: number; north: number; west: number; east: number };
 
 type NaverMapInstance = {
   setCenter: (center: unknown) => void;
   setZoom: (zoom: number) => void;
+  getBounds: () => {
+    getSW: () => { lat: () => number; lng: () => number };
+    getNE: () => { lat: () => number; lng: () => number };
+  };
 };
 
 type NaverMarkerInstance = {
@@ -181,7 +204,14 @@ type NaverMapsNamespace = {
       zoomControl?: boolean;
     },
   ) => NaverMapInstance;
-  Marker: new (options: { position: unknown; map: NaverMapInstance; title?: string }) => NaverMarkerInstance;
+  Marker: new (options: {
+    position: unknown;
+    map: NaverMapInstance;
+    title?: string;
+    opacity?: number;
+    zIndex?: number;
+    icon?: { content: HTMLElement };
+  }) => NaverMarkerInstance;
 };
 
 declare global {
@@ -195,6 +225,7 @@ declare global {
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_KEY_ID = process.env.NEXT_PUBLIC_NAVER_MAP_NCP_KEY_ID ?? "";
 const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
+  송파삼성래미안: { lat: 37.504744, lng: 127.118295 },
   위례: { lat: 37.4772, lng: 127.1437 },
   공릉: { lat: 37.6257, lng: 127.0731 },
   "당산 2동": { lat: 37.5351, lng: 126.9028 },
@@ -463,6 +494,7 @@ const initialChats: ChatRoom[] = [
 ];
 
 const LOCAL_CATEGORIES: LocalCategory[] = [
+  { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
   { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
   { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
   { id: "sale", name: "할인중", icon: BadgePercent, tone: "violet" },
@@ -476,6 +508,30 @@ const LOCAL_CATEGORIES: LocalCategory[] = [
 ];
 
 const LOCAL_BUSINESSES: LocalBusiness[] = [
+  {
+    id: "danger1",
+    name: "송파구 침수·집중호우 주의구역",
+    category: "danger",
+    neighborhoodName: "송파삼성래미안",
+    distance: "120m",
+    openNow: true,
+    liked: false,
+    summary: "실시간 재난안전: 하천변 발자국 및 보행 유의",
+    lat: 37.5052,
+    lng: 127.1188,
+  },
+  {
+    id: "danger2",
+    name: "공릉동 야간 통행 위험구역",
+    category: "danger",
+    neighborhoodName: "공릉",
+    distance: "350m",
+    openNow: true,
+    liked: false,
+    summary: "안전정보: 도로 가스배관 공사 중 (서행 필요)",
+    lat: 37.6262,
+    lng: 127.0741,
+  },
   {
     id: "b1",
     name: "당산 2동 작은식탁",
@@ -524,6 +580,43 @@ const LOCAL_BUSINESSES: LocalBusiness[] = [
     lat: 37.4788,
     lng: 127.1418,
   },
+  {
+    id: "b5",
+    name: "송파 래미안 픽업",
+    category: "takeout",
+    neighborhoodName: "송파삼성래미안",
+    distance: "120m",
+    openNow: true,
+    liked: false,
+    summary: "단지 근처 포장 주문 가능",
+    lat: 37.5051,
+    lng: 127.1187,
+  },
+];
+
+const DREAM_FACILITIES: DonationFacility[] = [
+  {
+    id: "df1",
+    name: "송파 아동복지센터",
+    facilityType: "아동복지센터",
+    neighborhoodName: "송파삼성래미안",
+    lat: 37.5063,
+    lng: 127.1198,
+    donationCount: 5,
+    currentAmount: 384000,
+    targetAmount: 600000,
+  },
+  {
+    id: "df2",
+    name: "송파 발달지원센터",
+    facilityType: "발달장애센터",
+    neighborhoodName: "송파삼성래미안",
+    lat: 37.5036,
+    lng: 127.1166,
+    donationCount: 2,
+    currentAmount: 216000,
+    targetAmount: 500000,
+  },
 ];
 
 const baseMessages = [
@@ -532,11 +625,46 @@ const baseMessages = [
   { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18" },
 ];
 
+type ThemeMode = "dark" | "light";
+const THEME_STORAGE_KEY = "carrot-theme";
+let sessionTheme: ThemeMode = "dark";
+
+function readTheme(): ThemeMode {
+  try {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    // Retain the in-memory selection when browser storage is unavailable.
+  }
+  return sessionTheme;
+}
+
+function subscribeTheme(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener("carrot-theme-change", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("carrot-theme-change", onChange);
+  };
+}
+
 export default function GajiMarketApp() {
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ThemeMode);
+
+  function changeTheme(value: ThemeMode) {
+    sessionTheme = value;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, value);
+    } catch {
+      // Keep the selection usable for this session when persistence is blocked.
+    }
+    window.dispatchEvent(new Event("carrot-theme-change"));
+  }
+
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
-  const [activeNeighborhood, setActiveNeighborhood] = useState("위례");
+  const [activeNeighborhood, setActiveNeighborhood] = useState("송파삼성래미안");
   const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
   const [productFilter, setProductFilter] = useState("전체");
   const [communityTab, setCommunityTab] = useState("동네생활");
@@ -545,6 +673,7 @@ export default function GajiMarketApp() {
   const [mapCategory, setMapCategory] = useState<string>("takeout");
   const [mapSheetState, setMapSheetState] = useState<"collapsed" | "half" | "expanded">("half");
   const [mapQuery, setMapQuery] = useState("");
+  const [mapSearchArea, setMapSearchArea] = useState<{ neighborhood: string; bounds: MapSearchBounds } | null>(null);
   const [locationAllowed, setLocationAllowed] = useState(true);
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
@@ -609,11 +738,14 @@ export default function GajiMarketApp() {
   }, [chatFilter, chats]);
 
   const businesses = useMemo(() => {
+    const bounds = mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
     return LOCAL_BUSINESSES.filter((business) => {
       const matchesCategory = business.category === mapCategory;
-      const matchesRegion =
-        business.neighborhoodName === activeNeighborhood ||
-        business.neighborhoodName === secondaryNeighborhood;
+      const matchesRegion = bounds
+        ? business.lat >= bounds.south && business.lat <= bounds.north &&
+          business.lng >= bounds.west && business.lng <= bounds.east
+        : business.neighborhoodName === activeNeighborhood ||
+          business.neighborhoodName === secondaryNeighborhood;
       const matchesQuery =
         mapQuery.trim().length === 0 ||
         business.name.includes(mapQuery.trim()) ||
@@ -621,7 +753,7 @@ export default function GajiMarketApp() {
         business.neighborhoodName.includes(mapQuery.trim());
       return matchesCategory && matchesRegion && matchesQuery;
     });
-  }, [activeNeighborhood, mapCategory, mapQuery, secondaryNeighborhood]);
+  }, [activeNeighborhood, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
 
   function navigateTab(tab: TabId) {
     setActiveTab(tab);
@@ -633,7 +765,13 @@ export default function GajiMarketApp() {
   }
 
   function goBack() {
-    if (subPage?.type === "settings" || subPage?.type === "my-menu" || subPage?.type === "sales" || subPage?.type === "favorites") {
+    if (
+      subPage?.type === "settings" ||
+      subPage?.type === "my-menu" ||
+      subPage?.type === "dream-dashboard" ||
+      subPage?.type === "sales" ||
+      subPage?.type === "favorites"
+    ) {
       setActiveTab("my");
       setSubPage(null);
       return;
@@ -766,13 +904,12 @@ export default function GajiMarketApp() {
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "settings", "sales", "favorites", "search"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
 
   return (
-    <div className={styles.stage}>
+    <div className={styles.stage} data-theme={theme}>
       <div className={styles.phoneShell}>
-        <StatusBar />
-        <main className={styles.appViewport} data-app-scroll>
+        <main className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""}`} data-app-scroll>
           {subPage?.type === "product-detail" && selectedProduct ? (
             <ProductDetailScreen
               product={selectedProduct}
@@ -802,8 +939,18 @@ export default function GajiMarketApp() {
             />
           ) : subPage?.type === "my-menu" ? (
             <MyMenuScreen onBack={goBack} />
+          ) : subPage?.type === "all-services" ? (
+            <AllServicesScreen onBack={goBack} />
+          ) : subPage?.type === "dream-dashboard" ? (
+            <DreamDashboardScreen
+              activeNeighborhood={activeNeighborhood}
+              onBack={goBack}
+              onChangeNeighborhood={() => setSheet("region")}
+            />
           ) : subPage?.type === "settings" ? (
             <SettingsScreen
+              theme={theme}
+              onThemeChange={changeTheme}
               onBack={goBack}
               locationAllowed={locationAllowed}
               isGuestMode={isGuestMode}
@@ -882,6 +1029,8 @@ export default function GajiMarketApp() {
               sheetState={mapSheetState}
               query={mapQuery}
               businesses={businesses}
+              hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
+              onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
               onCategoryChange={setMapCategory}
               onSheetStateChange={setMapSheetState}
@@ -891,7 +1040,6 @@ export default function GajiMarketApp() {
                 setActiveTab("my");
                 setSubPage(null);
               }}
-              onWrite={() => setSheet("write")}
             />
           ) : activeTab === "chats" ? (
             <ChatsScreen
@@ -912,11 +1060,17 @@ export default function GajiMarketApp() {
               myProducts={myProducts}
               onOpenSettings={() => setSubPage({ type: "settings" })}
               onOpenMenu={() => setSubPage({ type: "my-menu" })}
+              onOpenAllServices={() => setSubPage({ type: "all-services" })}
+              onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
               onOpenSales={() => setSubPage({ type: "sales" })}
               onOpenFavorites={() => setSubPage({ type: "favorites" })}
             />
           )}
         </main>
+
+        {activeTab === "map" && !subPage && mapSheetState === "expanded" && (
+          <FloatingWriteButton onClick={() => setSheet("write")} />
+        )}
 
         {showBottomNav && (
           <BottomNav activeTab={activeTab} unreadCount={totalUnread} onNavigate={navigateTab} />
@@ -957,30 +1111,16 @@ export default function GajiMarketApp() {
   );
 }
 
-function StatusBar() {
-  return (
-    <div className={styles.statusBar} aria-hidden="true">
-      <div className={styles.statusTime}>5:28</div>
-      <div className={styles.dynamicIsland}>
-        <Navigation size={21} strokeWidth={3} />
-      </div>
-      <div className={styles.signalGroup}>
-        <span className={styles.signalBars} />
-        <span>5G</span>
-        <span className={styles.battery}> </span>
-      </div>
-    </div>
-  );
-}
-
 function ScreenHeader({
   title,
   leading,
+  titleAccessory,
   actions,
   compact = false,
 }: {
   title: string;
   leading?: React.ReactNode;
+  titleAccessory?: React.ReactNode;
   actions?: React.ReactNode;
   compact?: boolean;
 }) {
@@ -989,6 +1129,7 @@ function ScreenHeader({
       <div className={styles.headerTitleRow}>
         {leading}
         <h1>{title}</h1>
+        {titleAccessory}
       </div>
       <div className={styles.headerActions}>{actions}</div>
     </header>
@@ -1588,13 +1729,14 @@ function MapScreen({
   sheetState,
   query,
   businesses,
+  hasSearchedArea,
+  onSearchBounds,
   locationAllowed,
   onCategoryChange,
   onSheetStateChange,
   onQueryChange,
   onRequestLocation,
   onOpenProfile,
-  onWrite,
 }: {
   activeNeighborhood: string;
   categories: LocalCategory[];
@@ -1602,21 +1744,84 @@ function MapScreen({
   sheetState: "collapsed" | "half" | "expanded";
   query: string;
   businesses: LocalBusiness[];
+  hasSearchedArea: boolean;
+  onSearchBounds: (bounds: MapSearchBounds) => void;
   locationAllowed: boolean;
   onCategoryChange: (id: string) => void;
   onSheetStateChange: (state: "collapsed" | "half" | "expanded") => void;
   onQueryChange: (value: string) => void;
   onRequestLocation: () => void;
   onOpenProfile: () => void;
-  onWrite: () => void;
 }) {
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [centerRequest, setCenterRequest] = useState(0);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const locationRequestRef = useRef(0);
+
+  useEffect(() => () => { locationRequestRef.current += 1; }, []);
+
+  function requestCurrentLocation() {
+    if (isLocating) return;
+    if (!window.isSecureContext) {
+      setLocationError("현재 위치는 HTTPS 또는 localhost에서 사용할 수 있어요.");
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocationError("현재 위치를 지원하지 않는 브라우저예요.");
+      return;
+    }
+    setIsLocating(true);
+    setLocationError("");
+    const requestId = ++locationRequestRef.current;
+    const onSuccess = ({ coords }: GeolocationPosition) => {
+        if (requestId !== locationRequestRef.current) return;
+        setCurrentLocation({ lat: coords.latitude, lng: coords.longitude });
+        setCenterRequest((value) => value + 1);
+        setIsLocating(false);
+        onRequestLocation();
+    };
+    const onError = (error: GeolocationPositionError) => {
+        if (requestId !== locationRequestRef.current) return;
+        setIsLocating(false);
+        const messages: Record<number, string> = {
+          1: "위치 권한이 차단됐어요. 브라우저의 위치 권한과 기기의 위치 서비스를 허용한 뒤 다시 시도해 주세요.",
+          2: "기기에서 위치를 제공하지 못했어요. 위치 서비스를 확인하거나 Chrome·Edge에서 이 페이지를 열어 주세요.",
+          3: "위치 확인 시간이 초과됐어요. 네트워크와 기기의 위치 서비스를 확인한 뒤 다시 시도해 주세요.",
+        };
+        setLocationError(messages[error.code] ?? "현재 위치를 찾지 못했어요. 다시 시도해 주세요.");
+    };
+    navigator.geolocation.getCurrentPosition(
+      onSuccess,
+      (error) => {
+        if (requestId !== locationRequestRef.current) return;
+        if (error.code === 1) {
+          onError(error);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+          enableHighAccuracy: false, timeout: 15000, maximumAge: 0,
+        });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  }
 
   return (
     <section className={styles.mapScreen}>
       <div className={styles.mapCanvas}>
-        <NaverMapLayer activeNeighborhood={activeNeighborhood} businesses={businesses} />
+        <NaverMapLayer
+          activeNeighborhood={activeNeighborhood}
+          businesses={businesses}
+          currentLocation={currentLocation}
+          centerRequest={centerRequest}
+          onSearchBounds={(bounds) => {
+            onSearchBounds(bounds);
+            onSheetStateChange("expanded");
+          }}
+        />
         <div className={styles.mapSearch}>
           <Search size={27} />
           <input
@@ -1628,29 +1833,16 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        <div className={styles.mapMarkerCenter}>
-          <House size={24} />
-          <span>내 장소</span>
-        </div>
-        <div className={styles.mapMarkerA}>
-          <Store size={17} />
-          <span>{activeNeighborhood}</span>
-        </div>
-        <div className={styles.mapMarkerB}>
-          <Coffee size={17} />
-          <span>근처 가게</span>
-        </div>
-        <button type="button" className={styles.mapSearchAgain}>
-          현 지도에서 검색
-        </button>
+        {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
+        {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
         <div className={styles.mapControls}>
           <button type="button" aria-label="관심 장소">
             <Heart size={25} />
           </button>
-          <button type="button" aria-label="내 장소">
+          <button type="button" aria-label="내 장소" title="내 장소로 이동" onClick={() => setCenterRequest((value) => value + 1)}>
             <House size={25} />
           </button>
-          <button type="button" aria-label="현재 위치" onClick={onRequestLocation}>
+          <button type="button" aria-label="현재 위치" aria-busy={isLocating} title={isLocating ? "위치 확인 중" : "현재 위치로 이동"} disabled={isLocating} onClick={requestCurrentLocation}>
             <Crosshair size={25} />
           </button>
         </div>
@@ -1660,7 +1852,11 @@ function MapScreen({
       </div>
 
       <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`}>
-        <button type="button" className={styles.sheetHandle} onClick={() => onSheetStateChange(nextState)}>
+        <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "업체 패널 접기" : "업체 패널 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
+          const panel = event.currentTarget.parentElement;
+          onSheetStateChange(nextState);
+          window.requestAnimationFrame(() => panel?.scrollTo({ top: 0, behavior: "instant" }));
+        }}>
           <span />
         </button>
         {!locationAllowed ? (
@@ -1668,7 +1864,7 @@ function MapScreen({
             title="동네 인증이 필요해요"
             body="현재 위치 권한을 허용하면 지도 업체와 동네 글을 더 정확하게 보여드려요."
             actionLabel="권한 허용"
-            onAction={onRequestLocation}
+            onAction={requestCurrentLocation}
           />
         ) : (
           <>
@@ -1695,7 +1891,9 @@ function MapScreen({
               <span />
             </div>
             <section className={styles.localResults}>
-              <h2>이런 동네 가게 알고 있었나요?</h2>
+              <h2 aria-live="polite">
+                {hasSearchedArea ? `현 지도 검색 결과 ${businesses.length}곳` : "이런 동네 가게 알고 있었나요?"}
+              </h2>
               {businesses.length === 0 ? (
                 <StateBlock
                   title="검색 결과가 없어요"
@@ -1724,7 +1922,6 @@ function MapScreen({
           </>
         )}
       </div>
-      <FloatingWriteButton onClick={onWrite} />
     </section>
   );
 }
@@ -1732,9 +1929,15 @@ function MapScreen({
 function NaverMapLayer({
   activeNeighborhood,
   businesses,
+  currentLocation,
+  centerRequest,
+  onSearchBounds,
 }: {
   activeNeighborhood: string;
   businesses: LocalBusiness[];
+  currentLocation: { lat: number; lng: number } | null;
+  centerRequest: number;
+  onSearchBounds: (bounds: MapSearchBounds) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapInstance | null>(null);
@@ -1772,7 +1975,7 @@ function NaverMapLayer({
       return;
     }
 
-    const centerCoord = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.위례;
+    const centerCoord = currentLocation ?? NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
     const center = new maps.LatLng(centerCoord.lat, centerCoord.lng);
 
     if (!mapRef.current) {
@@ -1790,21 +1993,56 @@ function NaverMapLayer({
       mapRef.current.setZoom(15);
     }
 
-    markerRefs.current.forEach((marker) => marker.setMap(null));
+    const placeMarker = new maps.Marker({
+      position: center,
+      map: mapRef.current,
+      title: "내 장소",
+      opacity: 0.8,
+      zIndex: 100,
+    });
+    return () => placeMarker.setMap(null);
+  }, [activeNeighborhood, currentLocation, centerRequest, canUseNaverMap]);
+
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map || !canUseNaverMap) return;
+
     markerRefs.current = businesses.map(
       (business) =>
         new maps.Marker({
           position: new maps.LatLng(business.lat, business.lng),
-          map: mapRef.current as NaverMapInstance,
+          map,
           title: business.name,
         }),
     );
-  }, [activeNeighborhood, businesses, canUseNaverMap]);
+    return () => {
+      markerRefs.current.forEach((marker) => marker.setMap(null));
+      markerRefs.current = [];
+    };
+  }, [businesses, canUseNaverMap]);
 
   return (
     <>
-      <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
+      <div className={styles.naverMapFrame}>
+        <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
+      </div>
       {!canUseNaverMap ? <div className={styles.mapGrid} /> : null}
+      <button
+        type="button"
+        className={styles.mapSearchAgain}
+        disabled={!canUseNaverMap}
+        title={canUseNaverMap ? "현재 지도 범위에서 검색" : "지도를 불러오는 중"}
+        onClick={() => {
+          const bounds = mapRef.current?.getBounds();
+          if (!bounds) return;
+          const sw = bounds.getSW();
+          const ne = bounds.getNE();
+          onSearchBounds({ south: sw.lat(), north: ne.lat(), west: sw.lng(), east: ne.lng() });
+        }}
+      >
+        현 지도에서 검색
+      </button>
     </>
   );
 }
@@ -1973,6 +2211,8 @@ function MyScreen({
   myProducts,
   onOpenSettings,
   onOpenMenu,
+  onOpenAllServices,
+  onOpenDream,
   onOpenSales,
   onOpenFavorites,
 }: {
@@ -1982,6 +2222,8 @@ function MyScreen({
   myProducts: ProductListItem[];
   onOpenSettings: () => void;
   onOpenMenu: () => void;
+  onOpenAllServices: () => void;
+  onOpenDream: () => void;
   onOpenSales: () => void;
   onOpenFavorites: () => void;
 }) {
@@ -1993,13 +2235,19 @@ function MyScreen({
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
     { label: "가지알바", icon: BriefcaseBusiness, tone: "primary" },
-    { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenMenu },
+    { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];
 
   return (
     <section className={styles.screen}>
       <ScreenHeader
         title="나의 가지"
+        titleAccessory={
+          <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream}>
+            꿈가지
+            <Image src="/dream/baby-elephant.png" alt="" width={36} height={29} className={styles.dreamEntryMascot} />
+          </button>
+        }
         actions={
           <IconButton label="설정" onClick={onOpenSettings}>
             <Settings size={31} />
@@ -2062,6 +2310,220 @@ function MyScreen({
         ]}
       />
     </section>
+  );
+}
+
+function DreamDashboardScreen({
+  activeNeighborhood,
+  onBack,
+  onChangeNeighborhood,
+}: {
+  activeNeighborhood: string;
+  onBack: () => void;
+  onChangeNeighborhood: () => void;
+}) {
+  const facilityListRef = useRef<HTMLElement | null>(null);
+  const visibleFacilities = useMemo(
+    () => DREAM_FACILITIES.filter((facility) => facility.neighborhoodName === activeNeighborhood),
+    [activeNeighborhood],
+  );
+  const totalCurrentAmount = visibleFacilities.reduce((sum, facility) => sum + facility.currentAmount, 0);
+  const totalTargetAmount = visibleFacilities.reduce((sum, facility) => sum + facility.targetAmount, 0);
+  const totalDonationCount = visibleFacilities.reduce((sum, facility) => sum + facility.donationCount, 0);
+  const neighborhoodProgress = totalTargetAmount > 0 ? Math.round((totalCurrentAmount / totalTargetAmount) * 100) : 0;
+  const showFacilities = () => facilityListRef.current?.scrollIntoView({ block: "start" });
+
+  return (
+    <section className={`${styles.screen} ${styles.dreamScreen}`}>
+      <ScreenHeader
+        title="꿈가지"
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+      <section className={styles.dreamBanner} aria-label="꿈가지 나눔 캠페인">
+        <div className={styles.dreamBannerCopy}>
+          <span>우리 동네와 함께</span>
+          <h2>작은 나눔이 모여<br />꿈이 자라요</h2>
+          <button type="button" onClick={showFacilities}>
+            모금 현황 보기 <ChevronRight size={16} />
+          </button>
+        </div>
+        <Image
+          src="/dream/baby-elephant.png"
+          alt="꿈가지에서 활동하는 귀여운 아기 코끼리"
+          width={160}
+          height={128}
+          className={styles.dreamBannerMascot}
+          priority
+        />
+      </section>
+      <section className={styles.dreamMapPanel}>
+        <DreamMapLayer activeNeighborhood={activeNeighborhood} facilities={visibleFacilities} />
+        <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
+          <span className={styles.dreamMapTitleCopy}>
+            <span>우리 동네 모금가지</span>
+            <strong>{activeNeighborhood === "송파삼성래미안" ? "송파구" : activeNeighborhood}</strong>
+            <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 · 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
+          </span>
+          <ChevronRight size={24} aria-hidden="true" />
+        </button>
+        <div className={styles.dreamSummaryDock} aria-label="꿈가지 요약">
+          <div className={styles.dreamSummaryItem}>
+            <span>기부 참여</span>
+            <strong>{totalDonationCount}<small>회</small></strong>
+          </div>
+          <div className={styles.dreamSummaryItem}>
+            <span>동네 기부 진행률</span>
+            <strong>{neighborhoodProgress}%</strong>
+            <div className={styles.dreamProgressTrack} role="progressbar" aria-label="동네 기부 진행률" aria-valuenow={Math.min(neighborhoodProgress, 100)} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${Math.min(neighborhoodProgress, 100)}%` }} />
+            </div>
+          </div>
+        </div>
+      </section>
+      <section ref={facilityListRef} className={styles.dreamFacilityCard} aria-label="시설별 모금 현황">
+        <div className={styles.dreamFacilityHeading}>
+          <h2>함께 키우는 우리 동네 꿈</h2>
+          <span>{visibleFacilities.length}곳</span>
+        </div>
+        {visibleFacilities.length === 0 && <p className={styles.dreamEmpty}>아직 이 동네에서 진행 중인 모금이 없어요.</p>}
+        {visibleFacilities.map((facility) => {
+          const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
+          return (
+          <article key={facility.name} className={styles.dreamFacilityItem}>
+            <div>
+              <strong>{facility.name}</strong>
+              <span>{facility.facilityType} · 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
+            </div>
+            <em>{progress}%</em>
+            <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${Math.min(progress, 100)}%` }} />
+            </div>
+          </article>
+          );
+        })}
+      </section>
+    </section>
+  );
+}
+
+function DreamMapLayer({
+  activeNeighborhood,
+  facilities,
+}: {
+  activeNeighborhood: string;
+  facilities: DonationFacility[];
+}) {
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<NaverMapInstance | null>(null);
+  const markerRefs = useRef<NaverMarkerInstance[]>([]);
+  const [isNaverMapReady, setIsNaverMapReady] = useState(false);
+  const [hasMapError, setHasMapError] = useState(!NAVER_MAP_KEY_ID);
+  const canUseNaverMap = Boolean(NAVER_MAP_KEY_ID && isNaverMapReady);
+
+  useEffect(() => {
+    if (!NAVER_MAP_KEY_ID) return;
+    let isMounted = true;
+    loadNaverMapScript(NAVER_MAP_KEY_ID)
+      .then(() => {
+        if (isMounted) setIsNaverMapReady(Boolean(window.naver?.maps));
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsNaverMapReady(false);
+          setHasMapError(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const mapElement = mapElementRef.current;
+    const maps = window.naver?.maps;
+    if (!mapElement || !maps || !canUseNaverMap) return;
+
+    const centerCoord = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
+    const center = new maps.LatLng(centerCoord.lat, centerCoord.lng);
+    const zoom = mapElement.clientHeight < 420 ? 14 : 15;
+    if (!mapRef.current) {
+      mapRef.current = new maps.Map(mapElement, {
+        center,
+        zoom,
+        logoControl: false,
+        mapDataControl: false,
+        mapTypeControl: false,
+        scaleControl: false,
+        zoomControl: false,
+      });
+    } else {
+      mapRef.current.setCenter(center);
+      mapRef.current.setZoom(zoom);
+    }
+    const resizeObserver = new ResizeObserver(() => {
+      mapRef.current?.setZoom(mapElement.clientHeight < 420 ? 14 : 15);
+    });
+    resizeObserver.observe(mapElement);
+    return () => resizeObserver.disconnect();
+  }, [activeNeighborhood, canUseNaverMap]);
+
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map || !canUseNaverMap) return;
+
+    markerRefs.current = facilities.map((facility) => {
+      const label = document.createElement("span");
+      label.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin}`;
+      label.textContent = facility.name;
+      return new maps.Marker({
+          position: new maps.LatLng(facility.lat, facility.lng),
+          map,
+          title: facility.name,
+          zIndex: 90,
+          icon: { content: label },
+        });
+    });
+    return () => {
+      markerRefs.current.forEach((marker) => marker.setMap(null));
+      markerRefs.current = [];
+    };
+  }, [facilities, canUseNaverMap]);
+
+  return (
+    <div className={styles.dreamMapCanvas}>
+      <div className={styles.naverMapFrame}>
+        <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
+      </div>
+      {!canUseNaverMap && (
+        <div className={styles.dreamMapUnavailable} role="status">
+          <MapPinned size={28} />
+          <span>{hasMapError ? "지도를 불러오지 못했어요" : "지도를 연결하고 있어요"}</span>
+          <small>모금 현황은 아래에서 확인할 수 있어요.</small>
+        </div>
+      )}
+      <button
+        type="button"
+        className={styles.dreamMapRecenter}
+        aria-label="우리 동네 위치로"
+        title="우리 동네 위치로"
+        disabled={!canUseNaverMap}
+        onClick={() => {
+          const maps = window.naver?.maps;
+          const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
+          if (!maps || !mapRef.current) return;
+          mapRef.current.setCenter(new maps.LatLng(center.lat, center.lng));
+          mapRef.current.setZoom((mapElementRef.current?.clientHeight ?? 540) < 420 ? 14 : 15);
+        }}
+      >
+        <Crosshair size={22} />
+      </button>
+    </div>
   );
 }
 
@@ -2179,6 +2641,8 @@ function MyMenuScreen({ onBack }: { onBack: () => void }) {
 }
 
 function SettingsScreen({
+  theme,
+  onThemeChange,
   onBack,
   locationAllowed,
   isGuestMode,
@@ -2187,6 +2651,8 @@ function SettingsScreen({
   onGuestToggle,
   onNetworkErrorToggle,
 }: {
+  theme: ThemeMode;
+  onThemeChange: (theme: ThemeMode) => void;
   onBack: () => void;
   locationAllowed: boolean;
   isGuestMode: boolean;
@@ -2205,6 +2671,19 @@ function SettingsScreen({
           </IconButton>
         }
       />
+      <fieldset className={styles.themeSettings}>
+        <legend>화면 모드</legend>
+        <div className={styles.themeOptions}>
+          <label>
+            <input type="radio" name="theme" value="light" checked={theme === "light"} onChange={() => onThemeChange("light")} />
+            <span><Sun size={20} />일반 모드</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" value="dark" checked={theme === "dark"} onChange={() => onThemeChange("dark")} />
+            <span><Moon size={20} />다크 모드</span>
+          </label>
+        </div>
+      </fieldset>
       <MenuCard
         title="설정"
         items={[
@@ -2357,6 +2836,128 @@ function FavoriteScreen({
   );
 }
 
+function AllServicesScreen({ onBack }: { onBack: () => void }) {
+  const serviceCategories = [
+    {
+      title: "최근 사용",
+      items: [
+        { label: "포장주문", icon: Utensils, color: "#f4a340" },
+        { label: "스토어", icon: ShoppingBasket, color: "#ff922b" },
+      ],
+    },
+    {
+      title: "동네 거래",
+      items: [
+        { label: "중고거래", icon: ShoppingBag, color: "#ff6f0f" },
+        { label: "알바", icon: Search, color: "#ff6f0f" },
+        { label: "부동산", icon: House, color: "#e64980" },
+        { label: "중고차", icon: Truck, color: "#228be6" },
+        { label: "스토어", icon: ShoppingBasket, color: "#fab005" },
+        { label: "포장주문", icon: Utensils, color: "#ff922b" },
+        { label: "공동구매", icon: Tag, color: "#ff6b6b" },
+        { label: "레슨/과외", icon: BookOpen, color: "#a9e34b" },
+      ],
+    },
+    {
+      title: "동네 서비스",
+      items: [
+        { label: "세탁 수거", icon: Shirt, color: "#22b8cf" },
+        { label: "출장 세차", icon: SprayCan, color: "#339af0" },
+      ],
+    },
+    {
+      title: "동네 이야기",
+      items: [
+        { label: "모임", icon: UsersRound, color: "#ff922b" },
+        { label: "온라인 카페", icon: Coffee, color: "#fab005" },
+        { label: "내 아파트", icon: Building2, color: "#4d638c" },
+        { label: "아파트 오픈게시판", icon: Building2, color: "#7950f2" },
+        { label: "동네생활", icon: MessageCircle, color: "#22b8cf" },
+        { label: "스토리", icon: Sparkles, color: "#ff6b6b" },
+        { label: "한 입 뉴스", icon: NotebookTabs, color: "#ff922b" },
+      ],
+    },
+    {
+      title: "비즈니스",
+      items: [
+        { label: "비즈프로필", icon: Store, color: "#fab005" },
+        { label: "광고", icon: Bell, color: "#ff922b" },
+        { label: "월세 카드결제", icon: House, color: "#ff922b" },
+        { label: "ATM 출금", icon: WalletCards, color: "#20b77a" },
+        { label: "당근 교환권", icon: QrCode, color: "#a970ff" },
+      ],
+    },
+    {
+      title: "혜택/브랜드",
+      items: [
+        { label: "혜택", icon: Gem, color: "#339af0" },
+        { label: "선물가게", icon: CakeSlice, color: "#ff922b" },
+        { label: "동네걷기", icon: Dumbbell, color: "#ff922b" },
+        { label: "당근이네", icon: Sparkles, color: "#20b77a" },
+        { label: "게임", icon: Headphones, color: "#845ef7" },
+        { label: "당근메이드", icon: House, color: "#ff922b" },
+      ],
+    },
+    {
+      title: "동네 전문가 찾기",
+      items: [
+        { label: "전문가 견적", icon: ShieldCheck, color: "#ff922b" },
+        { label: "취미/클래스", icon: GraduationCap, color: "#339af0" },
+        { label: "이사/용달", icon: Truck, color: "#339af0" },
+        { label: "청소", icon: SprayCan, color: "#20b77a" },
+        { label: "시공", icon: House, color: "#20b77a" },
+        { label: "수리", icon: Settings, color: "#868e96" },
+        { label: "운동", icon: Dumbbell, color: "#339af0" },
+        { label: "학원", icon: GraduationCap, color: "#339af0" },
+        { label: "미용실", icon: Sparkles, color: "#a970ff" },
+        { label: "뷰티", icon: Heart, color: "#a970ff" },
+        { label: "병원", icon: Heart, color: "#20b77a" },
+        { label: "반려동물", icon: Sparkles, color: "#fab005" },
+      ],
+    },
+    {
+      title: "동네 먹거리 찾기",
+      items: [
+        { label: "음식점", icon: Utensils, color: "#ff922b" },
+        { label: "카페/간식", icon: Coffee, color: "#fab005" },
+      ],
+    },
+  ];
+
+  return (
+    <section className={styles.screen}>
+      <ScreenHeader
+        title="전체 서비스"
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+      <div className={styles.allServicesContainer}>
+        {serviceCategories.map((category) => (
+          <div key={category.title} className={styles.serviceCategoryGroup}>
+            <h3 className={styles.serviceCategoryTitle}>{category.title}</h3>
+            <div className={styles.serviceCategoryGrid}>
+              {category.items.map((item, idx) => {
+                const ItemIcon = item.icon;
+                return (
+                  <button type="button" key={`${item.label}-${idx}`} className={styles.serviceItemButton}>
+                    <span className={styles.serviceItemIcon} style={{ color: item.color }}>
+                      <ItemIcon size={22} />
+                    </span>
+                    <span className={styles.serviceItemLabel}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SearchScreen({
   products,
   posts,
@@ -2434,6 +3035,41 @@ function SearchScreen({
   );
 }
 
+function EggplantPinIcon({
+  size = 31,
+  active = false,
+}: {
+  size?: number;
+  active?: boolean;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--eggplant-pin-top, #078452)" />
+          <stop offset="30%" stopColor="var(--eggplant-pin-top, #078452)" />
+          <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+          <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+        fill={active ? "url(#eggplant-pin-gradient)" : "none"}
+        stroke={active ? "none" : "currentColor"}
+        strokeWidth={active ? "0" : "1.7"}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function BottomNav({
   activeTab,
   unreadCount,
@@ -2446,13 +3082,23 @@ function BottomNav({
   const tabs: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
     { id: "home", label: "홈", icon: Home },
     { id: "community", label: "커뮤니티", icon: UsersRound },
-    { id: "map", label: "동네지도", icon: MapPin },
+    { id: "map", label: "갖가지", icon: MapPin },
     { id: "chats", label: "채팅", icon: MessageCircle },
     { id: "my", label: "나의 가지", icon: UserRound },
   ];
 
   return (
     <nav className={styles.bottomNav} aria-label="주요 화면">
+      <svg width="0" height="0" style={{ position: "absolute", pointerEvents: "none", visibility: "hidden" }}>
+        <defs>
+          <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--eggplant-pin-top, #078452)" />
+            <stop offset="30%" stopColor="var(--eggplant-pin-top, #078452)" />
+            <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+            <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+          </linearGradient>
+        </defs>
+      </svg>
       {tabs.map((tab) => {
         const TabIcon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -2461,10 +3107,20 @@ function BottomNav({
             type="button"
             key={tab.id}
             className={isActive ? styles.navActive : ""}
+            aria-current={isActive ? "page" : undefined}
             onClick={() => onNavigate(tab.id)}
           >
             <span>
-              <TabIcon size={31} fill={isActive ? "currentColor" : "none"} />
+              {tab.id === "map" ? (
+                <EggplantPinIcon size={28} active={isActive} />
+              ) : (
+                <TabIcon
+                  size={28}
+                  fill={isActive ? "url(#eggplant-pin-gradient)" : "none"}
+                  stroke={isActive ? "none" : "currentColor"}
+                  strokeWidth={isActive ? 0 : 1.7}
+                />
+              )}
               {tab.id === "chats" && unreadCount > 0 && <em>{formatBadge(unreadCount)}</em>}
             </span>
             {tab.label}

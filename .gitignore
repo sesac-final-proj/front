@@ -23,3 +23,5 @@ pnpm-debug.log*
 # local editor / os
 .DS_Store
 Thumbs.db
+__pycache__/
+*.py[cod]
