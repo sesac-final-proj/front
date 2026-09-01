@@ -6,6 +6,12 @@ import Image from "next/image";
 import {
   Moon,
   Sun,
+  Calendar,
+  EllipsisVertical,
+  FileText,
+  Footprints,
+  Package,
+  Share2,
   BadgePercent,
   Bell,
   BookOpen,
@@ -67,6 +73,34 @@ type ChatType = "TRADE" | "COMMUNITY" | "GROUP" | "SYSTEM";
 type TradeRole = "SELLER" | "BUYER";
 type SheetId = null | "write" | "region" | "notifications" | "status";
 
+export interface AlbaItem {
+  id: string;
+  title: string;
+  companyName: string;
+  neighborhoodName: string;
+  detailLocation: string;
+  payType: "연봉" | "일급" | "시급" | "월급";
+  payAmount: number;
+  payLabel: string;
+  workingDays: string;
+  workingHours: string;
+  category: "이웃알바" | "걸어서10분" | "단기알바" | "식당/카페" | "물류/현장" | "레슨/과외";
+  badges: string[];
+  reviewCount?: number;
+  thumbnailTone: string;
+  thumbnailEmoji?: string;
+  bgGradient: string;
+  descriptionBullets: string[];
+  details: string;
+  applicantCount: number;
+  viewCount: number;
+  isFavorite: boolean;
+  hasApplied: boolean;
+  phoneContact: string;
+  isAd?: boolean;
+  createdAt: string;
+}
+
 type SubPage =
   | null
   | { type: "product-detail"; id: string }
@@ -78,6 +112,9 @@ type SubPage =
   | { type: "all-services" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
+  | { type: "alba"; tab?: "home" | "search" | "applications" | "manage"; category?: string }
+  | { type: "alba-detail"; id: string }
+  | { type: "alba-form" }
   | { type: "settings" }
   | { type: "sales" }
   | { type: "favorites" }
@@ -776,6 +813,252 @@ function subscribeTheme(onChange: () => void) {
   };
 }
 
+
+const ALBA_MOCK_DATA: AlbaItem[] = [
+  {
+    id: "alba-1",
+    title: "[무신사스탠다드] 명동중앙점 풀타임 스태프 채용",
+    companyName: "무신사 스탠다드 명동중앙점",
+    neighborhoodName: "중구 충무로1가",
+    detailLocation: "명동역 6번 출구 도보 2분",
+    payType: "연봉",
+    payAmount: 27600000,
+    payLabel: "연봉 2,760만원",
+    workingDays: "주 5일 (스케줄 근무)",
+    workingHours: "09:30 ~ 19:30 (휴게 1시간)",
+    category: "이웃알바",
+    badges: ["정직원", "모범구인"],
+    reviewCount: 4,
+    thumbnailTone: "musinsa",
+    thumbnailEmoji: "🏢",
+    bgGradient: "linear-gradient(135deg, #1c1d22 0%, #363942 100%)",
+    descriptionBullets: [
+      "1. 매장 상품 진열 및 고객 응대",
+      "2. 피팅룸 안내 및 재고 관리",
+      "3. 4대보험, 퇴직금, 유니폼 지원",
+      "4. 무신사 패밀리 임직원 할인 혜택"
+    ],
+    details: "트렌디한 패션 브랜드 무신사 스탠다드 명동점에서 함께할 열정적인 스태프를 모십니다. 패션에 관심이 많고 친절한 분들의 많은 지원 바랍니다!",
+    applicantCount: 8,
+    viewCount: 412,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-1544-7199",
+    isAd: true,
+    createdAt: "방금 전",
+  },
+  {
+    id: "alba-2",
+    title: "명동뷰티매장 질서유지 및 고객응대",
+    companyName: "휴먼코드",
+    neighborhoodName: "중구 충무로1가",
+    detailLocation: "명동역 6번출구 도보 1분거리 올리브영 명동본점",
+    payType: "일급",
+    payAmount: 65000,
+    payLabel: "일급 65,000원",
+    workingDays: "월~금",
+    workingHours: "18:00 ~ 22:30",
+    category: "단기알바",
+    badges: ["후기 1"],
+    reviewCount: 1,
+    thumbnailTone: "oliveyoung",
+    thumbnailEmoji: "💄",
+    bgGradient: "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)",
+    descriptionBullets: [
+      "1. 대기줄 및 매장 질서유지",
+      "2. 고객 응대지원",
+      "3. 휴게시간 30분 제공",
+      "4. 상시 근무 및 당일/익일 지급 가능"
+    ],
+    details: "명동 중심 뷰티 매장에서 저녁 시간대 고객 질서유지 및 동선 안내를 도와주실 친절한 이웃 알바님을 구합니다. 초보자도 바로 가능합니다!",
+    applicantCount: 12,
+    viewCount: 520,
+    isFavorite: true,
+    hasApplied: false,
+    phoneContact: "010-8921-4321",
+    isAd: true,
+    createdAt: "10분 전",
+  },
+  {
+    id: "alba-3",
+    title: "[무신사스토어] 대림창고 성수 주말 피킹/물류 스태프",
+    companyName: "무신사 스토어 성수점",
+    neighborhoodName: "성동구 성수동2가",
+    detailLocation: "성수역 3번 출구 인근",
+    payType: "시급",
+    payAmount: 12384,
+    payLabel: "시급 12,384원",
+    workingDays: "주말 (토, 일)",
+    workingHours: "11:00 ~ 20:00",
+    category: "걸어서10분",
+    badges: ["모범구인"],
+    thumbnailTone: "musinsa_dark",
+    thumbnailEmoji: "📦",
+    bgGradient: "linear-gradient(135deg, #09090b 0%, #27272a 100%)",
+    descriptionBullets: [
+      "1. 입출고 상품 분류 및 피킹",
+      "2. 쾌적한 실내 창고 환경",
+      "3. 주휴수당 별도 지급, 식대 지원"
+    ],
+    details: "성수동 핫플레이스 무신사스토어 대림창고에서 주말 동안 활기차게 함께 일할 파트타이머를 모집합니다.",
+    applicantCount: 15,
+    viewCount: 680,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-6959-1122",
+    createdAt: "30분 전",
+  },
+  {
+    id: "alba-4",
+    title: "홀서빙 가족 구합니다 (초보 환영)",
+    companyName: "진주꽃돼지",
+    neighborhoodName: "용산구 한남동",
+    detailLocation: "순천향대병원 앞 먹자골목",
+    payType: "월급",
+    payAmount: 3400000,
+    payLabel: "월급 340만원",
+    workingDays: "주 5일",
+    workingHours: "16:00 ~ 02:00",
+    category: "식당/카페",
+    badges: ["정직원", "후기 18"],
+    reviewCount: 18,
+    thumbnailTone: "bbq",
+    thumbnailEmoji: "🥩",
+    bgGradient: "linear-gradient(135deg, #842323 0%, #d32f2f 100%)",
+    descriptionBullets: [
+      "1. 숯불구이 전문점 홀 서빙 및 테이블 정리",
+      "2. 맛있는 저녁 식사 제공",
+      "3. 팁 및 성과급 추가 지급"
+    ],
+    details: "동네에서 오랫동안 사랑받는 고깃집입니다. 가족처럼 편안한 분위기에서 서로 도우며 근무하실 성실한 분 환영합니다!",
+    applicantCount: 6,
+    viewCount: 340,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "010-3342-9988",
+    createdAt: "1시간 전",
+  },
+  {
+    id: "alba-5",
+    title: "[자라] 명동 눈스퀘어점 풀타임 어드바이저 채용",
+    companyName: "인디텍스코리아 자라",
+    neighborhoodName: "중구 명동2가",
+    detailLocation: "을지로입구역 6번 출구 연결",
+    payType: "연봉",
+    payAmount: 30980000,
+    payLabel: "연봉 3,098만원",
+    workingDays: "주 5일 (스케줄)",
+    workingHours: "09:00 ~ 18:30",
+    category: "이웃알바",
+    badges: ["모범구인", "후기 10"],
+    reviewCount: 10,
+    thumbnailTone: "zara",
+    thumbnailEmoji: "👗",
+    bgGradient: "linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)",
+    descriptionBullets: [
+      "1. 글로벌 SPA 브랜드 자라 고객 어드바이징",
+      "2. 디스플레이 및 매장 운영 관리",
+      "3. 인센티브 및 글로벌 교육 프로그램"
+    ],
+    details: "글로벌 패션 그룹 인디텍스 자라에서 패션 리더로 성장할 스태프를 채용합니다.",
+    applicantCount: 19,
+    viewCount: 890,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-3783-5000",
+    createdAt: "2시간 전",
+  },
+  {
+    id: "alba-6",
+    title: "디저트 전문점 카페 주5일 바리스타/스태프 모집",
+    companyName: "AVA 아바",
+    neighborhoodName: "성동구 성수동1가",
+    detailLocation: "서울숲역 5번 출구 도보 3분",
+    payType: "시급",
+    payAmount: 13500,
+    payLabel: "시급 13,500원",
+    workingDays: "주 5일",
+    workingHours: "10:00 ~ 18:00",
+    category: "식당/카페",
+    badges: ["모범구인", "후기 37"],
+    reviewCount: 37,
+    thumbnailTone: "cafe",
+    thumbnailEmoji: "☕",
+    bgGradient: "linear-gradient(135deg, #4b3832 0%, #854442 100%)",
+    descriptionBullets: [
+      "1. 스페셜티 커피 추출 및 음료 제조",
+      "2. 디저트 플레이팅 및 카운터 포스 응대",
+      "3. 쾌적하고 감성적인 인테리어 근무환경"
+    ],
+    details: "디저트와 스페셜티 커피를 사랑하는 분들의 지원을 기다립니다. 초보자도 꼼꼼한 레시피 교육 후 바로 근무 가능합니다.",
+    applicantCount: 24,
+    viewCount: 1040,
+    isFavorite: true,
+    hasApplied: true,
+    phoneContact: "010-4491-0102",
+    createdAt: "3시간 전",
+  },
+  {
+    id: "alba-7",
+    title: "논현 세차원 구합니다 (초보 환영, 단기 가능)",
+    companyName: "텐미닛워시",
+    neighborhoodName: "강남구 논현동",
+    detailLocation: "학동역 1번 출구 도보 5분",
+    payType: "시급",
+    payAmount: 12000,
+    payLabel: "시급 12,000원",
+    workingDays: "협의 가능 (주 3~5일)",
+    workingHours: "09:00 ~ 18:00",
+    category: "물류/현장",
+    badges: ["단기", "초보가능"],
+    thumbnailTone: "carwash",
+    thumbnailEmoji: "🚗",
+    bgGradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+    descriptionBullets: [
+      "1. 실내외 프리미엄 디테일링 세차 보조",
+      "2. 장비 사용법 1대1 맞춤 교육",
+      "3. 간식 및 식사 제공"
+    ],
+    details: "손세차 보조 인원을 충원합니다. 땀 흘린 만큼 보람 있는 작업이며 밝고 활기찬 분위기입니다.",
+    applicantCount: 4,
+    viewCount: 220,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "010-9988-1234",
+    createdAt: "4시간 전",
+  },
+  {
+    id: "alba-8",
+    title: "[5년연속 미슐랭] 이태원 우육미엔 홀/주방 직원",
+    companyName: "우육미엔",
+    neighborhoodName: "용산구 이태원동",
+    detailLocation: "한강진역 1번 출구 도보 4분",
+    payType: "월급",
+    payAmount: 2800000,
+    payLabel: "월급 280만원",
+    workingDays: "주 5일 (화요일 정기휴무)",
+    workingHours: "10:30 ~ 21:30 (브레이크타임 2시간)",
+    category: "식당/카페",
+    badges: ["정직원", "후기 1"],
+    reviewCount: 1,
+    thumbnailTone: "noodle",
+    thumbnailEmoji: "🍜",
+    bgGradient: "linear-gradient(135deg, #e52d27 0%, #b31217 100%)",
+    descriptionBullets: [
+      "1. 미슐랭 빕구르망 선정 대만식 우육면 전문점",
+      "2. 홀 서빙 및 주방 보조",
+      "3. 4대보험, 퇴직금, 유니폼 제공"
+    ],
+    details: "정통 대만 요리를 선보이는 우육미엔에서 성실하고 책임감 있는 팀원을 모십니다.",
+    applicantCount: 7,
+    viewCount: 450,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-798-5556",
+    createdAt: "5시간 전",
+  }
+];
+
 export default function GajiMarketApp() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ThemeMode);
 
@@ -806,6 +1089,7 @@ export default function GajiMarketApp() {
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>(initialChats);
+  const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
   const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
@@ -935,6 +1219,9 @@ export default function GajiMarketApp() {
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
+    if (tab === "map") {
+      setMapSheetState("half");
+    }
     window.requestAnimationFrame(() => {
       document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -946,11 +1233,17 @@ export default function GajiMarketApp() {
       subPage?.type === "my-menu" ||
       subPage?.type === "dream-dashboard" ||
       subPage?.type === "dream-notice" ||
+      subPage?.type === "alba" ||
+      subPage?.type === "alba-form" ||
       subPage?.type === "sales" ||
       subPage?.type === "favorites"
     ) {
       setActiveTab("my");
       setSubPage(null);
+      return;
+    }
+    if (subPage?.type === "alba-detail") {
+      setSubPage({ type: "alba" });
       return;
     }
     setSubPage(null);
@@ -1074,6 +1367,40 @@ export default function GajiMarketApp() {
     setSubPage(null);
   }
 
+  
+  function toggleAlbaFavorite(id: string) {
+    setAlbaList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    );
+  }
+
+  function handleApplyAlba(id: string) {
+    setAlbaList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, hasApplied: true, applicantCount: item.applicantCount + 1 } : item
+      )
+    );
+    alert("지원서가 성공적으로 접수되었습니다! 💜\n담당자가 확인 후 연락드릴 예정입니다.");
+  }
+
+  function handleCreateAlba(newItem: Omit<AlbaItem, "id" | "applicantCount" | "viewCount" | "isFavorite" | "hasApplied" | "createdAt">) {
+    const created: AlbaItem = {
+      ...newItem,
+      id: `alba-${Date.now()}`,
+      applicantCount: 0,
+      viewCount: 1,
+      isFavorite: false,
+      hasApplied: false,
+      createdAt: "방금 전",
+    };
+    setAlbaList((current) => [created, ...current]);
+    setSubPage({ type: "alba-detail", id: created.id });
+  }
+
+  const selectedAlba = subPage?.type === "alba-detail" ? albaList.find((item) => item.id === subPage.id) : undefined;
+
   const selectedProduct =
     subPage?.type === "product-detail" ? products.find((product) => product.id === subPage.id) : undefined;
   const selectedPost =
@@ -1116,9 +1443,9 @@ export default function GajiMarketApp() {
               onBack={goBack}
             />
           ) : subPage?.type === "my-menu" ? (
-            <MyMenuScreen onBack={goBack} />
+            <MyMenuScreen onBack={goBack} onOpenAlba={(tab) => setSubPage({ type: "alba", tab })} />
           ) : subPage?.type === "all-services" ? (
-            <AllServicesScreen onBack={goBack} />
+            <AllServicesScreen onBack={goBack} onOpenAlba={() => setSubPage({ type: "alba" })} />
           ) : subPage?.type === "dream-dashboard" ? (
             <DreamDashboardScreen
               activeNeighborhood={activeNeighborhood}
@@ -1128,6 +1455,30 @@ export default function GajiMarketApp() {
             />
           ) : subPage?.type === "dream-notice" ? (
             <DreamNoticeScreen onBack={goBack} />
+          ) : subPage?.type === "alba" ? (
+            <AlbaMainScreen
+              activeNeighborhood={activeNeighborhood}
+              initialTab={subPage.tab ?? "home"}
+              initialCategory={subPage.category}
+              albas={albaList}
+              onBack={goBack}
+              onSelectAlba={(id) => setSubPage({ type: "alba-detail", id })}
+              onWrite={() => setSubPage({ type: "alba-form" })}
+              onToggleFavorite={toggleAlbaFavorite}
+            />
+          ) : subPage?.type === "alba-detail" && selectedAlba ? (
+            <AlbaDetailScreen
+              alba={selectedAlba}
+              onBack={goBack}
+              onToggleFavorite={() => toggleAlbaFavorite(selectedAlba.id)}
+              onApply={() => handleApplyAlba(selectedAlba.id)}
+            />
+          ) : subPage?.type === "alba-form" ? (
+            <AlbaFormScreen
+              activeNeighborhood={activeNeighborhood}
+              onBack={goBack}
+              onSubmit={handleCreateAlba}
+            />
           ) : subPage?.type === "settings" ? (
             <SettingsScreen
               theme={theme}
@@ -1182,7 +1533,6 @@ export default function GajiMarketApp() {
               onFilterChange={setProductFilter}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onFavorite={toggleFavorite}
-              onWrite={() => setSheet("write")}
               onRetry={() => setHasNetworkError(false)}
             />
           ) : activeTab === "community" ? (
@@ -1200,7 +1550,6 @@ export default function GajiMarketApp() {
                 setSubPage({ type: "settings" });
               }}
               onPostClick={(id) => setSubPage({ type: "community-detail", id })}
-              onWrite={() => setSubPage({ type: "community-form" })}
             />
           ) : activeTab === "map" ? (
             <MapScreen
@@ -1243,14 +1592,23 @@ export default function GajiMarketApp() {
               onOpenMenu={() => setSubPage({ type: "my-menu" })}
               onOpenAllServices={() => setSubPage({ type: "all-services" })}
               onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
+              onOpenAlba={() => setSubPage({ type: "alba" })}
               onOpenSales={() => setSubPage({ type: "sales" })}
               onOpenFavorites={() => setSubPage({ type: "favorites" })}
             />
           )}
         </main>
 
-        {activeTab === "map" && !subPage && mapSheetState === "expanded" && (
-          <FloatingWriteButton onClick={() => setSheet("write")} />
+        {!subPage && (activeTab === "home" || activeTab === "community" || (activeTab === "map" && mapSheetState === "expanded")) && (
+          <FloatingWriteButton
+            onClick={() => {
+              if (activeTab === "community") {
+                setSubPage({ type: "community-form" });
+              } else {
+                setSheet("write");
+              }
+            }}
+          />
         )}
 
         {showBottomNav && (
@@ -1358,7 +1716,6 @@ function HomeScreen({
   onFilterChange,
   onProductClick,
   onFavorite,
-  onWrite,
   onRetry,
 }: {
   isLoading: boolean;
@@ -1374,7 +1731,6 @@ function HomeScreen({
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
   onFavorite: (id: string) => void;
-  onWrite: () => void;
   onRetry: () => void;
 }) {
   return (
@@ -1432,8 +1788,6 @@ function HomeScreen({
           ))}
         </div>
       )}
-
-      <FloatingWriteButton onClick={onWrite} />
     </section>
   );
 }
@@ -1715,7 +2069,6 @@ function CommunityScreen({
   onOpenNotifications,
   onOpenMenu,
   onPostClick,
-  onWrite,
 }: {
   activeTab: string;
   activeFilter: string;
@@ -1727,7 +2080,6 @@ function CommunityScreen({
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
   onPostClick: (id: string) => void;
-  onWrite: () => void;
 }) {
   return (
     <section className={styles.screen}>
@@ -1777,7 +2129,6 @@ function CommunityScreen({
           ))}
         </div>
       )}
-      <FloatingWriteButton onClick={onWrite} />
     </section>
   );
 }
@@ -1903,6 +2254,83 @@ function CommunityFormScreen({
   );
 }
 
+
+function RealtimeDangerTicker({
+  dangerSignals,
+  onSelectDanger,
+}: {
+  dangerSignals: LocalBusiness[];
+  onSelectDanger?: (business: LocalBusiness) => void;
+}) {
+  // 서울안전누리(Nuri) 실시간 크롤링 위험 소식 목록 (2개씩 순환 표시)
+  const nuriAlerts = dangerSignals.map((d) => ({
+    title: d.name,
+    tag: d.riskType ? `${d.riskType}` : "공식 소식",
+    business: d,
+  }));
+
+  const fallbackAlerts = [
+    { title: "교통 통제·공지도 여기 모여요", tag: "공식 소식", business: null },
+    { title: "잠수교 보행로 및 차도 전면 통제", tag: "도로통제", business: null },
+    { title: "서울 동남권 호우주의보 발효 중", tag: "기상특보", business: null },
+    { title: "성내천·탄천 산책로 출입 통제", tag: "하천통제", business: null },
+    { title: "올림픽대로 여의교 부근 부분통제", tag: "도로공사", business: null },
+  ];
+
+  const streamAlerts = nuriAlerts.length >= 2 ? nuriAlerts : [...nuriAlerts, ...fallbackAlerts];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % streamAlerts.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [streamAlerts.length]);
+
+  const item1 = streamAlerts[currentIndex];
+  const item2 = streamAlerts[(currentIndex + 1) % streamAlerts.length];
+
+  return (
+    <div className={styles.realtimeNewsCard}>
+      <div className={styles.realtimeNewsHeader}>
+        <span className={styles.realtimeDot} />
+        <strong>실시간 소식</strong>
+      </div>
+      <div className={styles.realtimeNewsSlider}>
+        <div
+          key={`row1-${currentIndex}`}
+          className={styles.realtimeNewsRow}
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (item1.business && onSelectDanger) {
+              onSelectDanger(item1.business);
+            }
+          }}
+        >
+          <p className={styles.realtimeNewsText}>{item1.title}</p>
+          <small className={styles.realtimeNewsTag}>{item1.tag}</small>
+        </div>
+        <div
+          key={`row2-${currentIndex}`}
+          className={styles.realtimeNewsRow}
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (item2.business && onSelectDanger) {
+              onSelectDanger(item2.business);
+            }
+          }}
+        >
+          <p className={styles.realtimeNewsText}>{item2.title}</p>
+          <small className={styles.realtimeNewsTag}>{item2.tag}</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MapScreen({
   activeNeighborhood,
   categories,
@@ -1942,6 +2370,36 @@ function MapScreen({
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const locationRequestRef = useRef(0);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY > 6 && sheetState !== "expanded") {
+      onSheetStateChange("expanded");
+    } else if (e.deltaY < -6 && sheetState === "expanded") {
+      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+        onSheetStateChange("half");
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartY.current === null) return;
+    const delta = touchStartY.current - e.touches[0].clientY;
+    if (delta > 12 && sheetState !== "expanded") {
+      onSheetStateChange("expanded");
+      touchStartY.current = null;
+    } else if (delta < -12 && sheetState === "expanded") {
+      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+        onSheetStateChange("half");
+        touchStartY.current = null;
+      }
+    }
+  };
 
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
   const visibleSelectedDanger = selectedDanger && businesses.some((business) => business.id === selectedDanger.id)
@@ -2034,6 +2492,10 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
+        <RealtimeDangerTicker
+          dangerSignals={businesses.filter((b) => b.category === "danger")}
+          onSelectDanger={selectDanger}
+        />
         {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
         {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
         <div className={styles.mapControls}>
@@ -2055,7 +2517,7 @@ function MapScreen({
         ) : null}
       </div>
 
-      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`}>
+      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
         <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "업체 패널 접기" : "업체 패널 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
           const panel = event.currentTarget.parentElement;
           onSheetStateChange(nextState);
@@ -2531,6 +2993,7 @@ function MyScreen({
   onOpenMenu,
   onOpenAllServices,
   onOpenDream,
+  onOpenAlba,
   onOpenSales,
   onOpenFavorites,
 }: {
@@ -2542,6 +3005,7 @@ function MyScreen({
   onOpenMenu: () => void;
   onOpenAllServices: () => void;
   onOpenDream: () => void;
+  onOpenAlba: () => void;
   onOpenSales: () => void;
   onOpenFavorites: () => void;
 }) {
@@ -2552,7 +3016,7 @@ function MyScreen({
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
-    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary" },
+    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
     { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];
 
@@ -2561,8 +3025,18 @@ function MyScreen({
       <ScreenHeader
         title="나의 가지"
         titleAccessory={
-          <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream}>
-            꿈가지
+          <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream} aria-label="꿈가지">
+            <span className={styles.dreamEntryLabel} aria-hidden="true">
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+            </span>
             <Image src="/dream/baby-elephant.png" alt="" width={36} height={29} className={styles.dreamEntryMascot} />
           </button>
         }
@@ -2670,31 +3144,21 @@ function DreamDashboardScreen({
           </IconButton>
         }
       />
-      <section
+      <button
+        type="button"
         className={styles.dreamBanner}
         aria-label="꿈가지 나눔 캠페인 공지사항 보기"
-        role="button"
-        tabIndex={0}
         onClick={onOpenNotice}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotice(); } }}
-        style={{ cursor: "pointer" }}
       >
-        <div className={styles.dreamBannerCopy}>
-          <span>우리 동네와 함께</span>
-          <h2>작은 나눔이 모여<br />꿈이 자라요</h2>
-          <button type="button" onClick={(e) => { e.stopPropagation(); onOpenNotice(); }}>
-            공지사항 및 안내 보기 <ChevronRight size={16} />
-          </button>
-        </div>
         <Image
-          src="/dream/baby-elephant.png"
-          alt="꿈가지에서 활동하는 귀여운 아기 코끼리"
-          width={160}
-          height={128}
-          className={styles.dreamBannerMascot}
+          src="/dream/dream-main-banner.png"
+          alt="우리 동네와 함께, 꿈가지. 작은 나눔이 모여 꿈이 자라요"
+          width={1940}
+          height={809}
+          className={styles.dreamBannerImage}
           priority
         />
-      </section>
+      </button>
       <section className={styles.dreamMapPanel}>
         <DreamMapLayer
           activeNeighborhood={activeNeighborhood}
@@ -2869,6 +3333,7 @@ function DreamMapLayer({
     if (!maps || !map || !canUseNaverMap) return;
 
     markerRefs.current = facilities.map((facility) => {
+      const isSelected = facility.id === selectedFacility?.id;
       const marker = new maps.Marker({
           position: new maps.LatLng(facility.lat, facility.lng),
           map,
@@ -2877,12 +3342,11 @@ function DreamMapLayer({
           icon: {
             content: createDreamFacilityMarkerContent(
               facility,
-              facility.id === selectedFacility?.id,
+              isSelected,
               onSelectFacility,
             ),
           },
         });
-      maps.Event?.addListener(marker, "click", () => onSelectFacility(facility));
       return marker;
     });
     return () => {
@@ -2932,21 +3396,34 @@ function DreamMapLayer({
 function createDreamFacilityMarkerContent(
   facility: DonationFacility,
   selected: boolean,
-  onSelectFacility: (facility: DonationFacility) => void,
+  onSelectFacility: (facility: DonationFacility | null) => void,
 ) {
+  const marker = document.createElement("span");
+  marker.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin} ${selected ? styles.dreamFacilityPinSelected : ""}`;
+  marker.tabIndex = 0;
+  marker.setAttribute("role", "button");
+  marker.setAttribute("aria-label", `${facility.name} 모금 현황`);
+
+  const mascot = document.createElement("span");
+  mascot.className = styles.dreamFacilityPinMascot;
+  const image = document.createElement("img");
+  image.src = "/dream/baby-elephant.png";
+  image.alt = "";
+  mascot.append(image);
+
   const label = document.createElement("span");
-  label.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin} ${selected ? styles.dreamFacilityPinSelected : ""}`;
+  label.className = styles.dreamFacilityPinLabel;
   label.textContent = facility.name;
-  label.tabIndex = 0;
-  label.setAttribute("role", "button");
-  label.setAttribute("aria-label", `${facility.name} 모금 현황`);
-  label.addEventListener("click", () => onSelectFacility(facility));
-  label.addEventListener("keydown", (event) => {
+
+  if (selected) marker.append(label);
+  marker.append(mascot);
+  marker.addEventListener("click", () => onSelectFacility(selected ? null : facility));
+  marker.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    onSelectFacility(facility);
+    onSelectFacility(selected ? null : facility);
   });
-  return label;
+  return marker;
 }
 
 function PromoCard() {
@@ -3009,7 +3486,13 @@ function MenuCard({
   );
 }
 
-function MyMenuScreen({ onBack }: { onBack: () => void }) {
+function MyMenuScreen({
+  onBack,
+  onOpenAlba,
+}: {
+  onBack: () => void;
+  onOpenAlba?: (tab: "manage") => void;
+}) {
   return (
     <section className={styles.screen}>
       <ScreenHeader
@@ -3044,7 +3527,7 @@ function MyMenuScreen({ onBack }: { onBack: () => void }) {
       <MenuCard
         title="나의 활동"
         items={[
-          { label: "알바 구인 공고", icon: NotebookTabs },
+          { label: "알바 구인 공고", icon: NotebookTabs, onClick: () => onOpenAlba?.("manage") },
           { label: "선생님 프로필 관리", icon: GraduationCap },
           { label: "참여중인 모임", icon: UsersRound },
           { label: "내 동네생활 글", icon: ReceiptText },
@@ -3258,7 +3741,13 @@ function FavoriteScreen({
   );
 }
 
-function AllServicesScreen({ onBack }: { onBack: () => void }) {
+function AllServicesScreen({
+  onBack,
+  onOpenAlba,
+}: {
+  onBack: () => void;
+  onOpenAlba?: () => void;
+}) {
   const serviceCategories = [
     {
       title: "최근 사용",
@@ -3271,7 +3760,7 @@ function AllServicesScreen({ onBack }: { onBack: () => void }) {
       title: "동네 거래",
       items: [
         { label: "중고거래", icon: ShoppingBag, color: "#ff6f0f" },
-        { label: "알바", icon: Search, color: "#ff6f0f" },
+        { label: "알바", icon: BriefcaseBusiness, color: "#ff6f0f", onClick: onOpenAlba },
         { label: "부동산", icon: House, color: "#e64980" },
         { label: "중고차", icon: Truck, color: "#228be6" },
         { label: "스토어", icon: ShoppingBasket, color: "#fab005" },
@@ -3555,8 +4044,8 @@ function BottomNav({
 
 function FloatingWriteButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" className={styles.floatingWrite} onClick={onClick}>
-      <Plus size={27} /> 글쓰기
+    <button type="button" className={styles.floatingWrite} onClick={onClick} aria-label="글쓰기">
+      <Plus size={20} strokeWidth={2.5} /> 글쓰기
     </button>
   );
 }
@@ -3702,84 +4191,693 @@ function formatBadge(count: number) {
   return String(count);
 }
 
-function DreamNoticeScreen({ onBack }: { onBack: () => void }) {
-  const [cheerCount, setCheerCount] = useState(28);
-  const [hasCheered, setHasCheered] = useState(false);
+const DREAM_NOTICE_ITEMS = [
+  {
+    id: "ticket-monitoring",
+    title: "[공지] 추석 명절에 앞서 '승차권' 판매금지 집중 모니터링 안내드려요.",
+    date: "2026.08.26",
+  },
+  {
+    id: "buy-now-policy",
+    title: "[공지] 더 나은 서비스 제공을 위해 바로구매 운영정책이 변경될 예정이에요.",
+    date: "2026.07.27",
+  },
+  {
+    id: "biocide-trade",
+    title: "[공지] 미승인 살생물제품(살충제 · 살균제) 거래 주의 안내",
+    date: "2026.07.22",
+  },
+  {
+    id: "kbank-maintenance",
+    title: "[공지] 케이뱅크 점검에 따른 당근페이 일부 은행 및 증권사 이용 제한 안내드려요. (7월 12일 일요일 00:00~10:00)",
+    date: "2026.07.12",
+  },
+  {
+    id: "honors-trade",
+    title: "[공지] 행정안전부에서 전하는 훈장 · 포장 거래 금지 안내",
+    date: "2026.07.08",
+  },
+  {
+    id: "privacy-policy",
+    title: "[공지] 당근 개인정보 처리방침이 개정될 예정이에요.",
+    date: "2026.06.30",
+  },
+] as const;
 
-  const handleCheer = () => {
-    if (hasCheered) {
-      setCheerCount((c) => c - 1);
-      setHasCheered(false);
-    } else {
-      setCheerCount((c) => c + 1);
-      setHasCheered(true);
+function DreamNoticeScreen({ onBack }: { onBack: () => void }) {
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const selectedNotice = DREAM_NOTICE_ITEMS.find((notice) => notice.id === selectedNoticeId) ?? null;
+  const handleBack = selectedNotice ? () => setSelectedNoticeId(null) : onBack;
+
+  useEffect(() => {
+    document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
+  }, [selectedNoticeId]);
+
+  return (
+    <section className={`${styles.screen} ${styles.dreamScreen} ${styles.dreamNoticeScreen}`}>
+      <ScreenHeader
+        title="공지사항"
+        leading={
+          <IconButton label="뒤로" onClick={handleBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+
+      {selectedNotice ? (
+        <article className={styles.dreamNoticeDetail}>
+          <header className={styles.dreamNoticeDetailHeader}>
+            <h2>{selectedNotice.title}</h2>
+            <time dateTime={selectedNotice.date.replaceAll(".", "-")}>{selectedNotice.date}</time>
+          </header>
+
+          {selectedNotice.id === "ticket-monitoring" && (
+            <div className={styles.dreamNoticeDetailBody}>
+              <p>
+                다가올 2026 추석 명절을 앞두고 연휴 기간동안의 <strong>&apos;승차권&apos;판매가 시작될 예정</strong>이에요.<br />
+                평상시에도 판매할 수 없지만 명절이 다가오면서 <strong>집중 모니터링</strong>이 진행되어 안내드려요.
+              </p>
+              <p>
+                기차표 등의 승차권은 <strong>철도 사업법 제10조의2(승차권 등 부정 판매의 금지)</strong> 내용으로 당근마켓에서는 금지된 물품을 거래할 수 없어요.<br />
+                관련 게시글은 서비스에서 노출되지 않게 됩니다.<br />
+                <span className={styles.dreamNoticeLinkText}>[판매 금지 물품에 해당하는 암표매매 행위는 어떤 것이 있나요?]</span>
+              </p>
+              <p>*신고가 접수될 경우 운영정책 위반 내용에 따라 게시글이 미노출돼요.</p>
+              <p>
+                한국철도공사에서는 암표 의심 거래에 대해 미스터리 쇼퍼를 운영 중이며,<br />
+                암표 거래가 적발될 경우 약관에 따라 불이익이 발생할 수 있으니 참고 부탁드립니다
+              </p>
+              <p>
+                승차권 암표는 아래 첨부드린 링크를 통해 제보 가능하니 참고 부탁드릴게요.
+              </p>
+              <p className={styles.dreamNoticeLinkText}>▸ [승차권 암표 신고 사이트 링크]</p>
+              <p>우리 함께 안전한 지역 거래문화를 만들어요.</p>
+            </div>
+          )}
+        </article>
+      ) : (
+        <div className={styles.dreamNoticeList} aria-label="공지사항 목록">
+          {DREAM_NOTICE_ITEMS.map((notice) => (
+            <button
+              key={notice.id}
+              type="button"
+              className={styles.dreamNoticeListItem}
+              onClick={() => setSelectedNoticeId(notice.id)}
+            >
+              <strong>{notice.title}</strong>
+              <time dateTime={notice.date.replaceAll(".", "-")}>{notice.date}</time>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+/* ==========================================================================
+   Gaji Alba Components
+   ========================================================================== */
+
+function AlbaMainScreen({
+  activeNeighborhood,
+  initialTab = "home",
+  initialCategory,
+  albas,
+  onBack,
+  onSelectAlba,
+  onWrite,
+  onToggleFavorite,
+}: {
+  activeNeighborhood: string;
+  initialTab?: "home" | "search" | "applications" | "manage";
+  initialCategory?: string;
+  albas: AlbaItem[];
+  onBack: () => void;
+  onSelectAlba: (id: string) => void;
+  onWrite: () => void;
+  onToggleFavorite: (id: string) => void;
+}) {
+  const [currentTab, setCurrentTab] = useState<"home" | "search" | "applications" | "manage">(initialTab);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory ?? null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const categories = [
+    { label: "이웃알바", emoji: "🧡", icon: Heart },
+    { label: "걸어서10분", emoji: "👟", icon: Footprints },
+    { label: "단기알바", emoji: "📅", icon: Calendar },
+    { label: "식당/카페", emoji: "🏪", icon: Utensils },
+    { label: "물류/현장", emoji: "📦", icon: Package },
+    { label: "레슨/과외", emoji: "📕", icon: BookOpen },
+  ];
+
+  const filteredAlbas = albas.filter((item) => {
+    if (selectedCategory && item.category !== selectedCategory) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.companyName.toLowerCase().includes(q) ||
+        item.neighborhoodName.toLowerCase().includes(q) ||
+        item.payLabel.toLowerCase().includes(q)
+      );
     }
+    return true;
+  });
+
+  const appliedAlbas = albas.filter((item) => item.hasApplied);
+
+  return (
+    <section className={styles.albaScreen}>
+      <header className={styles.albaHeader}>
+        <button type="button" onClick={onBack} aria-label="닫기" className={styles.iconButton}>
+          <X size={26} />
+        </button>
+        <h1>당근알바</h1>
+        <div className={styles.albaHeaderActions}>
+          <button type="button" onClick={() => setCurrentTab("search")} className={styles.iconButton} aria-label="알바 검색">
+            <Search size={24} />
+          </button>
+          <button type="button" className={styles.iconButton} aria-label="메뉴">
+            <Menu size={26} />
+          </button>
+        </div>
+      </header>
+
+      {currentTab === "home" && (
+        <>
+          {/* Top Quick Area */}
+          <section className={styles.albaTopSection}>
+            <div
+              className={styles.albaPopularCard}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedCategory(null)}
+            >
+              <div className={styles.albaPopularCardCopy}>
+                <span>우리동네</span>
+                <strong>인기알바 보기 <ChevronRight size={16} /></strong>
+              </div>
+              <div className={styles.albaPopularMapVisual}>
+                <MapPin size={28} color="#ffffff" className={styles.albaPopularPinIcon} fill="#ff6f0f" />
+              </div>
+            </div>
+
+            <div className={styles.albaCategoryGrid}>
+              {categories.map((cat) => {
+                const isSelected = selectedCategory === cat.label;
+                return (
+                  <button
+                    key={cat.label}
+                    type="button"
+                    className={`${styles.albaCategoryBtn} ${isSelected ? styles.chipActive : ""}`}
+                    onClick={() => setSelectedCategory(isSelected ? null : cat.label)}
+                  >
+                    <span className={styles.albaCategoryIconCircle}>{cat.emoji}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 2-Column Grid Feed */}
+          <section className={styles.albaFeedSection}>
+            <div className={styles.albaFeedHeading}>
+              <h2>
+                {selectedCategory ? `${selectedCategory} 목록` : `${activeNeighborhood === "송파삼성래미안" ? "한남동" : activeNeighborhood}에서 많이 찾는 알바`}
+              </h2>
+              <small>광고 ⓘ</small>
+            </div>
+
+            {filteredAlbas.length === 0 ? (
+              <StateBlock
+                title="해당하는 알바가 없어요"
+                body="다른 카테고리를 선택하거나 검색어를 변경해보세요."
+                actionLabel="전체 보기"
+                onAction={() => { setSelectedCategory(null); setSearchQuery(""); }}
+              />
+            ) : (
+              <div className={styles.albaGrid}>
+                {filteredAlbas.map((alba) => (
+                  <AlbaCardComponent
+                    key={alba.id}
+                    alba={alba}
+                    onSelect={() => onSelectAlba(alba.id)}
+                    onToggleFavorite={() => onToggleFavorite(alba.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {currentTab === "search" && (
+        <section className={styles.albaFeedSection}>
+          <div className={styles.mapSearch} style={{ margin: "10px 0 16px" }}>
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="직종, 업체명, 동네 등으로 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery("")} aria-label="검색어 지우기">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className={styles.albaGrid}>
+            {filteredAlbas.map((alba) => (
+              <AlbaCardComponent
+                key={alba.id}
+                alba={alba}
+                onSelect={() => onSelectAlba(alba.id)}
+                onToggleFavorite={() => onToggleFavorite(alba.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {currentTab === "applications" && (
+        <section className={styles.albaFeedSection}>
+          <div className={styles.albaFeedHeading}>
+            <h2>내가 지원한 알바 ({appliedAlbas.length})</h2>
+          </div>
+          {appliedAlbas.length === 0 ? (
+            <StateBlock
+              title="아직 지원한 알바가 없어요"
+              body="마음에 드는 동네 알바를 찾아서 지원해보세요!"
+              actionLabel="알바 둘러보기"
+              onAction={() => setCurrentTab("home")}
+            />
+          ) : (
+            <div className={styles.albaGrid}>
+              {appliedAlbas.map((alba) => (
+                <AlbaCardComponent
+                  key={alba.id}
+                  alba={alba}
+                  onSelect={() => onSelectAlba(alba.id)}
+                  onToggleFavorite={() => onToggleFavorite(alba.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {currentTab === "manage" && (
+        <section className={styles.albaFeedSection}>
+          <div className={styles.albaFeedHeading}>
+            <h2>구인글 관리</h2>
+            <button
+              type="button"
+              className={styles.albaBadgeGreen}
+              style={{ border: 0, padding: "6px 12px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}
+              onClick={onWrite}
+            >
+              + 새 공고 작성
+            </button>
+          </div>
+          <div className={styles.albaGrid}>
+            {albas.slice(0, 2).map((alba) => (
+              <AlbaCardComponent
+                key={alba.id}
+                alba={alba}
+                onSelect={() => onSelectAlba(alba.id)}
+                onToggleFavorite={() => onToggleFavorite(alba.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Floating Orange Write Button */}
+      <button type="button" className={styles.albaFloatingWrite} onClick={onWrite}>
+        <Plus size={20} strokeWidth={2.5} /> 글쓰기
+      </button>
+
+      {/* Alba 4-Tab Bottom Navigation Bar */}
+      <nav className={styles.albaBottomNav} aria-label="알바 메뉴">
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "home" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("home")}
+        >
+          <Home size={22} />
+          <span>알바 홈</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "search" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("search")}
+        >
+          <Search size={22} />
+          <span>알바 검색</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "applications" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("applications")}
+        >
+          <BriefcaseBusiness size={22} />
+          <span>지원 내역</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "manage" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("manage")}
+        >
+          <FileText size={22} />
+          <span>구인글 관리</span>
+        </button>
+      </nav>
+    </section>
+  );
+}
+
+function AlbaCardComponent({
+  alba,
+  onSelect,
+  onToggleFavorite,
+}: {
+  alba: AlbaItem;
+  onSelect: () => void;
+  onToggleFavorite: () => void;
+}) {
+  return (
+    <article className={styles.albaCard} onClick={onSelect}>
+      <div className={styles.albaCardThumbFrame}>
+        <div className={styles.albaCardThumbVisual} style={{ background: alba.bgGradient }}>
+          <span style={{ fontSize: "2rem" }}>{alba.thumbnailEmoji ?? "🏢"}</span>
+        </div>
+        <button
+          type="button"
+          className={styles.albaCardHeartBtn}
+          aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
+        >
+          <Heart size={16} fill={alba.isFavorite ? "#ff6f0f" : "none"} color={alba.isFavorite ? "#ff6f0f" : "#ffffff"} />
+        </button>
+      </div>
+      <h3 className={styles.albaCardTitle}>{alba.title}</h3>
+      <div className={styles.albaCardPay}>{alba.payLabel}</div>
+      <div className={styles.albaCardMeta}>
+        {alba.companyName} · {alba.neighborhoodName}
+      </div>
+      <div className={styles.albaBadgeRow}>
+        {alba.badges.map((badge, idx) => (
+          <span
+            key={`${badge}-${idx}`}
+            className={`${styles.albaBadge} ${badge.includes("정직원") || badge.includes("모범") ? styles.albaBadgeGreen : ""}`}
+          >
+            {badge}
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function AlbaDetailScreen({
+  alba,
+  onBack,
+  onToggleFavorite,
+  onApply,
+}: {
+  alba: AlbaItem;
+  onBack: () => void;
+  onToggleFavorite: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <section className={styles.albaDetailScreen}>
+      <div className={styles.albaDetailHero} style={{ background: alba.bgGradient }}>
+        <div className={styles.albaDetailNavFloat}>
+          <button type="button" onClick={onBack} aria-label="뒤로">
+            <ChevronLeft size={24} />
+          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button type="button" aria-label="공유">
+              <Share2 size={20} />
+            </button>
+            <button type="button" aria-label="더보기">
+              <EllipsisVertical size={20} />
+            </button>
+          </div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <span style={{ fontSize: "3.5rem", display: "block", marginBottom: "8px" }}>{alba.thumbnailEmoji ?? "🏢"}</span>
+          <strong>{alba.companyName}</strong>
+        </div>
+      </div>
+
+      <div className={styles.albaDetailContent}>
+        <h1 className={styles.albaDetailTitle}>{alba.title}</h1>
+        <div className={styles.albaDetailCompanyRow}>
+          <span>{alba.companyName}</span> · <span>{alba.neighborhoodName}</span>
+          {alba.reviewCount && <span> · 후기 {alba.reviewCount}개</span>}
+        </div>
+
+        {/* Key Conditions Box */}
+        <div className={styles.albaDetailConditionBox}>
+          <div className={styles.albaDetailConditionItem}>
+            <Clock3 size={22} />
+            <div>
+              <span>급여</span><br />
+              <strong>{alba.payLabel}</strong>
+            </div>
+          </div>
+          <div className={styles.albaDetailConditionItem}>
+            <Calendar size={22} />
+            <div>
+              <span>근무 요일</span><br />
+              <strong>{alba.workingDays}</strong>
+            </div>
+          </div>
+          <div className={styles.albaDetailConditionItem}>
+            <Clock3 size={22} />
+            <div>
+              <span>근무 시간</span><br />
+              <strong>{alba.workingHours}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Duties */}
+        <h2 className={styles.albaDetailSectionHeading}>근무 내용 및 상세 정보</h2>
+        <div className={styles.albaDetailDuties}>
+          <p style={{ margin: "0 0 10px", fontWeight: 600 }}>{alba.details}</p>
+          <ul>
+            {alba.descriptionBullets.map((bullet, idx) => (
+              <li key={idx}>{bullet}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Location Info */}
+        <h2 className={styles.albaDetailSectionHeading}>근무지 위치</h2>
+        <div className={styles.albaDetailDuties}>
+          <strong>📍 {alba.detailLocation}</strong>
+          <p style={{ margin: "4px 0 0", color: "var(--color-muted)", fontSize: "0.8125rem" }}>
+            {alba.neighborhoodName}
+          </p>
+        </div>
+
+        <div className={styles.albaDetailStatsFooter}>
+          조회 {alba.viewCount} · 지원자 {alba.applicantCount}명 · 등록 {alba.createdAt}
+        </div>
+      </div>
+
+      {/* Fixed Bottom Action Bar */}
+      <footer className={styles.albaDetailActionBar}>
+        <button
+          type="button"
+          className={styles.albaDetailHeartBtn}
+          aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
+          onClick={onToggleFavorite}
+        >
+          <Heart size={22} fill={alba.isFavorite ? "#ff6f0f" : "none"} color={alba.isFavorite ? "#ff6f0f" : "currentColor"} />
+        </button>
+        <button
+          type="button"
+          className={styles.albaDetailCallBtn}
+          onClick={() => alert(`전화문의: ${alba.phoneContact}`)}
+        >
+          전화문의
+        </button>
+        <button
+          type="button"
+          className={styles.albaDetailApplyBtn}
+          onClick={onApply}
+        >
+          {alba.hasApplied ? "지원 완료 ✓" : "지원하기"}
+        </button>
+      </footer>
+    </section>
+  );
+}
+
+function AlbaFormScreen({
+  activeNeighborhood,
+  onBack,
+  onSubmit,
+}: {
+  activeNeighborhood: string;
+  onBack: () => void;
+  onSubmit: (data: Omit<AlbaItem, "id" | "applicantCount" | "viewCount" | "isFavorite" | "hasApplied" | "createdAt">) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [payType, setPayType] = useState<"시급" | "일급" | "월급" | "연봉">("시급");
+  const [payAmount, setPayAmount] = useState(12000);
+  const [workingDays, setWorkingDays] = useState("월~금");
+  const [workingHours, setWorkingHours] = useState("09:00 ~ 18:00");
+  const [category, setCategory] = useState<AlbaItem["category"]>("식당/카페");
+  const [details, setDetails] = useState("");
+  const [detailLocation, setDetailLocation] = useState(`${activeNeighborhood} 인근`);
+  const [phoneContact, setPhoneContact] = useState("010-1234-5678");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !companyName.trim()) {
+      alert("공고 제목과 업체명을 입력해주세요.");
+      return;
+    }
+
+    const payLabel = `${payType} ${payAmount.toLocaleString()}원`;
+    onSubmit({
+      title,
+      companyName,
+      neighborhoodName: activeNeighborhood,
+      detailLocation,
+      payType,
+      payAmount,
+      payLabel,
+      workingDays,
+      workingHours,
+      category,
+      badges: ["모범구인"],
+      thumbnailTone: "custom",
+      thumbnailEmoji: "💼",
+      bgGradient: "linear-gradient(135deg, #7537c5 0%, #a970ff 100%)",
+      descriptionBullets: ["1. 상세 업무 협의 가능", "2. 친절하고 성실한 분 환영"],
+      details: details || "함께 즐겁게 일할 이웃을 모집합니다.",
+      phoneContact,
+    });
   };
 
   return (
-    <section className={`${styles.screen} ${styles.dreamScreen}`}>
+    <section className={styles.screen}>
       <ScreenHeader
-        title="꿈가지 공지사항"
+        title="알바 구인 공고 등록"
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
           </IconButton>
         }
       />
-      <div className={styles.dreamNoticeContainer}>
-        <article className={styles.dreamNoticeCard}>
-          <div className={styles.dreamNoticeTag}>공지 · 나눔 캠페인</div>
-          <h1 className={styles.dreamNoticeTitle}>아이들을 위한 꿈을 선물해 주세요 💜</h1>
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px", padding: "0 4px 30px" }}>
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>공고 제목</label>
+          <input
+            type="text"
+            className={styles.formInput}
+            placeholder="예: [올리브영] 주말 매장 스태프 모집"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
 
-          <div className={styles.dreamNoticeAuthorRow}>
-            <div className={styles.dreamNoticeAvatar}>
-              <Image src="/dream/baby-elephant.png" alt="꿈가지" width={32} height={26} style={{ objectFit: "contain" }} />
-            </div>
-            <div>
-              <strong>꿈가지 <span className={styles.officialBadge}>공식</span></strong>
-              <span>2026.09.01 · 조회 1,248</span>
-            </div>
-          </div>
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>업체명</label>
+          <input
+            type="text"
+            className={styles.formInput}
+            placeholder="예: 휴먼코드 / 무신사 스탠다드"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            required
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
 
-          <div className={styles.dreamNoticeBody}>
-            <p>안녕하세요! 가지마켓과 함께 따뜻한 동네를 만들어가는 <strong>꿈가지</strong>입니다. 💜</p>
-
-            <p>
-              우리 동네 곳곳에는 따뜻한 손길과 응원이 필요한 아동센터 및 발달지원센터 친구들이 있습니다.
-            </p>
-
-            <p>
-              가지마켓에서 물품을 거래하거나 나눔을 실천할 때마다 모이는 소중한 기부금은
-              우리 동네 복지시설의 아이들에게 <strong>꿈 지원 교육 프로그램, 학용품, 생필품</strong>으로 투명하게 전달됩니다.
-            </p>
-
-            <div className={styles.dreamNoticeHighlightBox}>
-              <strong>🌱 아이들의 꿈을 함께 키우는 방법</strong>
-              <ul>
-                <li>가지마켓 거래 완료 시 꿈가지 나눔에 동참하기</li>
-                <li>우리 동네 꿈가지 지도에서 모금 현황 확인하고 응원하기</li>
-                <li>이웃들과 따뜻한 나눔 소식 나누기</li>
-              </ul>
-            </div>
-
-            <p>
-              작은 나눔이 모여 우리 아이들의 커다란 꿈이 자라납니다.<br />
-              이웃 주민 여러분의 따뜻한 관심과 많은 응원 부탁드립니다! ✨
-            </p>
-          </div>
-
-          <div className={styles.dreamNoticeActions}>
-            <button
-              type="button"
-              className={`${styles.dreamCheerButton} ${hasCheered ? styles.dreamCheerButtonActive : ""}`}
-              onClick={handleCheer}
+        <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "10px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>급여 형태</label>
+            <select
+              value={payType}
+              onChange={(e) => setPayType(e.target.value as any)}
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
             >
-              <Heart size={18} fill={hasCheered ? "currentColor" : "none"} />
-              응원해요 {cheerCount}
-            </button>
+              <option value="시급">시급</option>
+              <option value="일급">일급</option>
+              <option value="월급">월급</option>
+              <option value="연봉">연봉</option>
+            </select>
           </div>
-        </article>
-      </div>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>금액 (원)</label>
+            <input
+              type="number"
+              value={payAmount}
+              onChange={(e) => setPayAmount(Number(e.target.value))}
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>근무 요일</label>
+            <input
+              type="text"
+              value={workingDays}
+              onChange={(e) => setWorkingDays(e.target.value)}
+              placeholder="예: 월~금 / 주말"
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>근무 시간</label>
+            <input
+              type="text"
+              value={workingHours}
+              onChange={(e) => setWorkingHours(e.target.value)}
+              placeholder="예: 09:00 ~ 18:00"
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>상세 설명</label>
+          <textarea
+            rows={4}
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            placeholder="근무 조건, 하는 일, 우대 사항 등을 상세히 적어주세요."
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className={styles.albaDetailApplyBtn}
+          style={{ width: "100%", height: "50px", marginTop: "10px" }}
+        >
+          공고 등록하기
+        </button>
+      </form>
     </section>
   );
 }
