@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import RegisterSW from "./register-sw";
 
 export const metadata: Metadata = {
   title: "가지마켓",
   description: "지역 거래와 생활을 연결하는 가지마켓 모바일 프로토타입",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "가지마켓",
+  },
 };
 
 export const viewport: Viewport = {
@@ -20,7 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {children}
+        <RegisterSW />
+      </body>
     </html>
   );
 }
