@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
 import {
@@ -77,6 +77,7 @@ type SubPage =
   | { type: "my-menu" }
   | { type: "all-services" }
   | { type: "dream-dashboard" }
+  | { type: "dream-notice" }
   | { type: "settings" }
   | { type: "sales" }
   | { type: "favorites" }
@@ -135,12 +136,25 @@ type LocalBusiness = {
   name: string;
   category: string;
   neighborhoodName: string;
+  districtName?: string;
   distance: string;
   openNow: boolean;
   liked: boolean;
   summary: string;
   lat: number;
   lng: number;
+  riskType?: string | null;
+  dangerTone?: DangerTone;
+  observedAt?: string | null;
+  sourceUrl?: string | null;
+};
+
+type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
+
+type DangerVisual = {
+  label: string;
+  emoji: string;
+  tone: DangerTone;
 };
 
 type DonationFacility = {
@@ -191,6 +205,9 @@ type NaverMarkerInstance = {
 };
 
 type NaverMapsNamespace = {
+  Event?: {
+    addListener: (target: NaverMarkerInstance, eventName: string, listener: () => void) => unknown;
+  };
   LatLng: new (lat: number, lng: number) => unknown;
   Map: new (
     element: HTMLElement,
@@ -224,11 +241,28 @@ declare global {
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_KEY_ID = process.env.NEXT_PUBLIC_NAVER_MAP_NCP_KEY_ID ?? "";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
   송파삼성래미안: { lat: 37.504744, lng: 127.118295 },
   위례: { lat: 37.4772, lng: 127.1437 },
   공릉: { lat: 37.6257, lng: 127.0731 },
   "당산 2동": { lat: 37.5351, lng: 126.9028 },
+};
+const NEIGHBORHOOD_DISTRICTS: Record<string, string> = {
+  송파삼성래미안: "송파구",
+  위례: "송파구",
+  공릉: "노원구",
+  "당산 2동": "영등포구",
+};
+
+const DANGER_VISUALS: Record<DangerTone, DangerVisual> = {
+  fire: { label: "화재", emoji: "🔥", tone: "fire" },
+  accident: { label: "사고", emoji: "⚠️", tone: "accident" },
+  construction: { label: "공사", emoji: "🚧", tone: "construction" },
+  failure: { label: "고장", emoji: "🔧", tone: "failure" },
+  control: { label: "통제", emoji: "⛔", tone: "control" },
+  flood: { label: "침수", emoji: "🌊", tone: "flood" },
+  default: { label: "위험", emoji: "🚨", tone: "default" },
 };
 
 let naverMapScriptPromise: Promise<void> | null = null;
@@ -264,6 +298,100 @@ function loadNaverMapScript(keyId: string) {
   });
 
   return naverMapScriptPromise;
+}
+
+function apiUrl(path: string) {
+  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
+}
+
+type DangerSignalApiItem = {
+  id?: string | number;
+  name?: string | null;
+  risk_name?: string | null;
+  category?: string | null;
+  neighborhood_name?: string | null;
+  sigungu?: string | null;
+  district_name?: string | null;
+  distance?: string | null;
+  open_now?: boolean | null;
+  liked?: boolean | null;
+  summary?: string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  risk_type?: string | null;
+  observed_at?: string | null;
+  source_url?: string | null;
+};
+
+type DangerSignalApiResponse = { items?: DangerSignalApiItem[] } | DangerSignalApiItem[];
+
+function parseCoordinate(value: number | string | null | undefined) {
+  const coordinate = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function formatObservedAt(value: string | null | undefined) {
+  if (!value) return "실시간";
+  const observedAt = new Date(value);
+  if (Number.isNaN(observedAt.getTime())) return "실시간";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(observedAt);
+}
+
+function dangerToneForText(value: string) {
+  if (/화재|불|연기/.test(value)) return "fire";
+  if (/침수|호우|홍수|빗물|하천/.test(value)) return "flood";
+  if (/통제|차단|금지|폐쇄/.test(value)) return "control";
+  if (/고장|장애/.test(value)) return "failure";
+  if (/공사|보수|작업/.test(value)) return "construction";
+  if (/사고|추돌|전도|충돌/.test(value)) return "accident";
+  return "default";
+}
+
+function getDangerVisual(business: Pick<LocalBusiness, "category" | "dangerTone" | "riskType" | "name" | "summary">) {
+  if (business.category !== "danger") return null;
+  const tone = business.dangerTone ?? dangerToneForText(`${business.riskType ?? ""} ${business.name} ${business.summary}`);
+  return DANGER_VISUALS[tone] ?? DANGER_VISUALS.default;
+}
+
+function toDangerBusiness(item: DangerSignalApiItem): LocalBusiness | null {
+  const lat = parseCoordinate(item.lat ?? item.latitude);
+  const lng = parseCoordinate(item.lng ?? item.longitude);
+  if (lat === null || lng === null) return null;
+
+  const districtName = item.sigungu ?? item.district_name ?? item.neighborhood_name ?? "서울";
+  const name = item.name ?? item.risk_name ?? item.risk_type ?? "서울안전누리 위험신호";
+  const summary = item.summary ?? item.risk_type ?? "서울안전누리 위험신호";
+  const dangerTone = dangerToneForText(`${item.risk_type ?? ""} ${name} ${summary}`);
+
+  return {
+    id: `nuri-${String(item.id ?? `${lat}-${lng}-${name}`)}`,
+    name,
+    category: "danger",
+    neighborhoodName: districtName,
+    districtName,
+    distance: item.distance ?? formatObservedAt(item.observed_at),
+    openNow: item.open_now ?? true,
+    liked: item.liked ?? false,
+    summary,
+    lat,
+    lng,
+    riskType: item.risk_type,
+    dangerTone,
+    observedAt: item.observed_at,
+    sourceUrl: item.source_url,
+  };
+}
+
+function matchesNeighborhood(business: LocalBusiness, neighborhood: string) {
+  const district = NEIGHBORHOOD_DISTRICTS[neighborhood];
+  return business.neighborhoodName === neighborhood || Boolean(district && business.districtName === district);
 }
 
 const initialProducts: ProductListItem[] = [
@@ -670,7 +798,7 @@ export default function GajiMarketApp() {
   const [communityTab, setCommunityTab] = useState("동네생활");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
-  const [mapCategory, setMapCategory] = useState<string>("takeout");
+  const [mapCategory, setMapCategory] = useState<string>("danger");
   const [mapSheetState, setMapSheetState] = useState<"collapsed" | "half" | "expanded">("half");
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchArea, setMapSearchArea] = useState<{ neighborhood: string; bounds: MapSearchBounds } | null>(null);
@@ -678,6 +806,8 @@ export default function GajiMarketApp() {
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>(initialChats);
+  const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
+  const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
   const [extraMessages, setExtraMessages] = useState<Record<string, typeof baseMessages>>({});
   const [isBooting, setIsBooting] = useState(true);
@@ -687,6 +817,43 @@ export default function GajiMarketApp() {
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 520);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    function syncTabFromHash() {
+      if (window.location.hash === "#map" || window.location.hash === "#map-pointers") {
+        setActiveTab("map");
+        setSubPage(null);
+        setMapCategory("danger");
+        setMapSheetState(window.location.hash === "#map-pointers" ? "half" : "expanded");
+      } else if (window.location.hash === "#dream") {
+        setActiveTab("my");
+        setSubPage({ type: "dream-dashboard" });
+      }
+    }
+
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(apiUrl("/api/v1/local/danger-signals?limit=120"), { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("danger signals failed");
+        return response.json() as Promise<DangerSignalApiResponse>;
+      })
+      .then((payload) => {
+        const items = Array.isArray(payload) ? payload : payload.items ?? [];
+        setDangerSignals(items.map(toDangerBusiness).filter((item): item is LocalBusiness => Boolean(item)));
+        setDangerSignalsLoaded(true);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDangerSignalsLoaded(false);
+      });
+    return () => controller.abort();
   }, []);
 
   const totalUnread = useMemo(
@@ -737,23 +904,32 @@ export default function GajiMarketApp() {
     });
   }, [chatFilter, chats]);
 
+  const localBusinesses = useMemo(() => {
+    const staticBusinesses = dangerSignalsLoaded
+      ? LOCAL_BUSINESSES.filter((business) => business.category !== "danger")
+      : LOCAL_BUSINESSES;
+    return [...dangerSignals, ...staticBusinesses];
+  }, [dangerSignals, dangerSignalsLoaded]);
+
   const businesses = useMemo(() => {
     const bounds = mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
-    return LOCAL_BUSINESSES.filter((business) => {
+    return localBusinesses.filter((business) => {
       const matchesCategory = business.category === mapCategory;
       const matchesRegion = bounds
         ? business.lat >= bounds.south && business.lat <= bounds.north &&
           business.lng >= bounds.west && business.lng <= bounds.east
-        : business.neighborhoodName === activeNeighborhood ||
-          business.neighborhoodName === secondaryNeighborhood;
+        : matchesNeighborhood(business, activeNeighborhood) ||
+          matchesNeighborhood(business, secondaryNeighborhood);
       const matchesQuery =
         mapQuery.trim().length === 0 ||
         business.name.includes(mapQuery.trim()) ||
         business.summary.includes(mapQuery.trim()) ||
-        business.neighborhoodName.includes(mapQuery.trim());
+        business.neighborhoodName.includes(mapQuery.trim()) ||
+        (business.districtName?.includes(mapQuery.trim()) ?? false) ||
+        (business.riskType?.includes(mapQuery.trim()) ?? false);
       return matchesCategory && matchesRegion && matchesQuery;
     });
-  }, [activeNeighborhood, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
+  }, [activeNeighborhood, localBusinesses, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
 
   function navigateTab(tab: TabId) {
     setActiveTab(tab);
@@ -769,6 +945,7 @@ export default function GajiMarketApp() {
       subPage?.type === "settings" ||
       subPage?.type === "my-menu" ||
       subPage?.type === "dream-dashboard" ||
+      subPage?.type === "dream-notice" ||
       subPage?.type === "sales" ||
       subPage?.type === "favorites"
     ) {
@@ -904,10 +1081,11 @@ export default function GajiMarketApp() {
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
+  const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
 
   return (
-    <div className={styles.stage} data-theme={theme}>
+    <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
       <div className={styles.phoneShell}>
         <main className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""}`} data-app-scroll>
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -946,7 +1124,10 @@ export default function GajiMarketApp() {
               activeNeighborhood={activeNeighborhood}
               onBack={goBack}
               onChangeNeighborhood={() => setSheet("region")}
+              onOpenNotice={() => setSubPage({ type: "dream-notice" })}
             />
+          ) : subPage?.type === "dream-notice" ? (
+            <DreamNoticeScreen onBack={goBack} />
           ) : subPage?.type === "settings" ? (
             <SettingsScreen
               theme={theme}
@@ -978,7 +1159,7 @@ export default function GajiMarketApp() {
             <SearchScreen
               products={products}
               posts={posts}
-              businesses={LOCAL_BUSINESSES}
+              businesses={localBusinesses}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onPostClick={(id) => setSubPage({ type: "community-detail", id })}
@@ -1757,11 +1938,30 @@ function MapScreen({
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [centerRequest, setCenterRequest] = useState(0);
+  const [selectedDanger, setSelectedDanger] = useState<LocalBusiness | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const locationRequestRef = useRef(0);
 
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
+  const visibleSelectedDanger = selectedDanger && businesses.some((business) => business.id === selectedDanger.id)
+    ? selectedDanger
+    : null;
+
+  const selectDanger = useCallback((business: LocalBusiness) => {
+    if (business.category !== "danger") return;
+    setSelectedDanger(business);
+  }, []);
+
+  function changeCategory(id: string) {
+    setSelectedDanger(null);
+    onCategoryChange(id);
+  }
+
+  function changeQuery(value: string) {
+    setSelectedDanger(null);
+    onQueryChange(value);
+  }
 
   function requestCurrentLocation() {
     if (isLocating) return;
@@ -1817,6 +2017,7 @@ function MapScreen({
           businesses={businesses}
           currentLocation={currentLocation}
           centerRequest={centerRequest}
+          onSelectBusiness={selectDanger}
           onSearchBounds={(bounds) => {
             onSearchBounds(bounds);
             onSheetStateChange("expanded");
@@ -1826,7 +2027,7 @@ function MapScreen({
           <Search size={27} />
           <input
             value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder="집 근처 업체 검색"
           />
           <button type="button" onClick={onOpenProfile} aria-label="프로필">
@@ -1849,6 +2050,9 @@ function MapScreen({
         <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
           <currentCategory.icon size={26} />
         </button>
+        {visibleSelectedDanger ? (
+          <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
+        ) : null}
       </div>
 
       <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`}>
@@ -1876,7 +2080,7 @@ function MapScreen({
                     type="button"
                     key={category.id}
                     className={selectedCategory === category.id ? styles.localCategoryActive : ""}
-                    onClick={() => onCategoryChange(category.id)}
+                    onClick={() => changeCategory(category.id)}
                   >
                     <span className={`${styles.localIcon} ${styles[`local_${category.tone}` as keyof typeof styles] ?? ""}`}>
                       <CategoryIcon size={27} />
@@ -1899,23 +2103,43 @@ function MapScreen({
                   title="검색 결과가 없어요"
                   body="다른 카테고리나 검색어로 다시 찾아보세요."
                   actionLabel="검색어 지우기"
-                  onAction={() => onQueryChange("")}
+                  onAction={() => changeQuery("")}
                 />
               ) : (
                 <div className={styles.businessGrid}>
-                  {businesses.map((business) => (
-                    <article key={business.id} className={styles.businessCard}>
-                      <button type="button" aria-label={`${business.name} 관심`}>
-                        <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
-                      </button>
-                      <div className={styles.businessImage}>{business.name.slice(0, 2)}</div>
-                      <h3>{business.name}</h3>
-                      <p>{business.summary}</p>
-                      <small>
-                        {business.distance} · {business.openNow ? "영업중" : "준비중"}
-                      </small>
-                    </article>
-                  ))}
+                  {businesses.map((business) => {
+                    const dangerVisual = getDangerVisual(business);
+                    return (
+                      <article key={business.id} className={styles.businessCard}>
+                        <button type="button" aria-label={`${business.name} 관심`}>
+                          <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
+                        </button>
+                        <div
+                          className={`${styles.businessImage} ${
+                            dangerVisual
+                              ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
+                              : ""
+                          }`}
+                        >
+                          {dangerVisual ? (
+                            <>
+                              <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
+                              <span>{dangerVisual.label}</span>
+                            </>
+                          ) : (
+                            business.name.slice(0, 2)
+                          )}
+                        </div>
+                        <h3>{business.name}</h3>
+                        <p>{business.summary}</p>
+                        <small>
+                          {dangerVisual
+                            ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
+                            : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
+                        </small>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1931,12 +2155,14 @@ function NaverMapLayer({
   businesses,
   currentLocation,
   centerRequest,
+  onSelectBusiness,
   onSearchBounds,
 }: {
   activeNeighborhood: string;
   businesses: LocalBusiness[];
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
+  onSelectBusiness: (business: LocalBusiness) => void;
   onSearchBounds: (bounds: MapSearchBounds) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -2008,26 +2234,39 @@ function NaverMapLayer({
     const map = mapRef.current;
     if (!maps || !map || !canUseNaverMap) return;
 
-    markerRefs.current = businesses.map(
-      (business) =>
-        new maps.Marker({
-          position: new maps.LatLng(business.lat, business.lng),
-          map,
-          title: business.name,
-        }),
-    );
+    markerRefs.current = businesses.map((business) => {
+      const visual = getDangerVisual(business);
+      const marker = new maps.Marker({
+        position: new maps.LatLng(business.lat, business.lng),
+        map,
+        title: business.name,
+        zIndex: visual ? 80 : 20,
+        icon: visual ? { content: createDangerMarkerContent(business, visual, onSelectBusiness) } : undefined,
+      });
+      if (visual) maps.Event?.addListener(marker, "click", () => onSelectBusiness(business));
+      return marker;
+    });
     return () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
-  }, [businesses, canUseNaverMap]);
+  }, [businesses, canUseNaverMap, onSelectBusiness]);
 
   return (
     <>
       <div className={styles.naverMapFrame}>
         <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
       </div>
-      {!canUseNaverMap ? <div className={styles.mapGrid} /> : null}
+      {!canUseNaverMap ? (
+        <>
+          <div className={styles.mapGrid} />
+          <FallbackDangerMarkers
+            activeNeighborhood={activeNeighborhood}
+            businesses={businesses}
+            onSelectBusiness={onSelectBusiness}
+          />
+        </>
+      ) : null}
       <button
         type="button"
         className={styles.mapSearchAgain}
@@ -2044,6 +2283,85 @@ function NaverMapLayer({
         현 지도에서 검색
       </button>
     </>
+  );
+}
+
+function createDangerMarkerContent(
+  business: LocalBusiness,
+  visual: DangerVisual,
+  onSelectBusiness: (business: LocalBusiness) => void,
+) {
+  const marker = document.createElement("div");
+  const toneClass = styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? "";
+  marker.className = `${styles.dangerMapMarker} ${toneClass}`;
+  marker.tabIndex = 0;
+  marker.setAttribute("role", "button");
+  marker.setAttribute("aria-label", `${visual.label}: ${business.name}`);
+  marker.innerHTML = `<span>${visual.emoji}</span>`;
+  marker.addEventListener("click", () => onSelectBusiness(business));
+  marker.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelectBusiness(business);
+  });
+  return marker;
+}
+
+function FallbackDangerMarkers({
+  activeNeighborhood,
+  businesses,
+  onSelectBusiness,
+}: {
+  activeNeighborhood: string;
+  businesses: LocalBusiness[];
+  onSelectBusiness: (business: LocalBusiness) => void;
+}) {
+  const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
+  const dangerBusinesses = businesses.filter((business) => business.category === "danger").slice(0, 18);
+
+  return (
+    <div className={styles.fallbackMarkers}>
+      {dangerBusinesses.map((business) => {
+        const visual = getDangerVisual(business) ?? DANGER_VISUALS.default;
+        const x = Math.min(92, Math.max(8, 50 + (business.lng - center.lng) * 4200));
+        const y = Math.min(88, Math.max(12, 50 - (business.lat - center.lat) * 5200));
+        return (
+          <button
+            type="button"
+            key={business.id}
+            className={`${styles.dangerMapMarker} ${styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? ""}`}
+            aria-label={`${visual.label}: ${business.name}`}
+            onClick={() => onSelectBusiness(business)}
+            style={{ left: `${x}%`, top: `${y}%` }}
+          >
+            <span>{visual.emoji}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DangerSignalCallout({ business, onClose }: { business: LocalBusiness; onClose: () => void }) {
+  const visual = getDangerVisual(business) ?? DANGER_VISUALS.default;
+  const toneClass = styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? "";
+  const meta = [business.riskType ?? visual.label, business.neighborhoodName, business.distance].filter(Boolean).join(" · ");
+
+  return (
+    <aside className={`${styles.dangerCallout} ${toneClass}`} role="status" aria-live="polite">
+      <span className={styles.dangerCalloutAvatar} aria-hidden="true">{visual.emoji}</span>
+      <div className={styles.dangerCalloutBubble}>
+        <div className={styles.dangerCalloutTop}>
+          <span>안전 알림</span>
+          <button type="button" onClick={onClose} aria-label="위험 알림 닫기">
+            <X size={16} />
+          </button>
+        </div>
+        <strong>{business.name}</strong>
+        <p>{business.summary}</p>
+        <small>{meta}</small>
+      </div>
+    </aside>
   );
 }
 
@@ -2317,21 +2635,30 @@ function DreamDashboardScreen({
   activeNeighborhood,
   onBack,
   onChangeNeighborhood,
+  onOpenNotice,
 }: {
   activeNeighborhood: string;
   onBack: () => void;
   onChangeNeighborhood: () => void;
+  onOpenNotice: () => void;
 }) {
   const facilityListRef = useRef<HTMLElement | null>(null);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const visibleFacilities = useMemo(
     () => DREAM_FACILITIES.filter((facility) => facility.neighborhoodName === activeNeighborhood),
     [activeNeighborhood],
   );
+  const visibleSelectedFacilityId = visibleFacilities.some((facility) => facility.id === selectedFacilityId)
+    ? selectedFacilityId
+    : null;
+  const selectedFacility = visibleFacilities.find((facility) => facility.id === visibleSelectedFacilityId) ?? null;
+  const selectFacility = useCallback((facility: DonationFacility | null) => {
+    setSelectedFacilityId(facility ? facility.id : null);
+  }, []);
   const totalCurrentAmount = visibleFacilities.reduce((sum, facility) => sum + facility.currentAmount, 0);
   const totalTargetAmount = visibleFacilities.reduce((sum, facility) => sum + facility.targetAmount, 0);
   const totalDonationCount = visibleFacilities.reduce((sum, facility) => sum + facility.donationCount, 0);
   const neighborhoodProgress = totalTargetAmount > 0 ? Math.round((totalCurrentAmount / totalTargetAmount) * 100) : 0;
-  const showFacilities = () => facilityListRef.current?.scrollIntoView({ block: "start" });
 
   return (
     <section className={`${styles.screen} ${styles.dreamScreen}`}>
@@ -2343,12 +2670,20 @@ function DreamDashboardScreen({
           </IconButton>
         }
       />
-      <section className={styles.dreamBanner} aria-label="꿈가지 나눔 캠페인">
+      <section
+        className={styles.dreamBanner}
+        aria-label="꿈가지 나눔 캠페인 공지사항 보기"
+        role="button"
+        tabIndex={0}
+        onClick={onOpenNotice}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotice(); } }}
+        style={{ cursor: "pointer" }}
+      >
         <div className={styles.dreamBannerCopy}>
           <span>우리 동네와 함께</span>
           <h2>작은 나눔이 모여<br />꿈이 자라요</h2>
-          <button type="button" onClick={showFacilities}>
-            모금 현황 보기 <ChevronRight size={16} />
+          <button type="button" onClick={(e) => { e.stopPropagation(); onOpenNotice(); }}>
+            공지사항 및 안내 보기 <ChevronRight size={16} />
           </button>
         </div>
         <Image
@@ -2361,12 +2696,17 @@ function DreamDashboardScreen({
         />
       </section>
       <section className={styles.dreamMapPanel}>
-        <DreamMapLayer activeNeighborhood={activeNeighborhood} facilities={visibleFacilities} />
+        <DreamMapLayer
+          activeNeighborhood={activeNeighborhood}
+          facilities={visibleFacilities}
+          selectedFacility={selectedFacility}
+          onSelectFacility={selectFacility}
+        />
         <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
           <span className={styles.dreamMapTitleCopy}>
             <span>우리 동네 모금가지</span>
             <strong>{activeNeighborhood === "송파삼성래미안" ? "송파구" : activeNeighborhood}</strong>
-            <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 · 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
+            <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 - 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
           </span>
           <ChevronRight size={24} aria-hidden="true" />
         </button>
@@ -2393,16 +2733,21 @@ function DreamDashboardScreen({
         {visibleFacilities.map((facility) => {
           const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
           return (
-          <article key={facility.name} className={styles.dreamFacilityItem}>
-            <div>
-              <strong>{facility.name}</strong>
-              <span>{facility.facilityType} · 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
-            </div>
-            <em>{progress}%</em>
-            <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
-              <span style={{ width: `${Math.min(progress, 100)}%` }} />
-            </div>
-          </article>
+            <button
+              type="button"
+              key={facility.id}
+              className={`${styles.dreamFacilityItem} ${facility.id === visibleSelectedFacilityId ? styles.dreamFacilitySelected : ""}`}
+              onClick={() => selectFacility(facility)}
+            >
+              <div>
+                <strong>{facility.name}</strong>
+                <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
+              </div>
+              <em>{progress}%</em>
+              <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+                <span style={{ width: `${Math.min(progress, 100)}%` }} />
+              </div>
+            </button>
           );
         })}
       </section>
@@ -2410,12 +2755,58 @@ function DreamDashboardScreen({
   );
 }
 
+function DreamFacilityCallout({
+  facility,
+  onClose,
+}: {
+  facility: DonationFacility;
+  onClose: () => void;
+}) {
+  const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
+  return (
+    <aside className={styles.dreamFacilityCallout} role="dialog" aria-label={`${facility.name} 상세 정보`}>
+      <div className={styles.dreamFacilityCalloutTop}>
+        <span className={styles.dreamFacilityCalloutBadge}>
+          <Image src="/dream/baby-elephant.png" alt="" width={20} height={16} style={{ objectFit: "contain" }} />
+          꿈가지 나눔 시설
+        </span>
+        <button type="button" onClick={onClose} aria-label="닫기">
+          <X size={16} />
+        </button>
+      </div>
+      <strong>{facility.name}</strong>
+      <p>{facility.facilityType} · {facility.neighborhoodName}</p>
+      <div className={styles.dreamFacilityCalloutStats}>
+        <div>
+          <span>현재 모금액</span>
+          <strong>{facility.currentAmount.toLocaleString()}원</strong>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <span>목표액</span>
+          <strong>{facility.targetAmount.toLocaleString()}원</strong>
+        </div>
+      </div>
+      <div className={styles.dreamProgressTrack} role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${Math.min(progress, 100)}%` }} />
+      </div>
+      <div className={styles.dreamFacilityCalloutFooter}>
+        <small>{facility.donationCount}명의 이웃이 함께 참여했어요</small>
+        <em>{progress}%</em>
+      </div>
+    </aside>
+  );
+}
+
 function DreamMapLayer({
   activeNeighborhood,
   facilities,
+  selectedFacility,
+  onSelectFacility,
 }: {
   activeNeighborhood: string;
   facilities: DonationFacility[];
+  selectedFacility: DonationFacility | null;
+  onSelectFacility: (facility: DonationFacility | null) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapInstance | null>(null);
@@ -2478,28 +2869,39 @@ function DreamMapLayer({
     if (!maps || !map || !canUseNaverMap) return;
 
     markerRefs.current = facilities.map((facility) => {
-      const label = document.createElement("span");
-      label.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin}`;
-      label.textContent = facility.name;
-      return new maps.Marker({
+      const marker = new maps.Marker({
           position: new maps.LatLng(facility.lat, facility.lng),
           map,
           title: facility.name,
           zIndex: 90,
-          icon: { content: label },
+          icon: {
+            content: createDreamFacilityMarkerContent(
+              facility,
+              facility.id === selectedFacility?.id,
+              onSelectFacility,
+            ),
+          },
         });
+      maps.Event?.addListener(marker, "click", () => onSelectFacility(facility));
+      return marker;
     });
     return () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
-  }, [facilities, canUseNaverMap]);
+  }, [facilities, selectedFacility, canUseNaverMap, onSelectFacility]);
 
   return (
     <div className={styles.dreamMapCanvas}>
       <div className={styles.naverMapFrame}>
         <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
       </div>
+      {selectedFacility && (
+        <DreamFacilityCallout
+          facility={selectedFacility}
+          onClose={() => onSelectFacility(null)}
+        />
+      )}
       {!canUseNaverMap && (
         <div className={styles.dreamMapUnavailable} role="status">
           <MapPinned size={28} />
@@ -2525,6 +2927,26 @@ function DreamMapLayer({
       </button>
     </div>
   );
+}
+
+function createDreamFacilityMarkerContent(
+  facility: DonationFacility,
+  selected: boolean,
+  onSelectFacility: (facility: DonationFacility) => void,
+) {
+  const label = document.createElement("span");
+  label.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin} ${selected ? styles.dreamFacilityPinSelected : ""}`;
+  label.textContent = facility.name;
+  label.tabIndex = 0;
+  label.setAttribute("role", "button");
+  label.setAttribute("aria-label", `${facility.name} 모금 현황`);
+  label.addEventListener("click", () => onSelectFacility(facility));
+  label.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelectFacility(facility);
+  });
+  return label;
 }
 
 function PromoCard() {
@@ -3278,4 +3700,86 @@ function formatPrice(product: ProductListItem) {
 function formatBadge(count: number) {
   if (count > 99) return "99+";
   return String(count);
+}
+
+function DreamNoticeScreen({ onBack }: { onBack: () => void }) {
+  const [cheerCount, setCheerCount] = useState(28);
+  const [hasCheered, setHasCheered] = useState(false);
+
+  const handleCheer = () => {
+    if (hasCheered) {
+      setCheerCount((c) => c - 1);
+      setHasCheered(false);
+    } else {
+      setCheerCount((c) => c + 1);
+      setHasCheered(true);
+    }
+  };
+
+  return (
+    <section className={`${styles.screen} ${styles.dreamScreen}`}>
+      <ScreenHeader
+        title="꿈가지 공지사항"
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+      <div className={styles.dreamNoticeContainer}>
+        <article className={styles.dreamNoticeCard}>
+          <div className={styles.dreamNoticeTag}>공지 · 나눔 캠페인</div>
+          <h1 className={styles.dreamNoticeTitle}>아이들을 위한 꿈을 선물해 주세요 💜</h1>
+
+          <div className={styles.dreamNoticeAuthorRow}>
+            <div className={styles.dreamNoticeAvatar}>
+              <Image src="/dream/baby-elephant.png" alt="꿈가지" width={32} height={26} style={{ objectFit: "contain" }} />
+            </div>
+            <div>
+              <strong>꿈가지 <span className={styles.officialBadge}>공식</span></strong>
+              <span>2026.09.01 · 조회 1,248</span>
+            </div>
+          </div>
+
+          <div className={styles.dreamNoticeBody}>
+            <p>안녕하세요! 가지마켓과 함께 따뜻한 동네를 만들어가는 <strong>꿈가지</strong>입니다. 💜</p>
+
+            <p>
+              우리 동네 곳곳에는 따뜻한 손길과 응원이 필요한 아동센터 및 발달지원센터 친구들이 있습니다.
+            </p>
+
+            <p>
+              가지마켓에서 물품을 거래하거나 나눔을 실천할 때마다 모이는 소중한 기부금은
+              우리 동네 복지시설의 아이들에게 <strong>꿈 지원 교육 프로그램, 학용품, 생필품</strong>으로 투명하게 전달됩니다.
+            </p>
+
+            <div className={styles.dreamNoticeHighlightBox}>
+              <strong>🌱 아이들의 꿈을 함께 키우는 방법</strong>
+              <ul>
+                <li>가지마켓 거래 완료 시 꿈가지 나눔에 동참하기</li>
+                <li>우리 동네 꿈가지 지도에서 모금 현황 확인하고 응원하기</li>
+                <li>이웃들과 따뜻한 나눔 소식 나누기</li>
+              </ul>
+            </div>
+
+            <p>
+              작은 나눔이 모여 우리 아이들의 커다란 꿈이 자라납니다.<br />
+              이웃 주민 여러분의 따뜻한 관심과 많은 응원 부탁드립니다! ✨
+            </p>
+          </div>
+
+          <div className={styles.dreamNoticeActions}>
+            <button
+              type="button"
+              className={`${styles.dreamCheerButton} ${hasCheered ? styles.dreamCheerButtonActive : ""}`}
+              onClick={handleCheer}
+            >
+              <Heart size={18} fill={hasCheered ? "currentColor" : "none"} />
+              응원해요 {cheerCount}
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
 }
