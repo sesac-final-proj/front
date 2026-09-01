@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'feat/frontend-overall',
+                git branch: 'release',
                     url: 'https://github.com/sesac-final-proj/front.git',
                     credentialsId: 'mrmushdog777'
             }
