@@ -23,6 +23,14 @@ pipeline {
             }
         }
 
+        stage('Load Env') {
+            steps {
+                withCredentials([file(credentialsId: 'front-env-file', variable: 'ENV_FILE')]) {
+                    sh 'cp $ENV_FILE .env'
+                }
+            }
+        }
+
         stage('Docker Build') {
             steps {
                 sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
