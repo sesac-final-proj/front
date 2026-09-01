@@ -57,6 +57,7 @@ import {
   Store,
   Tag,
   Truck,
+  EyeOff,
   UserRound,
   UsersRound,
   Utensils,
@@ -1425,6 +1426,12 @@ export default function GajiMarketApp() {
                 const room = chats.find((chat) => chat.productId === selectedProduct.id) ?? chats[0];
                 openChat(room.id);
               }}
+              onHideSeller={(id) => {
+                setProducts((prev) => prev.filter((p) => p.id !== id));
+              }}
+              onReportProduct={(id, _reason) => {
+                setProducts((prev) => prev.filter((p) => p.id !== id));
+              }}
             />
           ) : subPage?.type === "product-form" ? (
             <ProductFormScreen onBack={goBack} onSubmit={submitProduct} />
@@ -1925,20 +1932,36 @@ function ProductDetailScreen({
   onFavorite,
   onStatusChange,
   onChat,
+  onHideSeller,
+  onReportProduct,
 }: {
   product: ProductListItem;
   onBack: () => void;
   onFavorite: (id: string) => void;
   onStatusChange: (id: string, status: TradeStatus) => void;
   onChat: () => void;
+  onHideSeller: (productId: string) => void;
+  onReportProduct: (productId: string, reason: string) => void;
 }) {
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState("전문 판매업자 같아요");
+
+  const reportReasons = [
+    "전문 판매업자 같아요",
+    "사기 글이에요 / 의심돼요",
+    "거래 금지 품목이에요",
+    "비매너 및 욕설/비방",
+    "기타 사유",
+  ];
+
   return (
     <section className={styles.detailScreen}>
       <div className={`${styles.detailHero} ${styles[`tone_${product.thumbnailTone}` as keyof typeof styles] ?? ""}`}>
         <IconButton label="뒤로" onClick={onBack} className={styles.backFloating}>
           <ChevronLeft size={28} />
         </IconButton>
-        <IconButton label="더보기" className={styles.moreFloating}>
+        <IconButton label="더보기" className={styles.moreFloating} onClick={() => setShowMoreSheet(true)}>
           <MoreVertical size={24} />
         </IconButton>
         <span>{product.thumbnailLabel}</span>
@@ -1992,6 +2015,96 @@ function ProductDetailScreen({
           채팅하기
         </button>
       </div>
+
+      {/* More Options Action Sheet (이 사용자의 글 보지 않기 / 신고하기) */}
+      {showMoreSheet && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowMoreSheet(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            <div className={styles.productActionGroup}>
+              <button
+                type="button"
+                className={styles.productActionBtn}
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  onHideSeller(product.id);
+                  alert("이 사용자의 글을 더 이상 보지 않습니다.");
+                  onBack();
+                }}
+              >
+                <EyeOff size={22} />
+                <span>이 사용자의 글 보지 않기</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  setShowReportModal(true);
+                }}
+              >
+                <MessageCircle size={22} />
+                <span>신고하기</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              className={styles.productActionCloseBtn}
+              onClick={() => setShowMoreSheet(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Report Reason Selection Modal */}
+      {showReportModal && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowReportModal(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            <h3 style={{ margin: "4px 0 0", fontSize: "1.125rem", fontWeight: 800 }}>신고 사유를 선택해주세요</h3>
+            <div className={styles.reportReasonList}>
+              {reportReasons.map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  className={`${styles.reportReasonItem} ${selectedReportReason === reason ? styles.reportReasonItemSelected : ""}`}
+                  onClick={() => setSelectedReportReason(reason)}
+                >
+                  <span>{reason}</span>
+                  {selectedReportReason === reason && <CheckCircle2 size={18} />}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.albaDetailApplyBtn}
+              style={{ width: "100%", height: "48px" }}
+              onClick={() => {
+                setShowReportModal(false);
+                onReportProduct(product.id, selectedReportReason);
+                alert(`신고가 접수되었습니다. (${selectedReportReason})\n운영팀에서 확인 후 신속하게 처리하겠습니다.`);
+              }}
+            >
+              신고 제출하기
+            </button>
+            <button
+              type="button"
+              className={styles.productActionCloseBtn}
+              onClick={() => setShowReportModal(false)}
+            >
+              취소
+            </button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -2284,7 +2397,7 @@ function RealtimeDangerTicker({
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % streamAlerts.length);
-    }, 3200);
+    }, 5500);
     return () => clearInterval(timer);
   }, [streamAlerts.length]);
 
@@ -2492,10 +2605,12 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        <RealtimeDangerTicker
-          dangerSignals={businesses.filter((b) => b.category === "danger")}
-          onSelectDanger={selectDanger}
-        />
+        {sheetState !== "expanded" ? (
+          <RealtimeDangerTicker
+            dangerSignals={businesses.filter((b) => b.category === "danger")}
+            onSelectDanger={selectDanger}
+          />
+        ) : null}
         {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
         {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
         <div className={styles.mapControls}>
@@ -3028,13 +3143,13 @@ function MyScreen({
           <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream} aria-label="꿈가지">
             <span className={styles.dreamEntryLabel} aria-hidden="true">
               <span className={styles.dreamEntrySyllable}>
-                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
               </span>
               <span className={styles.dreamEntrySyllable}>
-                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
               </span>
               <span className={styles.dreamEntrySyllable}>
-                <Image src="/dream/dream-wordmark-cutout.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
               </span>
             </span>
             <Image src="/dream/baby-elephant.png" alt="" width={36} height={29} className={styles.dreamEntryMascot} />
@@ -4193,34 +4308,9 @@ function formatBadge(count: number) {
 
 const DREAM_NOTICE_ITEMS = [
   {
-    id: "ticket-monitoring",
-    title: "[공지] 추석 명절에 앞서 '승차권' 판매금지 집중 모니터링 안내드려요.",
-    date: "2026.08.26",
-  },
-  {
-    id: "buy-now-policy",
-    title: "[공지] 더 나은 서비스 제공을 위해 바로구매 운영정책이 변경될 예정이에요.",
-    date: "2026.07.27",
-  },
-  {
-    id: "biocide-trade",
-    title: "[공지] 미승인 살생물제품(살충제 · 살균제) 거래 주의 안내",
-    date: "2026.07.22",
-  },
-  {
-    id: "kbank-maintenance",
-    title: "[공지] 케이뱅크 점검에 따른 당근페이 일부 은행 및 증권사 이용 제한 안내드려요. (7월 12일 일요일 00:00~10:00)",
-    date: "2026.07.12",
-  },
-  {
-    id: "honors-trade",
-    title: "[공지] 행정안전부에서 전하는 훈장 · 포장 거래 금지 안내",
-    date: "2026.07.08",
-  },
-  {
-    id: "privacy-policy",
-    title: "[공지] 당근 개인정보 처리방침이 개정될 예정이에요.",
-    date: "2026.06.30",
+    id: "dream-launch",
+    title: "[공지] 꿈가지가 오픈되었어요",
+    date: "2026.09.01",
   },
 ] as const;
 
@@ -4251,27 +4341,17 @@ function DreamNoticeScreen({ onBack }: { onBack: () => void }) {
             <time dateTime={selectedNotice.date.replaceAll(".", "-")}>{selectedNotice.date}</time>
           </header>
 
-          {selectedNotice.id === "ticket-monitoring" && (
+          {selectedNotice.id === "dream-launch" && (
             <div className={styles.dreamNoticeDetailBody}>
               <p>
-                다가올 2026 추석 명절을 앞두고 연휴 기간동안의 <strong>&apos;승차권&apos;판매가 시작될 예정</strong>이에요.<br />
-                평상시에도 판매할 수 없지만 명절이 다가오면서 <strong>집중 모니터링</strong>이 진행되어 안내드려요.
+                우리 동네 아이들의 작은 꿈을 함께 키우는 <strong>꿈가지가 문을 열었어요.</strong>
               </p>
               <p>
-                기차표 등의 승차권은 <strong>철도 사업법 제10조의2(승차권 등 부정 판매의 금지)</strong> 내용으로 당근마켓에서는 금지된 물품을 거래할 수 없어요.<br />
-                관련 게시글은 서비스에서 노출되지 않게 됩니다.<br />
-                <span className={styles.dreamNoticeLinkText}>[판매 금지 물품에 해당하는 암표매매 행위는 어떤 것이 있나요?]</span>
-              </p>
-              <p>*신고가 접수될 경우 운영정책 위반 내용에 따라 게시글이 미노출돼요.</p>
-              <p>
-                한국철도공사에서는 암표 의심 거래에 대해 미스터리 쇼퍼를 운영 중이며,<br />
-                암표 거래가 적발될 경우 약관에 따라 불이익이 발생할 수 있으니 참고 부탁드립니다
+                꿈가지는 지역사회의 도움이 필요한 아이들을 이웃과 함께 응원하고, 아이들이 자신의 꿈을 건강하게 키워갈 수 있도록 마음을 모으는 공간이에요.
               </p>
               <p>
-                승차권 암표는 아래 첨부드린 링크를 통해 제보 가능하니 참고 부탁드릴게요.
+                작은 관심과 나눔이 아이들에게는 새로운 경험과 용기가 될 수 있어요. 우리 동네 아이들의 내일이 더 환하게 자랄 수 있도록 꿈가지와 함께해 주세요.
               </p>
-              <p className={styles.dreamNoticeLinkText}>▸ [승차권 암표 신고 사이트 링크]</p>
-              <p>우리 함께 안전한 지역 거래문화를 만들어요.</p>
             </div>
           )}
         </article>

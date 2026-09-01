@@ -1578,7 +1578,7 @@
   background: #17181d;
   padding: 4px 17px calc(100px + env(safe-area-inset-bottom));
   box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.28);
-  transition: height 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: height 380ms cubic-bezier(0.25, 1, 0.5, 1);
   touch-action: pan-y;
 }
 
@@ -2395,10 +2395,6 @@
   font-weight: 700;
 }
 
-.dreamNoticeLinkText {
-  color: #176fd1;
-}
-
 .dreamMapPanel {
   position: relative;
   height: max(360px, calc(var(--app-height) - 304px));
@@ -2474,6 +2470,7 @@
   color: var(--dream-text-secondary);
 }
 
+/* Seed Design style clean map marker & pill tooltip */
 .dreamFacilityPin {
   position: relative;
   --dream-marker-scale: 1;
@@ -2482,60 +2479,69 @@
   border: 0;
   background: transparent;
   color: #ffffff;
-  display: inline-grid;
+  display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  justify-items: center;
-  gap: 0;
+  gap: 2px;
   padding: 0;
   font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 700;
   white-space: nowrap;
-  filter: drop-shadow(0 6px 14px rgba(117, 55, 197, 0.28));
   cursor: pointer;
-  transform: translate(-50%, calc(-100% - 6px)) scale(var(--dream-marker-scale));
-  transition: transform 140ms ease, filter 140ms ease;
+  transform: translate(-50%, calc(-100% - 2px)) scale(var(--dream-marker-scale));
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  filter: none; /* Remove harsh blurry purple drop-shadow */
 }
 
 .dreamFacilityPinMascot {
   position: relative;
-  z-index: 1;
-  width: 58px;
-  height: 48px;
+  width: 50px;
+  height: 42px;
   display: grid;
   place-items: center;
   border: 0;
   background: transparent;
   overflow: visible;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
 }
 
 .dreamFacilityPinMascot img {
-  width: 64px;
+  width: 50px;
   height: auto;
   display: block;
   pointer-events: none;
 }
 
+/* Seed Design Iconography / Tooltip Pill */
 .dreamFacilityPinLabel {
   position: relative;
-  min-height: 34px;
-  margin-bottom: 4px;
-  padding: 8px 15px;
-  border: 1.5px solid #8d50db;
-  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9999px;
   background: #7537c5;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(117, 55, 197, 0.4);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(117, 55, 197, 0.25);
+  margin-bottom: 1px;
 }
 
 .dreamFacilityPinLabel::after {
   content: "";
   position: absolute;
   top: 100%;
-  left: calc(50% - 6px);
-  border: 6px solid transparent;
-  border-top-color: #7537c5;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid #7537c5;
 }
 
 .dreamFacilityPin:hover {
@@ -2544,22 +2550,20 @@
 
 .dreamFacilityPinSelected {
   --dream-marker-scale: 1.08;
-  filter: drop-shadow(0 8px 18px rgba(96, 40, 168, 0.42));
 }
 
 .dreamFacilityPinSelected .dreamFacilityPinMascot {
-  background: transparent;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.22));
 }
 
 .dreamFacilityPinSelected .dreamFacilityPinLabel {
+  background: #5e24a8;
   border-color: #ffffff;
-  background: #6028a8;
-  color: #ffffff;
-  box-shadow: 0 6px 18px rgba(96, 40, 168, 0.55), 0 0 0 2px #a970ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(169, 112, 255, 0.35);
 }
 
 .dreamFacilityPinSelected .dreamFacilityPinLabel::after {
-  border-top-color: #6028a8;
+  border-top-color: #5e24a8;
 }
 
 .dreamMapRecenter {
@@ -4244,13 +4248,13 @@
   justify-content: space-between;
   gap: 8px;
   height: 22px;
-  animation: slideDownNews 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideDownNews 680ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 @keyframes slideDownNews {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-7px);
   }
   to {
     opacity: 1;
@@ -4273,4 +4277,154 @@
   color: var(--color-muted);
   font-weight: 600;
   flex-shrink: 0;
+}
+
+
+/* ==========================================================================
+   Product Detail Action Sheet (신고 및 보지 않기 - 사진 정합성)
+   ========================================================================== */
+
+.productActionBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 80;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeInAction 180ms ease forwards;
+}
+
+@keyframes fadeInAction {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.productActionSheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 85;
+  background: #17181d;
+  border-top: 1px solid var(--color-line);
+  border-radius: 24px 24px 0 0;
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.4);
+  animation: slideUpAction 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stage[data-theme="light"] .productActionSheet {
+  background: #ffffff;
+  border-top-color: var(--color-line);
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.16);
+}
+
+@keyframes slideUpAction {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.productActionGroup {
+  background: #252830;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage[data-theme="light"] .productActionGroup {
+  background: #f2f3f7;
+}
+
+.productActionBtn {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.productActionBtn + .productActionBtn {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stage[data-theme="light"] .productActionBtn + .productActionBtn {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+.productActionBtn:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stage[data-theme="light"] .productActionBtn:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.productActionReport {
+  color: #ff5252 !important;
+}
+
+.productActionReport svg {
+  color: #ff5252;
+}
+
+.productActionCloseBtn {
+  height: 52px;
+  border-radius: 18px;
+  border: 0;
+  background: #252830;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 120ms ease;
+}
+
+.stage[data-theme="light"] .productActionCloseBtn {
+  background: #f2f3f7;
+}
+
+.productActionCloseBtn:active {
+  opacity: 0.85;
+}
+
+/* Report Reason Dialog */
+.reportReasonList {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+
+.reportReasonItem {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reportReasonItemSelected {
+  border-color: #ff5252;
+  background: rgba(255, 82, 82, 0.12);
+  color: #ff5252;
 }
