@@ -35,15 +35,30 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 64px;
+  gap: 24px;
+  width: 100%;
 }
 
-.hero {
+.carousel {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 48px;
-  width: 100%;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
 }
 
 .title {
@@ -71,7 +86,6 @@
   width: 56px;
   height: 56px;
   border-radius: 100px;
-  background: #f0e6ff;
 }
 
 .avatarAccent {
@@ -89,8 +103,11 @@
 .dot {
   width: 8px;
   height: 8px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
   background: #d5d7da;
+  cursor: pointer;
 }
 
 .dotActive {
