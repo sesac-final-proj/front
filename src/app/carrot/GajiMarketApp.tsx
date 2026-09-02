@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
 import {
   Moon,
   Sun,
+  Calendar,
+  EllipsisVertical,
+  FileText,
+  Footprints,
+  Package,
+  Share2,
   BadgePercent,
   Bell,
   BookOpen,
   BriefcaseBusiness,
+  Building,
   Building2,
   CakeSlice,
   CheckCircle2,
@@ -20,12 +27,14 @@ import {
   Coffee,
   Crosshair,
   Dumbbell,
+  Eye,
   Gem,
   GraduationCap,
   Headphones,
   Heart,
   Home,
   House,
+  Lock,
   LogOut,
   Mail,
   MapPin,
@@ -37,6 +46,7 @@ import {
   Plus,
   QrCode,
   ReceiptText,
+  RefreshCw,
   Search,
   Send,
   Settings,
@@ -51,7 +61,9 @@ import {
   Store,
   Tag,
   Truck,
+  EyeOff,
   UserRound,
+  Users,
   UsersRound,
   Utensils,
   WalletCards,
@@ -59,6 +71,32 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
+import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+import { getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+import {
+  getRentTransactions,
+  groupBuildingsByDong,
+  groupTransactionsByBuilding,
+} from "@/services/realEstateService";
+import type {
+  HouseTypeFilter,
+  PropertyBuilding,
+  RealEstateBounds,
+  RentTransaction,
+  RentTypeFilter,
+} from "@/types/realEstate";
+import { TogetherIntroView } from "./components/together/TogetherIntroView";
+import { TogetherCategoryView } from "./components/together/TogetherCategoryView";
+import { TogetherFormView } from "./components/together/TogetherFormView";
+import { TogetherFeedCard } from "./components/together/TogetherFeedCard";
+import { TogetherDetailView } from "./components/together/TogetherDetailView";
+import type { TogetherCategory, TogetherPost, CreateTogetherPostInput } from "@/types/together";
+import {
+  getTogetherPosts,
+  createTogetherPost,
+  toggleTogetherJoin,
+} from "@/services/togetherService";
+
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
 type TradeStatus = "SALE" | "RESERVED" | "SOLD";
@@ -66,6 +104,34 @@ type TradeType = "SALE" | "FREE";
 type ChatType = "TRADE" | "COMMUNITY" | "GROUP" | "SYSTEM";
 type TradeRole = "SELLER" | "BUYER";
 type SheetId = null | "write" | "region" | "notifications" | "status";
+
+export interface AlbaItem {
+  id: string;
+  title: string;
+  companyName: string;
+  neighborhoodName: string;
+  detailLocation: string;
+  payType: "연봉" | "일급" | "시급" | "월급";
+  payAmount: number;
+  payLabel: string;
+  workingDays: string;
+  workingHours: string;
+  category: "이웃알바" | "걸어서10분" | "단기알바" | "식당/카페" | "물류/현장" | "레슨/과외";
+  badges: string[];
+  reviewCount?: number;
+  thumbnailTone: string;
+  thumbnailEmoji?: string;
+  bgGradient: string;
+  descriptionBullets: string[];
+  details: string;
+  applicantCount: number;
+  viewCount: number;
+  isFavorite: boolean;
+  hasApplied: boolean;
+  phoneContact: string;
+  isAd?: boolean;
+  createdAt: string;
+}
 
 type SubPage =
   | null
@@ -76,10 +142,21 @@ type SubPage =
   | { type: "chat-room"; id: string }
   | { type: "my-menu" }
   | { type: "all-services" }
+  | { type: "real-estate" }
   | { type: "dream-dashboard" }
+  | { type: "dream-notice" }
+  | { type: "alba"; tab?: "home" | "search" | "applications" | "manage"; category?: string }
+  | { type: "alba-detail"; id: string }
+  | { type: "alba-form" }
+  | { type: "together-intro" }
+  | { type: "together-category" }
+  | { type: "together-form"; category?: TogetherCategory }
+  | { type: "together-detail"; id: string }
   | { type: "settings" }
   | { type: "sales" }
   | { type: "favorites" }
+  | { type: "apartment-verification" }
+  | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" };
 
 type ProductListItem = {
@@ -135,12 +212,25 @@ type LocalBusiness = {
   name: string;
   category: string;
   neighborhoodName: string;
+  districtName?: string;
   distance: string;
   openNow: boolean;
   liked: boolean;
   summary: string;
   lat: number;
   lng: number;
+  riskType?: string | null;
+  dangerTone?: DangerTone;
+  observedAt?: string | null;
+  sourceUrl?: string | null;
+};
+
+type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
+
+type DangerVisual = {
+  label: string;
+  emoji: string;
+  tone: DangerTone;
 };
 
 type DonationFacility = {
@@ -170,7 +260,7 @@ type IconItem = {
 };
 
 const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부동산", "기타 서비스"];
-const COMMUNITY_TABS = ["동네생활", "모임", "카페", "아파트", "게임"];
+const COMMUNITY_TABS = ["전체", "자유 주제", "같이해요", "질문", "동네 정보"];
 const COMMUNITY_FILTERS = ["추천", "인기", "취미/여가", "운동/스포츠", "맛집/음식", "동네친구", "일반"];
 const CHAT_FILTERS = ["전체", "판매", "구매", "안읽음", "모임", "알바"];
 const NEIGHBORHOODS = ["송파삼성래미안", "위례", "공릉", "당산 2동"];
@@ -178,8 +268,10 @@ const NEIGHBORHOODS = ["송파삼성래미안", "위례", "공릉", "당산 2동
 type MapSearchBounds = { south: number; north: number; west: number; east: number };
 
 type NaverMapInstance = {
+  autoResize?: () => void;
   setCenter: (center: unknown) => void;
   setZoom: (zoom: number) => void;
+  getZoom: () => number;
   getBounds: () => {
     getSW: () => { lat: () => number; lng: () => number };
     getNE: () => { lat: () => number; lng: () => number };
@@ -188,10 +280,19 @@ type NaverMapInstance = {
 
 type NaverMarkerInstance = {
   setMap: (map: NaverMapInstance | null) => void;
+  setIcon?: (icon: any) => void;
+  setZIndex?: (zIndex: number) => void;
+  getPosition?: () => { lat: () => number; lng: () => number };
 };
 
 type NaverMapsNamespace = {
+  Event?: {
+    addListener: (target: any, eventName: string, listener: (...args: any[]) => void) => unknown;
+    removeListener: (listener: unknown) => void;
+  };
   LatLng: new (lat: number, lng: number) => unknown;
+  Point?: new (x: number, y: number) => unknown;
+  LatLngBounds?: new (sw: unknown, ne: unknown) => unknown;
   Map: new (
     element: HTMLElement,
     options: {
@@ -210,9 +311,10 @@ type NaverMapsNamespace = {
     title?: string;
     opacity?: number;
     zIndex?: number;
-    icon?: { content: HTMLElement };
+    icon?: { content: HTMLElement | string; anchor?: unknown };
   }) => NaverMarkerInstance;
 };
+
 
 declare global {
   interface Window {
@@ -224,11 +326,28 @@ declare global {
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_KEY_ID = process.env.NEXT_PUBLIC_NAVER_MAP_NCP_KEY_ID ?? "";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
   송파삼성래미안: { lat: 37.504744, lng: 127.118295 },
   위례: { lat: 37.4772, lng: 127.1437 },
   공릉: { lat: 37.6257, lng: 127.0731 },
   "당산 2동": { lat: 37.5351, lng: 126.9028 },
+};
+const NEIGHBORHOOD_DISTRICTS: Record<string, string> = {
+  송파삼성래미안: "송파구",
+  위례: "송파구",
+  공릉: "노원구",
+  "당산 2동": "영등포구",
+};
+
+const DANGER_VISUALS: Record<DangerTone, DangerVisual> = {
+  fire: { label: "화재", emoji: "🔥", tone: "fire" },
+  accident: { label: "사고", emoji: "⚠️", tone: "accident" },
+  construction: { label: "공사", emoji: "🚧", tone: "construction" },
+  failure: { label: "고장", emoji: "🔧", tone: "failure" },
+  control: { label: "통제", emoji: "⛔", tone: "control" },
+  flood: { label: "침수", emoji: "🌊", tone: "flood" },
+  default: { label: "위험", emoji: "🚨", tone: "default" },
 };
 
 let naverMapScriptPromise: Promise<void> | null = null;
@@ -264,6 +383,100 @@ function loadNaverMapScript(keyId: string) {
   });
 
   return naverMapScriptPromise;
+}
+
+function apiUrl(path: string) {
+  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
+}
+
+type DangerSignalApiItem = {
+  id?: string | number;
+  name?: string | null;
+  risk_name?: string | null;
+  category?: string | null;
+  neighborhood_name?: string | null;
+  sigungu?: string | null;
+  district_name?: string | null;
+  distance?: string | null;
+  open_now?: boolean | null;
+  liked?: boolean | null;
+  summary?: string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  risk_type?: string | null;
+  observed_at?: string | null;
+  source_url?: string | null;
+};
+
+type DangerSignalApiResponse = { items?: DangerSignalApiItem[] } | DangerSignalApiItem[];
+
+function parseCoordinate(value: number | string | null | undefined) {
+  const coordinate = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function formatObservedAt(value: string | null | undefined) {
+  if (!value) return "실시간";
+  const observedAt = new Date(value);
+  if (Number.isNaN(observedAt.getTime())) return "실시간";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(observedAt);
+}
+
+function dangerToneForText(value: string) {
+  if (/화재|불|연기/.test(value)) return "fire";
+  if (/침수|호우|홍수|빗물|하천/.test(value)) return "flood";
+  if (/통제|차단|금지|폐쇄/.test(value)) return "control";
+  if (/고장|장애/.test(value)) return "failure";
+  if (/공사|보수|작업/.test(value)) return "construction";
+  if (/사고|추돌|전도|충돌/.test(value)) return "accident";
+  return "default";
+}
+
+function getDangerVisual(business: Pick<LocalBusiness, "category" | "dangerTone" | "riskType" | "name" | "summary">) {
+  if (business.category !== "danger") return null;
+  const tone = business.dangerTone ?? dangerToneForText(`${business.riskType ?? ""} ${business.name} ${business.summary}`);
+  return DANGER_VISUALS[tone] ?? DANGER_VISUALS.default;
+}
+
+function toDangerBusiness(item: DangerSignalApiItem): LocalBusiness | null {
+  const lat = parseCoordinate(item.lat ?? item.latitude);
+  const lng = parseCoordinate(item.lng ?? item.longitude);
+  if (lat === null || lng === null) return null;
+
+  const districtName = item.sigungu ?? item.district_name ?? item.neighborhood_name ?? "서울";
+  const name = item.name ?? item.risk_name ?? item.risk_type ?? "서울안전누리 위험신호";
+  const summary = item.summary ?? item.risk_type ?? "서울안전누리 위험신호";
+  const dangerTone = dangerToneForText(`${item.risk_type ?? ""} ${name} ${summary}`);
+
+  return {
+    id: `nuri-${String(item.id ?? `${lat}-${lng}-${name}`)}`,
+    name,
+    category: "danger",
+    neighborhoodName: districtName,
+    districtName,
+    distance: item.distance ?? formatObservedAt(item.observed_at),
+    openNow: item.open_now ?? true,
+    liked: item.liked ?? false,
+    summary,
+    lat,
+    lng,
+    riskType: item.risk_type,
+    dangerTone,
+    observedAt: item.observed_at,
+    sourceUrl: item.source_url,
+  };
+}
+
+function matchesNeighborhood(business: LocalBusiness, neighborhood: string) {
+  const district = NEIGHBORHOOD_DISTRICTS[neighborhood];
+  return business.neighborhoodName === neighborhood || Boolean(district && business.districtName === district);
 }
 
 const initialProducts: ProductListItem[] = [
@@ -648,6 +861,252 @@ function subscribeTheme(onChange: () => void) {
   };
 }
 
+
+const ALBA_MOCK_DATA: AlbaItem[] = [
+  {
+    id: "alba-1",
+    title: "[무신사스탠다드] 명동중앙점 풀타임 스태프 채용",
+    companyName: "무신사 스탠다드 명동중앙점",
+    neighborhoodName: "중구 충무로1가",
+    detailLocation: "명동역 6번 출구 도보 2분",
+    payType: "연봉",
+    payAmount: 27600000,
+    payLabel: "연봉 2,760만원",
+    workingDays: "주 5일 (스케줄 근무)",
+    workingHours: "09:30 ~ 19:30 (휴게 1시간)",
+    category: "이웃알바",
+    badges: ["정직원", "모범구인"],
+    reviewCount: 4,
+    thumbnailTone: "musinsa",
+    thumbnailEmoji: "🏢",
+    bgGradient: "linear-gradient(135deg, #1c1d22 0%, #363942 100%)",
+    descriptionBullets: [
+      "1. 매장 상품 진열 및 고객 응대",
+      "2. 피팅룸 안내 및 재고 관리",
+      "3. 4대보험, 퇴직금, 유니폼 지원",
+      "4. 무신사 패밀리 임직원 할인 혜택"
+    ],
+    details: "트렌디한 패션 브랜드 무신사 스탠다드 명동점에서 함께할 열정적인 스태프를 모십니다. 패션에 관심이 많고 친절한 분들의 많은 지원 바랍니다!",
+    applicantCount: 8,
+    viewCount: 412,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-1544-7199",
+    isAd: true,
+    createdAt: "방금 전",
+  },
+  {
+    id: "alba-2",
+    title: "명동뷰티매장 질서유지 및 고객응대",
+    companyName: "휴먼코드",
+    neighborhoodName: "중구 충무로1가",
+    detailLocation: "명동역 6번출구 도보 1분거리 올리브영 명동본점",
+    payType: "일급",
+    payAmount: 65000,
+    payLabel: "일급 65,000원",
+    workingDays: "월~금",
+    workingHours: "18:00 ~ 22:30",
+    category: "단기알바",
+    badges: ["후기 1"],
+    reviewCount: 1,
+    thumbnailTone: "oliveyoung",
+    thumbnailEmoji: "💄",
+    bgGradient: "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)",
+    descriptionBullets: [
+      "1. 대기줄 및 매장 질서유지",
+      "2. 고객 응대지원",
+      "3. 휴게시간 30분 제공",
+      "4. 상시 근무 및 당일/익일 지급 가능"
+    ],
+    details: "명동 중심 뷰티 매장에서 저녁 시간대 고객 질서유지 및 동선 안내를 도와주실 친절한 이웃 알바님을 구합니다. 초보자도 바로 가능합니다!",
+    applicantCount: 12,
+    viewCount: 520,
+    isFavorite: true,
+    hasApplied: false,
+    phoneContact: "010-8921-4321",
+    isAd: true,
+    createdAt: "10분 전",
+  },
+  {
+    id: "alba-3",
+    title: "[무신사스토어] 대림창고 성수 주말 피킹/물류 스태프",
+    companyName: "무신사 스토어 성수점",
+    neighborhoodName: "성동구 성수동2가",
+    detailLocation: "성수역 3번 출구 인근",
+    payType: "시급",
+    payAmount: 12384,
+    payLabel: "시급 12,384원",
+    workingDays: "주말 (토, 일)",
+    workingHours: "11:00 ~ 20:00",
+    category: "걸어서10분",
+    badges: ["모범구인"],
+    thumbnailTone: "musinsa_dark",
+    thumbnailEmoji: "📦",
+    bgGradient: "linear-gradient(135deg, #09090b 0%, #27272a 100%)",
+    descriptionBullets: [
+      "1. 입출고 상품 분류 및 피킹",
+      "2. 쾌적한 실내 창고 환경",
+      "3. 주휴수당 별도 지급, 식대 지원"
+    ],
+    details: "성수동 핫플레이스 무신사스토어 대림창고에서 주말 동안 활기차게 함께 일할 파트타이머를 모집합니다.",
+    applicantCount: 15,
+    viewCount: 680,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-6959-1122",
+    createdAt: "30분 전",
+  },
+  {
+    id: "alba-4",
+    title: "홀서빙 가족 구합니다 (초보 환영)",
+    companyName: "진주꽃돼지",
+    neighborhoodName: "용산구 한남동",
+    detailLocation: "순천향대병원 앞 먹자골목",
+    payType: "월급",
+    payAmount: 3400000,
+    payLabel: "월급 340만원",
+    workingDays: "주 5일",
+    workingHours: "16:00 ~ 02:00",
+    category: "식당/카페",
+    badges: ["정직원", "후기 18"],
+    reviewCount: 18,
+    thumbnailTone: "bbq",
+    thumbnailEmoji: "🥩",
+    bgGradient: "linear-gradient(135deg, #842323 0%, #d32f2f 100%)",
+    descriptionBullets: [
+      "1. 숯불구이 전문점 홀 서빙 및 테이블 정리",
+      "2. 맛있는 저녁 식사 제공",
+      "3. 팁 및 성과급 추가 지급"
+    ],
+    details: "동네에서 오랫동안 사랑받는 고깃집입니다. 가족처럼 편안한 분위기에서 서로 도우며 근무하실 성실한 분 환영합니다!",
+    applicantCount: 6,
+    viewCount: 340,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "010-3342-9988",
+    createdAt: "1시간 전",
+  },
+  {
+    id: "alba-5",
+    title: "[자라] 명동 눈스퀘어점 풀타임 어드바이저 채용",
+    companyName: "인디텍스코리아 자라",
+    neighborhoodName: "중구 명동2가",
+    detailLocation: "을지로입구역 6번 출구 연결",
+    payType: "연봉",
+    payAmount: 30980000,
+    payLabel: "연봉 3,098만원",
+    workingDays: "주 5일 (스케줄)",
+    workingHours: "09:00 ~ 18:30",
+    category: "이웃알바",
+    badges: ["모범구인", "후기 10"],
+    reviewCount: 10,
+    thumbnailTone: "zara",
+    thumbnailEmoji: "👗",
+    bgGradient: "linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)",
+    descriptionBullets: [
+      "1. 글로벌 SPA 브랜드 자라 고객 어드바이징",
+      "2. 디스플레이 및 매장 운영 관리",
+      "3. 인센티브 및 글로벌 교육 프로그램"
+    ],
+    details: "글로벌 패션 그룹 인디텍스 자라에서 패션 리더로 성장할 스태프를 채용합니다.",
+    applicantCount: 19,
+    viewCount: 890,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-3783-5000",
+    createdAt: "2시간 전",
+  },
+  {
+    id: "alba-6",
+    title: "디저트 전문점 카페 주5일 바리스타/스태프 모집",
+    companyName: "AVA 아바",
+    neighborhoodName: "성동구 성수동1가",
+    detailLocation: "서울숲역 5번 출구 도보 3분",
+    payType: "시급",
+    payAmount: 13500,
+    payLabel: "시급 13,500원",
+    workingDays: "주 5일",
+    workingHours: "10:00 ~ 18:00",
+    category: "식당/카페",
+    badges: ["모범구인", "후기 37"],
+    reviewCount: 37,
+    thumbnailTone: "cafe",
+    thumbnailEmoji: "☕",
+    bgGradient: "linear-gradient(135deg, #4b3832 0%, #854442 100%)",
+    descriptionBullets: [
+      "1. 스페셜티 커피 추출 및 음료 제조",
+      "2. 디저트 플레이팅 및 카운터 포스 응대",
+      "3. 쾌적하고 감성적인 인테리어 근무환경"
+    ],
+    details: "디저트와 스페셜티 커피를 사랑하는 분들의 지원을 기다립니다. 초보자도 꼼꼼한 레시피 교육 후 바로 근무 가능합니다.",
+    applicantCount: 24,
+    viewCount: 1040,
+    isFavorite: true,
+    hasApplied: true,
+    phoneContact: "010-4491-0102",
+    createdAt: "3시간 전",
+  },
+  {
+    id: "alba-7",
+    title: "논현 세차원 구합니다 (초보 환영, 단기 가능)",
+    companyName: "텐미닛워시",
+    neighborhoodName: "강남구 논현동",
+    detailLocation: "학동역 1번 출구 도보 5분",
+    payType: "시급",
+    payAmount: 12000,
+    payLabel: "시급 12,000원",
+    workingDays: "협의 가능 (주 3~5일)",
+    workingHours: "09:00 ~ 18:00",
+    category: "물류/현장",
+    badges: ["단기", "초보가능"],
+    thumbnailTone: "carwash",
+    thumbnailEmoji: "🚗",
+    bgGradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+    descriptionBullets: [
+      "1. 실내외 프리미엄 디테일링 세차 보조",
+      "2. 장비 사용법 1대1 맞춤 교육",
+      "3. 간식 및 식사 제공"
+    ],
+    details: "손세차 보조 인원을 충원합니다. 땀 흘린 만큼 보람 있는 작업이며 밝고 활기찬 분위기입니다.",
+    applicantCount: 4,
+    viewCount: 220,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "010-9988-1234",
+    createdAt: "4시간 전",
+  },
+  {
+    id: "alba-8",
+    title: "[5년연속 미슐랭] 이태원 우육미엔 홀/주방 직원",
+    companyName: "우육미엔",
+    neighborhoodName: "용산구 이태원동",
+    detailLocation: "한강진역 1번 출구 도보 4분",
+    payType: "월급",
+    payAmount: 2800000,
+    payLabel: "월급 280만원",
+    workingDays: "주 5일 (화요일 정기휴무)",
+    workingHours: "10:30 ~ 21:30 (브레이크타임 2시간)",
+    category: "식당/카페",
+    badges: ["정직원", "후기 1"],
+    reviewCount: 1,
+    thumbnailTone: "noodle",
+    thumbnailEmoji: "🍜",
+    bgGradient: "linear-gradient(135deg, #e52d27 0%, #b31217 100%)",
+    descriptionBullets: [
+      "1. 미슐랭 빕구르망 선정 대만식 우육면 전문점",
+      "2. 홀 서빙 및 주방 보조",
+      "3. 4대보험, 퇴직금, 유니폼 제공"
+    ],
+    details: "정통 대만 요리를 선보이는 우육미엔에서 성실하고 책임감 있는 팀원을 모십니다.",
+    applicantCount: 7,
+    viewCount: 450,
+    isFavorite: false,
+    hasApplied: false,
+    phoneContact: "02-798-5556",
+    createdAt: "5시간 전",
+  }
+];
+
 export default function GajiMarketApp() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ThemeMode);
 
@@ -670,7 +1129,7 @@ export default function GajiMarketApp() {
   const [communityTab, setCommunityTab] = useState("동네생활");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
-  const [mapCategory, setMapCategory] = useState<string>("takeout");
+  const [mapCategory, setMapCategory] = useState<string>("danger");
   const [mapSheetState, setMapSheetState] = useState<"collapsed" | "half" | "expanded">("half");
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchArea, setMapSearchArea] = useState<{ neighborhood: string; bounds: MapSearchBounds } | null>(null);
@@ -678,15 +1137,64 @@ export default function GajiMarketApp() {
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>(initialChats);
+  const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
+  const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
+  const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
   const [extraMessages, setExtraMessages] = useState<Record<string, typeof baseMessages>>({});
   const [isBooting, setIsBooting] = useState(true);
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
+
+  const openApartmentFlow = useCallback(() => {
+    if (verifiedApartment) {
+      setSubPage({ type: "apartment-community", apartmentName: verifiedApartment });
+    } else {
+      setSubPage({ type: "apartment-verification" });
+    }
+  }, [verifiedApartment]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 520);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    function syncTabFromHash() {
+      if (window.location.hash === "#map" || window.location.hash === "#map-pointers") {
+        setActiveTab("map");
+        setSubPage(null);
+        setMapCategory("danger");
+        setMapSheetState(window.location.hash === "#map-pointers" ? "half" : "expanded");
+      } else if (window.location.hash === "#dream") {
+        setActiveTab("my");
+        setSubPage({ type: "dream-dashboard" });
+      }
+    }
+
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(apiUrl("/api/v1/local/danger-signals?limit=120"), { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("danger signals failed");
+        return response.json() as Promise<DangerSignalApiResponse>;
+      })
+      .then((payload) => {
+        const items = Array.isArray(payload) ? payload : payload.items ?? [];
+        setDangerSignals(items.map(toDangerBusiness).filter((item): item is LocalBusiness => Boolean(item)));
+        setDangerSignalsLoaded(true);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDangerSignalsLoaded(false);
+      });
+    return () => controller.abort();
   }, []);
 
   const totalUnread = useMemo(
@@ -737,30 +1245,57 @@ export default function GajiMarketApp() {
     });
   }, [chatFilter, chats]);
 
+  const localBusinesses = useMemo(() => {
+    const staticBusinesses = dangerSignalsLoaded
+      ? LOCAL_BUSINESSES.filter((business) => business.category !== "danger")
+      : LOCAL_BUSINESSES;
+    return [...dangerSignals, ...staticBusinesses];
+  }, [dangerSignals, dangerSignalsLoaded]);
+
   const businesses = useMemo(() => {
     const bounds = mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
-    return LOCAL_BUSINESSES.filter((business) => {
+    return localBusinesses.filter((business) => {
       const matchesCategory = business.category === mapCategory;
       const matchesRegion = bounds
         ? business.lat >= bounds.south && business.lat <= bounds.north &&
           business.lng >= bounds.west && business.lng <= bounds.east
-        : business.neighborhoodName === activeNeighborhood ||
-          business.neighborhoodName === secondaryNeighborhood;
+        : matchesNeighborhood(business, activeNeighborhood) ||
+          matchesNeighborhood(business, secondaryNeighborhood);
       const matchesQuery =
         mapQuery.trim().length === 0 ||
         business.name.includes(mapQuery.trim()) ||
         business.summary.includes(mapQuery.trim()) ||
-        business.neighborhoodName.includes(mapQuery.trim());
+        business.neighborhoodName.includes(mapQuery.trim()) ||
+        (business.districtName?.includes(mapQuery.trim()) ?? false) ||
+        (business.riskType?.includes(mapQuery.trim()) ?? false);
       return matchesCategory && matchesRegion && matchesQuery;
     });
-  }, [activeNeighborhood, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
+  }, [activeNeighborhood, localBusinesses, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
+
+  const [togetherPosts, setTogetherPosts] = useState<TogetherPost[]>(() => getTogetherPosts("all"));
+  const [togetherCategoryFilter, setTogetherCategoryFilter] = useState<TogetherCategory | "all">("all");
+
+  const filteredTogetherPosts = useMemo(() => {
+    if (togetherCategoryFilter === "all") return togetherPosts;
+    return togetherPosts.filter((p) => p.category === togetherCategoryFilter);
+  }, [togetherPosts, togetherCategoryFilter]);
 
   function navigateTab(tab: TabId) {
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
+    if (tab === "map") {
+      setMapSheetState("half");
+    }
     window.requestAnimationFrame(() => {
       document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  function openRealEstate() {
+    setSubPage({ type: "real-estate" });
+    window.requestAnimationFrame(() => {
+      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
     });
   }
 
@@ -769,6 +1304,9 @@ export default function GajiMarketApp() {
       subPage?.type === "settings" ||
       subPage?.type === "my-menu" ||
       subPage?.type === "dream-dashboard" ||
+      subPage?.type === "dream-notice" ||
+      subPage?.type === "alba" ||
+      subPage?.type === "alba-form" ||
       subPage?.type === "sales" ||
       subPage?.type === "favorites"
     ) {
@@ -776,7 +1314,40 @@ export default function GajiMarketApp() {
       setSubPage(null);
       return;
     }
+    if (subPage?.type === "alba-detail") {
+      setSubPage({ type: "alba" });
+      return;
+    }
+    if (subPage?.type === "together-category") {
+      setSubPage({ type: "together-intro" });
+      return;
+    }
+    if (subPage?.type === "together-form") {
+      setSubPage({ type: "together-category" });
+      return;
+    }
+    if (subPage?.type === "together-detail") {
+      setSubPage(null);
+      return;
+    }
+    if (subPage?.type === "together-intro") {
+      setSubPage(null);
+      return;
+    }
     setSubPage(null);
+  }
+
+  function handleSubmitTogether(input: CreateTogetherPostInput) {
+    const created = createTogetherPost(input);
+    setTogetherPosts(getTogetherPosts("all"));
+    setSubPage({ type: "together-detail", id: created.id });
+  }
+
+  function handleToggleTogetherJoin(postId: string) {
+    const res = toggleTogetherJoin(postId);
+    if (res.success) {
+      setTogetherPosts(getTogetherPosts("all"));
+    }
   }
 
   function toggleFavorite(productId: string) {
@@ -897,6 +1468,44 @@ export default function GajiMarketApp() {
     setSubPage(null);
   }
 
+  
+  function toggleAlbaFavorite(id: string) {
+    setAlbaList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    );
+  }
+
+  function handleApplyAlba(id: string) {
+    setAlbaList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, hasApplied: true, applicantCount: item.applicantCount + 1 } : item
+      )
+    );
+    alert("지원서가 성공적으로 접수되었습니다! 💜\n담당자가 확인 후 연락드릴 예정입니다.");
+  }
+
+  function handleCreateAlba(newItem: Omit<AlbaItem, "id" | "applicantCount" | "viewCount" | "isFavorite" | "hasApplied" | "createdAt">) {
+    const created: AlbaItem = {
+      ...newItem,
+      id: `alba-${Date.now()}`,
+      applicantCount: 0,
+      viewCount: 1,
+      isFavorite: false,
+      hasApplied: false,
+      createdAt: "방금 전",
+    };
+    setAlbaList((current) => [created, ...current]);
+    setSubPage({ type: "alba-detail", id: created.id });
+  }
+
+  const selectedAlba = subPage?.type === "alba-detail" ? albaList.find((item) => item.id === subPage.id) : undefined;
+  const selectedTogetherPost =
+    subPage?.type === "together-detail"
+      ? togetherPosts.find((post) => post.id === subPage.id)
+      : undefined;
+
   const selectedProduct =
     subPage?.type === "product-detail" ? products.find((product) => product.id === subPage.id) : undefined;
   const selectedPost =
@@ -904,12 +1513,16 @@ export default function GajiMarketApp() {
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
+  const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
 
   return (
-    <div className={styles.stage} data-theme={theme}>
+    <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
       <div className={styles.phoneShell}>
-        <main className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""}`} data-app-scroll>
+        <main
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""}`}
+          data-app-scroll
+        >
           {subPage?.type === "product-detail" && selectedProduct ? (
             <ProductDetailScreen
               product={selectedProduct}
@@ -920,6 +1533,12 @@ export default function GajiMarketApp() {
                 const room = chats.find((chat) => chat.productId === selectedProduct.id) ?? chats[0];
                 openChat(room.id);
               }}
+              onHideSeller={(id) => {
+                setProducts((prev) => prev.filter((p) => p.id !== id));
+              }}
+              onReportProduct={(id, _reason) => {
+                setProducts((prev) => prev.filter((p) => p.id !== id));
+              }}
             />
           ) : subPage?.type === "product-form" ? (
             <ProductFormScreen onBack={goBack} onSubmit={submitProduct} />
@@ -927,6 +1546,33 @@ export default function GajiMarketApp() {
             <CommunityDetailScreen post={selectedPost} onBack={goBack} />
           ) : subPage?.type === "community-form" ? (
             <CommunityFormScreen onBack={goBack} onSubmit={submitCommunityPost} />
+          ) : subPage?.type === "together-intro" ? (
+            <TogetherIntroView
+              onBack={goBack}
+              onStart={() => setSubPage({ type: "together-category" })}
+            />
+          ) : subPage?.type === "together-category" ? (
+            <TogetherCategoryView
+              onBack={goBack}
+              onSelectCategory={(cat) => setSubPage({ type: "together-form", category: cat })}
+            />
+          ) : subPage?.type === "together-form" ? (
+            <TogetherFormView
+              initialCategory={subPage.category ?? "group_buy"}
+              userNeighborhood={activeNeighborhood}
+              onBack={goBack}
+              onSubmit={handleSubmitTogether}
+            />
+          ) : subPage?.type === "together-detail" && selectedTogetherPost ? (
+            <TogetherDetailView
+              post={selectedTogetherPost}
+              onBack={goBack}
+              onToggleJoin={() => handleToggleTogetherJoin(selectedTogetherPost.id)}
+              onStartChat={() => {
+                const room = chats[0];
+                openChat(room.id);
+              }}
+            />
           ) : subPage?.type === "chat-room" && selectedChat ? (
             <ChatRoomScreen
               room={selectedChat}
@@ -938,14 +1584,70 @@ export default function GajiMarketApp() {
               onBack={goBack}
             />
           ) : subPage?.type === "my-menu" ? (
-            <MyMenuScreen onBack={goBack} />
+            <MyMenuScreen onBack={goBack} onOpenAlba={(tab) => setSubPage({ type: "alba", tab })} />
           ) : subPage?.type === "all-services" ? (
-            <AllServicesScreen onBack={goBack} />
+            <AllServicesScreen
+              onBack={goBack}
+              onOpenAlba={() => setSubPage({ type: "alba" })}
+              onOpenRealEstate={openRealEstate}
+              onOpenApartment={openApartmentFlow}
+            />
+          ) : subPage?.type === "apartment-verification" ? (
+            <ApartmentVerificationScreen
+              onBack={goBack}
+              onVerify={(aptName) => {
+                setVerifiedApartment(aptName);
+                setSubPage({ type: "apartment-community", apartmentName: aptName });
+              }}
+            />
+          ) : subPage?.type === "apartment-community" ? (
+            <ApartmentCommunityScreen
+              apartmentName={subPage.apartmentName || verifiedApartment || "내 아파트"}
+              onBack={goBack}
+              onReverify={() => setSubPage({ type: "apartment-verification" })}
+              onOpenSearch={() => setSubPage({ type: "search" })}
+              onOpenNotifications={() => setSheet("notifications")}
+              onOpenMenu={() => setSubPage({ type: "all-services" })}
+              onOpenPost={(id) => setSubPage({ type: "community-detail", id })}
+              onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
+              onOpenTogetherPost={(id) => setSubPage({ type: "together-detail", id })}
+              togetherPosts={togetherPosts}
+              onWrite={() => setSubPage({ type: "together-intro" })}
+            />
+          ) : subPage?.type === "real-estate" ? (
+            <RealEstateScreen activeNeighborhood={activeNeighborhood} onBack={goBack} />
           ) : subPage?.type === "dream-dashboard" ? (
             <DreamDashboardScreen
               activeNeighborhood={activeNeighborhood}
               onBack={goBack}
               onChangeNeighborhood={() => setSheet("region")}
+              onOpenNotice={() => setSubPage({ type: "dream-notice" })}
+            />
+          ) : subPage?.type === "dream-notice" ? (
+            <DreamNoticeScreen onBack={goBack} />
+          ) : subPage?.type === "alba" ? (
+            <AlbaMainScreen
+              activeNeighborhood={activeNeighborhood}
+              initialTab={subPage.tab ?? "home"}
+              initialCategory={subPage.category}
+              albas={albaList}
+              onBack={goBack}
+              onSelectAlba={(id) => setSubPage({ type: "alba-detail", id })}
+              onWrite={() => setSubPage({ type: "alba-form" })}
+              onToggleFavorite={toggleAlbaFavorite}
+            />
+          ) : subPage?.type === "alba-detail" && selectedAlba ? (
+            <AlbaDetailScreen
+              alba={selectedAlba}
+              onBack={goBack}
+              onToggleFavorite={() => toggleAlbaFavorite(selectedAlba.id)}
+              onApply={() => handleApplyAlba(selectedAlba.id)}
+            />
+          ) : subPage?.type === "alba-form" ? (
+            <AlbaFormScreen
+              activeNeighborhood={activeNeighborhood}
+              onBack={goBack}
+              onSubmit={handleCreateAlba}
             />
           ) : subPage?.type === "settings" ? (
             <SettingsScreen
@@ -978,7 +1680,7 @@ export default function GajiMarketApp() {
             <SearchScreen
               products={products}
               posts={posts}
-              businesses={LOCAL_BUSINESSES}
+              businesses={localBusinesses}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onPostClick={(id) => setSubPage({ type: "community-detail", id })}
@@ -998,10 +1700,15 @@ export default function GajiMarketApp() {
                 setActiveTab("my");
                 setSubPage({ type: "my-menu" });
               }}
-              onFilterChange={setProductFilter}
+              onFilterChange={(value) => {
+                if (value === "부동산") {
+                  openRealEstate();
+                  return;
+                }
+                setProductFilter(value);
+              }}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onFavorite={toggleFavorite}
-              onWrite={() => setSheet("write")}
               onRetry={() => setHasNetworkError(false)}
             />
           ) : activeTab === "community" ? (
@@ -1009,6 +1716,11 @@ export default function GajiMarketApp() {
               activeTab={communityTab}
               activeFilter={communityFilter}
               posts={filteredPosts}
+              togetherPosts={filteredTogetherPosts}
+              togetherCategoryFilter={togetherCategoryFilter}
+              onTogetherCategoryChange={setTogetherCategoryFilter}
+              onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
+              onTogetherPostClick={(id) => setSubPage({ type: "together-detail", id })}
               isLoading={isBooting}
               onTabChange={setCommunityTab}
               onFilterChange={setCommunityFilter}
@@ -1019,7 +1731,6 @@ export default function GajiMarketApp() {
                 setSubPage({ type: "settings" });
               }}
               onPostClick={(id) => setSubPage({ type: "community-detail", id })}
-              onWrite={() => setSubPage({ type: "community-form" })}
             />
           ) : activeTab === "map" ? (
             <MapScreen
@@ -1062,14 +1773,30 @@ export default function GajiMarketApp() {
               onOpenMenu={() => setSubPage({ type: "my-menu" })}
               onOpenAllServices={() => setSubPage({ type: "all-services" })}
               onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
+              onOpenAlba={() => setSubPage({ type: "alba" })}
               onOpenSales={() => setSubPage({ type: "sales" })}
               onOpenFavorites={() => setSubPage({ type: "favorites" })}
+              onOpenApartment={openApartmentFlow}
             />
           )}
         </main>
 
-        {activeTab === "map" && !subPage && mapSheetState === "expanded" && (
-          <FloatingWriteButton onClick={() => setSheet("write")} />
+        {!subPage && (activeTab === "home" || activeTab === "community" || (activeTab === "map" && mapSheetState === "expanded")) && (
+          <FloatingWriteButton
+            showTogetherTooltip={activeTab === "community"}
+            onTooltipClick={() => setSubPage({ type: "together-intro" })}
+            onClick={() => {
+              if (activeTab === "community") {
+                if (communityTab === "같이해요") {
+                  setSubPage({ type: "together-intro" });
+                } else {
+                  setSubPage({ type: "community-form" });
+                }
+              } else {
+                setSheet("write");
+              }
+            }}
+          />
         )}
 
         {showBottomNav && (
@@ -1093,6 +1820,10 @@ export default function GajiMarketApp() {
           onCommunityWrite={() => {
             setSheet(null);
             setSubPage({ type: "community-form" });
+          }}
+          onTogetherWrite={() => {
+            setSheet(null);
+            setSubPage({ type: "together-intro" });
           }}
           totalUnread={totalUnread}
           hasNetworkError={hasNetworkError}
@@ -1177,7 +1908,6 @@ function HomeScreen({
   onFilterChange,
   onProductClick,
   onFavorite,
-  onWrite,
   onRetry,
 }: {
   isLoading: boolean;
@@ -1193,7 +1923,6 @@ function HomeScreen({
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
   onFavorite: (id: string) => void;
-  onWrite: () => void;
   onRetry: () => void;
 }) {
   return (
@@ -1251,8 +1980,6 @@ function HomeScreen({
           ))}
         </div>
       )}
-
-      <FloatingWriteButton onClick={onWrite} />
     </section>
   );
 }
@@ -1390,20 +2117,36 @@ function ProductDetailScreen({
   onFavorite,
   onStatusChange,
   onChat,
+  onHideSeller,
+  onReportProduct,
 }: {
   product: ProductListItem;
   onBack: () => void;
   onFavorite: (id: string) => void;
   onStatusChange: (id: string, status: TradeStatus) => void;
   onChat: () => void;
+  onHideSeller: (productId: string) => void;
+  onReportProduct: (productId: string, reason: string) => void;
 }) {
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState("전문 판매업자 같아요");
+
+  const reportReasons = [
+    "전문 판매업자 같아요",
+    "사기 글이에요 / 의심돼요",
+    "거래 금지 품목이에요",
+    "비매너 및 욕설/비방",
+    "기타 사유",
+  ];
+
   return (
     <section className={styles.detailScreen}>
       <div className={`${styles.detailHero} ${styles[`tone_${product.thumbnailTone}` as keyof typeof styles] ?? ""}`}>
         <IconButton label="뒤로" onClick={onBack} className={styles.backFloating}>
           <ChevronLeft size={28} />
         </IconButton>
-        <IconButton label="더보기" className={styles.moreFloating}>
+        <IconButton label="더보기" className={styles.moreFloating} onClick={() => setShowMoreSheet(true)}>
           <MoreVertical size={24} />
         </IconButton>
         <span>{product.thumbnailLabel}</span>
@@ -1457,6 +2200,96 @@ function ProductDetailScreen({
           채팅하기
         </button>
       </div>
+
+      {/* More Options Action Sheet (이 사용자의 글 보지 않기 / 신고하기) */}
+      {showMoreSheet && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowMoreSheet(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            <div className={styles.productActionGroup}>
+              <button
+                type="button"
+                className={styles.productActionBtn}
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  onHideSeller(product.id);
+                  alert("이 사용자의 글을 더 이상 보지 않습니다.");
+                  onBack();
+                }}
+              >
+                <EyeOff size={22} />
+                <span>이 사용자의 글 보지 않기</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  setShowReportModal(true);
+                }}
+              >
+                <MessageCircle size={22} />
+                <span>신고하기</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              className={styles.productActionCloseBtn}
+              onClick={() => setShowMoreSheet(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Report Reason Selection Modal */}
+      {showReportModal && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowReportModal(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            <h3 style={{ margin: "4px 0 0", fontSize: "1.125rem", fontWeight: 800 }}>신고 사유를 선택해주세요</h3>
+            <div className={styles.reportReasonList}>
+              {reportReasons.map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  className={`${styles.reportReasonItem} ${selectedReportReason === reason ? styles.reportReasonItemSelected : ""}`}
+                  onClick={() => setSelectedReportReason(reason)}
+                >
+                  <span>{reason}</span>
+                  {selectedReportReason === reason && <CheckCircle2 size={18} />}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.albaDetailApplyBtn}
+              style={{ width: "100%", height: "48px" }}
+              onClick={() => {
+                setShowReportModal(false);
+                onReportProduct(product.id, selectedReportReason);
+                alert(`신고가 접수되었습니다. (${selectedReportReason})\n운영팀에서 확인 후 신속하게 처리하겠습니다.`);
+              }}
+            >
+              신고 제출하기
+            </button>
+            <button
+              type="button"
+              className={styles.productActionCloseBtn}
+              onClick={() => setShowReportModal(false)}
+            >
+              취소
+            </button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -1527,6 +2360,11 @@ function CommunityScreen({
   activeTab,
   activeFilter,
   posts,
+  togetherPosts = [],
+  togetherCategoryFilter = "all",
+  onTogetherCategoryChange,
+  onOpenTogetherIntro,
+  onTogetherPostClick,
   isLoading,
   onTabChange,
   onFilterChange,
@@ -1534,11 +2372,15 @@ function CommunityScreen({
   onOpenNotifications,
   onOpenMenu,
   onPostClick,
-  onWrite,
 }: {
   activeTab: string;
   activeFilter: string;
   posts: CommunityPost[];
+  togetherPosts?: TogetherPost[];
+  togetherCategoryFilter?: TogetherCategory | "all";
+  onTogetherCategoryChange?: (cat: TogetherCategory | "all") => void;
+  onOpenTogetherIntro?: () => void;
+  onTogetherPostClick?: (id: string) => void;
   isLoading: boolean;
   onTabChange: (tab: string) => void;
   onFilterChange: (filter: string) => void;
@@ -1546,7 +2388,6 @@ function CommunityScreen({
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
   onPostClick: (id: string) => void;
-  onWrite: () => void;
 }) {
   return (
     <section className={styles.screen}>
@@ -1567,36 +2408,117 @@ function CommunityScreen({
           </>
         }
       />
-      <nav className={styles.topTabs} aria-label="커뮤니티 탭">
+      <nav className={styles.communityPillTabs} aria-label="커뮤니티 탭">
         {COMMUNITY_TABS.map((tab) => (
           <button
             type="button"
             key={tab}
-            className={activeTab === tab ? styles.topTabActive : ""}
+            className={`${styles.communityPillTab} ${activeTab === tab ? styles.communityPillTabActive : ""}`}
             onClick={() => onTabChange(tab)}
           >
             {tab}
+            {tab === "같이해요" && <em className={styles.communityNBadge}>N</em>}
           </button>
         ))}
       </nav>
-      <ChipScroller items={COMMUNITY_FILTERS} value={activeFilter} onChange={onFilterChange} />
-      {isLoading ? (
-        <PostSkeletonList />
-      ) : posts.length === 0 ? (
-        <StateBlock
-          title="아직 올라온 이야기가 없어요"
-          body="필터를 추천으로 바꾸거나 첫 글을 남겨보세요."
-          actionLabel="추천 보기"
-          onAction={() => onFilterChange("추천")}
-        />
-      ) : (
-        <div className={styles.postList}>
-          {posts.map((post) => (
-            <CommunityPostRow key={post.id} post={post} onClick={() => onPostClick(post.id)} />
-          ))}
+
+      {/* Together Banner Slider - Visible on All / Together Tab */}
+      <div
+        onClick={onOpenTogetherIntro}
+        className={styles.daangnTogetherBanner}
+      >
+        <div className={styles.daangnTogetherBannerLeft}>
+          <span className={styles.daangnTogetherBannerIcon}>🤝</span>
+          <div className={styles.daangnTogetherBannerText}>
+            <span className={styles.daangnTogetherBannerSub}>입주민끼리 무엇이든 같이해보세요</span>
+            <strong className={styles.daangnTogetherBannerTitle}>이웃과 같이해요</strong>
+          </div>
         </div>
+        <ChevronRight size={18} className={styles.togetherBannerArrow} />
+      </div>
+      <div className={styles.daangnBannerDots}>
+        <span className={`${styles.daangnBannerDot} ${styles.daangnBannerDotActive}`} />
+        <span className={styles.daangnBannerDot} />
+      </div>
+
+      {/* Notice Megaphone Line */}
+      <div className={styles.communityNoticeLine} onClick={onOpenTogetherIntro}>
+        <span>📢</span>
+        <span>안녕하세요 😊 동네 커뮤니티는 가까운 이웃과 함께하는 공간입니다.</span>
+      </div>
+
+      {activeTab === "같이해요" ? (
+        <>
+          {/* Seed ChipScroller */}
+          <ChipScroller
+            items={["전체", "공동구매", "공동육아", "취미활동", "강아지 산책", "기타"]}
+            value={
+              togetherCategoryFilter === "group_buy"
+                ? "공동구매"
+                : togetherCategoryFilter === "childcare"
+                ? "공동육아"
+                : togetherCategoryFilter === "hobby"
+                ? "취미활동"
+                : togetherCategoryFilter === "pet_walk"
+                ? "강아지 산책"
+                : togetherCategoryFilter === "etc"
+                ? "기타"
+                : "전체"
+            }
+            onChange={(item) => {
+              const map: Record<string, TogetherCategory | "all"> = {
+                전체: "all",
+                공동구매: "group_buy",
+                공동육아: "childcare",
+                취미활동: "hobby",
+                "강아지 산책": "pet_walk",
+                기타: "etc",
+              };
+              onTogetherCategoryChange?.(map[item] || "all");
+            }}
+          />
+
+          {/* Together Post List */}
+          {togetherPosts.length === 0 ? (
+            <StateBlock
+              title="등록된 모임이 아직 없어요"
+              body="가까운 이웃과 함께할 모임을 직접 만들어보세요!"
+              actionLabel="모임 만들기"
+              onAction={() => onOpenTogetherIntro?.()}
+            />
+          ) : (
+            <div className={styles.postList}>
+              {togetherPosts.map((post) => (
+                <TogetherFeedCard
+                  key={post.id}
+                  post={post}
+                  onClick={() => onTogetherPostClick?.(post.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <ChipScroller items={COMMUNITY_FILTERS} value={activeFilter} onChange={onFilterChange} />
+          {isLoading ? (
+            <PostSkeletonList />
+          ) : posts.length === 0 ? (
+            <StateBlock
+              title="아직 올라온 이야기가 없어요"
+              body="필터를 추천으로 바꾸거나 첫 글을 남겨보세요."
+              actionLabel="추천 보기"
+              onAction={() => onFilterChange("추천")}
+            />
+          ) : (
+            <div className={styles.postList}>
+              {posts.map((post) => (
+                <CommunityPostRow key={post.id} post={post} onClick={() => onPostClick(post.id)} />
+              ))}
+            </div>
+          )}
+        </>
       )}
-      <FloatingWriteButton onClick={onWrite} />
     </section>
   );
 }
@@ -1679,6 +2601,546 @@ function CommunityDetailScreen({ post, onBack }: { post: CommunityPost; onBack: 
   );
 }
 
+function ApartmentVerificationScreen({
+  onBack,
+  onVerify,
+}: {
+  onBack: () => void;
+  onVerify: (apartmentName: string) => void;
+}) {
+  const [phase, setPhase] = useState<"idle" | "locating" | "found" | "searching">("idle");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedApt, setSelectedApt] = useState<string | null>(null);
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null);
+  const [nearbyApts, setNearbyApts] = useState<{ name: string; addr: string; units: string; dist: string }[]>([]);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  // 서울 주요 아파트 단지 DB (실제 서비스에선 서버에서 좌표 기반 조회)
+  const APT_DB = [
+    { name: "푸르지오시티", addr: "서울 구로구 개봉동 128-3", units: "1,240세대", lat: 37.495, lng: 126.847 },
+    { name: "개봉두산위브", addr: "서울 구로구 개봉동 84-1", units: "798세대", lat: 37.496, lng: 126.849 },
+    { name: "개봉한신", addr: "서울 구로구 개봉동 202", units: "560세대", lat: 37.493, lng: 126.845 },
+    { name: "현대홈타운", addr: "서울 구로구 개봉동 45-2", units: "980세대", lat: 37.494, lng: 126.851 },
+    { name: "아이파크", addr: "서울 구로구 개봉동 89", units: "620세대", lat: 37.492, lng: 126.844 },
+    { name: "래미안", addr: "서울 송파구 신천동 7-20", units: "1,840세대", lat: 37.515, lng: 127.105 },
+    { name: "헬리오시티", addr: "서울 송파구 가락동 100", units: "9,510세대", lat: 37.498, lng: 127.118 },
+    { name: "올림픽선수촌", addr: "서울 송파구 방이동 88", units: "5,540세대", lat: 37.511, lng: 127.127 },
+    { name: "마포래미안푸르지오", addr: "서울 마포구 아현동 747", units: "3,885세대", lat: 37.555, lng: 126.953 },
+    { name: "e편한세상", addr: "서울 은평구 불광동 329", units: "1,350세대", lat: 37.616, lng: 126.923 },
+  ];
+
+  const handleGPS = () => {
+    setPhase("locating");
+    setSelectedApt(null);
+
+    if (!navigator.geolocation) {
+      // fallback: 현재 activeNeighborhood 기반으로 근처 단지 보여주기
+      setTimeout(() => {
+        const apts = APT_DB.slice(0, 5).map((a) => ({ ...a, dist: `${Math.floor(Math.random() * 300 + 50)}m` }));
+        setNearbyApts(apts);
+        setDetectedLocation("개봉동");
+        setPhase("found");
+      }, 1200);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        // 거리 계산 (haversine 근사)
+        const sorted = APT_DB.map((apt) => {
+          const dlat = (apt.lat - latitude) * 111000;
+          const dlng = (apt.lng - longitude) * 88000;
+          const dist = Math.round(Math.sqrt(dlat * dlat + dlng * dlng));
+          return { name: apt.name, addr: apt.addr, units: apt.units, dist: dist < 1000 ? `${dist}m` : `${(dist / 1000).toFixed(1)}km` };
+        }).sort((a, b) => parseInt(a.dist) - parseInt(b.dist)).slice(0, 5);
+        setNearbyApts(sorted);
+        setDetectedLocation("현재 위치");
+        setPhase("found");
+      },
+      () => {
+        // 권한 거부 시 기본 목록
+        const apts = APT_DB.slice(0, 5).map((a) => ({ ...a, dist: `${Math.floor(Math.random() * 400 + 100)}m` }));
+        setNearbyApts(apts);
+        setDetectedLocation("내 동네");
+        setPhase("found");
+      },
+      { timeout: 8000 }
+    );
+  };
+
+  const searchResults = searchTerm.trim()
+    ? APT_DB.filter((a) =>
+        a.name.includes(searchTerm) || a.addr.includes(searchTerm)
+      ).map((a) => ({ ...a, dist: "" }))
+    : [];
+
+  const handleConfirm = () => {
+    if (!selectedApt) return;
+    setIsConfirming(true);
+    setTimeout(() => {
+      setIsConfirming(false);
+      onVerify(selectedApt);
+    }, 500);
+  };
+
+  return (
+    <section className={styles.screen}>
+      <ScreenHeader
+        title="내 아파트 인증"
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+
+      {/* 상단 히어로 */}
+      <div className={styles.aptVerifyHero}>
+        <div className={styles.aptVerifyIconBg}>
+          <Building2 size={28} strokeWidth={1.8} />
+        </div>
+        <h1 className={styles.aptVerifyTitle}>
+          입주민 전용 커뮤니티<br />
+          <em>아파트를 인증해주세요</em>
+        </h1>
+        <p className={styles.aptVerifyDesc}>
+          실제 거주 중인 아파트를 인증하면<br />
+          이웃과 함께하는 전용 공간이 열려요
+        </p>
+      </div>
+
+      {/* GPS 버튼 */}
+      <button
+        type="button"
+        className={styles.aptGpsBtn}
+        onClick={handleGPS}
+        disabled={phase === "locating"}
+      >
+        {phase === "locating" ? (
+          <>
+            <span className={styles.aptGpsSpinner} />
+            <span>위치 확인 중...</span>
+          </>
+        ) : (
+          <>
+            <MapPin size={18} />
+            <span>GPS로 내 위치 아파트 찾기</span>
+          </>
+        )}
+      </button>
+
+      <div className={styles.aptVerifyDivider}>
+        <span>또는 직접 검색</span>
+      </div>
+
+      {/* 검색창 */}
+      <div className={styles.aptSearchWrap}>
+        <Search size={17} className={styles.aptSearchIcon} />
+        <input
+          type="text"
+          className={styles.aptSearchInput}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setPhase("searching");
+            setSelectedApt(null);
+          }}
+          placeholder="아파트 이름 검색"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            className={styles.aptSearchClear}
+            onClick={() => { setSearchTerm(""); setPhase(phase === "searching" ? "idle" : phase); }}
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
+      {/* 결과 목록 */}
+      {(phase === "found" || phase === "searching") && (
+        <div className={styles.aptListWrap}>
+          <p className={styles.aptListLabel}>
+            {phase === "found"
+              ? `📍 ${detectedLocation} 근처 아파트`
+              : `'${searchTerm}' 검색 결과`}
+          </p>
+          <div className={styles.aptList}>
+            {(phase === "found" ? nearbyApts : searchResults).map((apt) => {
+              const sel = selectedApt === apt.name;
+              return (
+                <button
+                  key={apt.name}
+                  type="button"
+                  className={`${styles.aptListItem} ${sel ? styles.aptListItemSelected : ""}`}
+                  onClick={() => setSelectedApt(apt.name)}
+                >
+                  <div className={styles.aptListItemIcon}>
+                    <Building2 size={18} />
+                  </div>
+                  <div className={styles.aptListItemInfo}>
+                    <strong>{apt.name}</strong>
+                    <span>{apt.addr} · {apt.units}</span>
+                  </div>
+                  <div className={styles.aptListItemRight}>
+                    {apt.dist && <span className={styles.aptListDist}>{apt.dist}</span>}
+                    <span className={`${styles.aptListRadio} ${sel ? styles.aptListRadioSelected : ""}`}>
+                      {sel && <CheckCircle2 size={14} />}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+            {phase === "searching" && searchResults.length === 0 && searchTerm.trim() && (
+              <div className={styles.aptEmptyState}>
+                <Search size={28} />
+                <p>검색 결과가 없어요</p>
+                <span>아파트 이름으로 검색해보세요</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {phase === "idle" && (
+        <div className={styles.aptIdleHint}>
+          <MapPinned size={40} strokeWidth={1.3} />
+          <p>GPS 버튼을 누르면 현재 위치에서<br />가까운 아파트를 자동으로 찾아줘요</p>
+        </div>
+      )}
+
+      {/* 하단 고정 버튼 */}
+      <div className={styles.aptVerifyBar}>
+        <button
+          type="button"
+          className={`${styles.primaryButton} ${!selectedApt ? styles.aptVerifyBtnDisabled : ""}`}
+          disabled={!selectedApt || isConfirming}
+          onClick={handleConfirm}
+        >
+          {isConfirming
+            ? "인증 중..."
+            : selectedApt
+            ? `${selectedApt} 인증하기`
+            : "아파트를 선택해주세요"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ApartmentCommunityScreen({
+  apartmentName = "내 아파트",
+  onBack,
+  onReverify,
+  onOpenSearch,
+  onOpenNotifications,
+  onOpenMenu,
+  onOpenPost,
+  onOpenTogetherIntro,
+  onOpenTogetherPost,
+  togetherPosts,
+  onWrite,
+}: {
+  apartmentName?: string;
+  onBack: () => void;
+  onReverify?: () => void;
+  onOpenSearch?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenMenu?: () => void;
+  onOpenPost?: (id: string) => void;
+  onOpenTogetherIntro?: () => void;
+  onOpenTogetherPost?: (id: string) => void;
+  togetherPosts: TogetherPost[];
+  onWrite: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<string>("전체");
+  const [showMarketPosts, setShowMarketPosts] = useState<boolean>(true);
+  const [togetherFilter, setTogetherFilter] = useState<TogetherCategory | "all">("all");
+
+  const APT_TABS = ["전체", "자유 주제", "같이해요", "질문", "입주민 의견"];
+
+  const mockAptPosts = [
+    {
+      id: "apt-1",
+      category: "생활 정보",
+      hasDot: true,
+      title: `${apartmentName} 며칠전에 근처 맛집 방문했는데 정말 친절하고 맛있었어요! 입주민 분들께 추천드립니다.`,
+      viewCount: 43,
+      isMarket: false,
+    },
+    {
+      id: "apt-2",
+      category: "중고거래",
+      hasDot: false,
+      title: "베이지 콤비 암막블라인드 깔끔하게 사용하기 좋아요. 창문에 설치하면 아늑한 분위기를 ...",
+      thumbnail: "warm",
+      viewCount: 22,
+      isMarket: true,
+    },
+    {
+      id: "apt-3",
+      category: "가입인사",
+      hasDot: false,
+      title: `안녕하세요 ${apartmentName}에 새로 입주한 주민입니다! 잘 부탁드려요 😊`,
+      viewCount: 6,
+      isMarket: false,
+    },
+    {
+      id: "apt-4",
+      category: "중고거래",
+      hasDot: false,
+      title: "이솝 엘레오스 바디 클렌저 & 레저렉션 핸드워시 새상품 세트예요. 은은한 향으로 기분 좋...",
+      thumbnail: "botanical",
+      photoCount: 2,
+      viewCount: 30,
+      isMarket: true,
+    },
+    {
+      id: "apt-5",
+      category: "중고거래",
+      hasDot: false,
+      title: "프라다 사피아노 지갑 핑크 새상품이에요. 선물용으로도 괜찮고, 관심 있으...",
+      thumbnail: "leather",
+      photoCount: 2,
+      viewCount: 16,
+      isMarket: true,
+    },
+  ];
+
+  const displayedPosts = mockAptPosts.filter((post) => {
+    if (!showMarketPosts && post.isMarket) return false;
+    if (activeTab === "자유 주제") return post.category === "생활 정보" || post.category === "가입인사";
+    if (activeTab === "질문") return post.category === "질문";
+    if (activeTab === "입주민 의견") return post.category === "생활 정보";
+    return true;
+  });
+
+  return (
+    <section className={styles.screen}>
+      {/* Header */}
+      <ScreenHeader
+        title={apartmentName}
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+        actions={
+          <>
+            <IconButton label="채팅" onClick={onOpenNotifications}>
+              <MessageCircle size={25} />
+            </IconButton>
+            <IconButton label="검색" onClick={onOpenSearch}>
+              <Search size={25} />
+            </IconButton>
+            <IconButton label="메뉴" onClick={onOpenMenu}>
+              <Menu size={27} />
+            </IconButton>
+          </>
+        }
+      />
+
+      {/* Subheader Meta */}
+      <div className={styles.aptHeaderMeta}>
+        <Lock size={13} />
+        <span>입주민 비공개 · 게시글 109 · <strong className={styles.aptMetaActive}>15시간 전 활동</strong></span>
+        {onReverify && (
+          <button
+            type="button"
+            onClick={onReverify}
+            style={{
+              marginLeft: "auto",
+              border: 0,
+              background: "transparent",
+              color: "var(--color-primary)",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            아파트 변경
+          </button>
+        )}
+      </div>
+
+      {/* Action Buttons: 이웃 158 / 초대 */}
+      <div className={styles.aptActionRow}>
+        <button type="button" className={styles.aptActionBtn}>
+          <UsersRound size={16} />
+          <span>이웃 158</span>
+        </button>
+        <button type="button" className={styles.aptActionBtn}>
+          <Mail size={16} />
+          <span>초대</span>
+        </button>
+      </div>
+
+      {/* 4 Shortcut Grid */}
+      <div className={styles.aptShortcutGrid}>
+        <button type="button" className={styles.aptShortcutItem}>
+          <div className={styles.aptShortcutIconWrap}>
+            <Building2 size={20} />
+          </div>
+          <span>단지 정보</span>
+        </button>
+        <button type="button" className={styles.aptShortcutItem} onClick={() => setActiveTab("전체")}>
+          <div className={styles.aptShortcutIconWrap}>
+            <ShoppingBag size={20} />
+            <span className={styles.aptShortcutDot} />
+          </div>
+          <span>중고거래</span>
+        </button>
+        <button type="button" className={styles.aptShortcutItem}>
+          <div className={styles.aptShortcutIconWrap}>
+            <BriefcaseBusiness size={20} />
+          </div>
+          <span>알바</span>
+        </button>
+        <button type="button" className={styles.aptShortcutItem} onClick={() => setActiveTab("자유 주제")}>
+          <div className={styles.aptShortcutIconWrap}>
+            <Building size={20} />
+            <span className={styles.aptShortcutDot} />
+          </div>
+          <span>오픈 게시판</span>
+        </button>
+      </div>
+
+      {/* Together Banner Slider */}
+      <div
+        onClick={onOpenTogetherIntro}
+        className={styles.daangnTogetherBanner}
+      >
+        <div className={styles.daangnTogetherBannerLeft}>
+          <span className={styles.daangnTogetherBannerIcon}>🤝</span>
+          <div className={styles.daangnTogetherBannerText}>
+            <span className={styles.daangnTogetherBannerSub}>입주민끼리 무엇이든 같이해보세요</span>
+            <strong className={styles.daangnTogetherBannerTitle}>아파트 같이해요</strong>
+          </div>
+        </div>
+        <ChevronRight size={18} className={styles.togetherBannerArrow} />
+      </div>
+      <div className={styles.daangnBannerDots}>
+        <span className={`${styles.daangnBannerDot} ${styles.daangnBannerDotActive}`} />
+        <span className={styles.daangnBannerDot} />
+      </div>
+
+      {/* Notice Megaphone */}
+      <div className={styles.communityNoticeLine} onClick={onOpenTogetherIntro}>
+        <span>📢</span>
+        <span>안녕하세요 😊 아파트 커뮤니티는 같은 단지에 거주하는 입주민 전용 공간입니다.</span>
+      </div>
+
+      {/* Filter Tabs */}
+      <nav className={styles.communityPillTabs} aria-label="아파트 커뮤니티 탭">
+        {APT_TABS.map((tab) => (
+          <button
+            type="button"
+            key={tab}
+            className={`${styles.communityPillTab} ${activeTab === tab ? styles.communityPillTabActive : ""}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+            {tab === "같이해요" && <em className={styles.communityNBadge}>N</em>}
+          </button>
+        ))}
+      </nav>
+
+      {/* 중고거래글 보기 Toggle */}
+      {activeTab !== "같이해요" && (
+        <div className={styles.communityToggleRow}>
+          <button
+            type="button"
+            className={`${styles.seedToggleSwitch} ${showMarketPosts ? styles.seedToggleSwitchActive : ""}`}
+            onClick={() => setShowMarketPosts(!showMarketPosts)}
+            aria-label="중고거래글 보기 토글"
+          >
+            <span className={styles.seedToggleThumb} />
+          </button>
+          <span>중고거래글 보기</span>
+        </div>
+      )}
+
+      {/* Feed List */}
+      {activeTab === "같이해요" ? (
+        <>
+          <ChipScroller
+            items={["전체", "공동구매", "공동육아", "취미활동", "강아지 산책", "기타"]}
+            value={
+              togetherFilter === "group_buy"
+                ? "공동구매"
+                : togetherFilter === "childcare"
+                ? "공동육아"
+                : togetherFilter === "hobby"
+                ? "취미활동"
+                : togetherFilter === "pet_walk"
+                ? "강아지 산책"
+                : togetherFilter === "etc"
+                ? "기타"
+                : "전체"
+            }
+            onChange={(item) => {
+              const map: Record<string, TogetherCategory | "all"> = {
+                전체: "all",
+                공동구매: "group_buy",
+                공동육아: "childcare",
+                취미활동: "hobby",
+                "강아지 산책": "pet_walk",
+                기타: "etc",
+              };
+              setTogetherFilter(map[item] || "all");
+            }}
+          />
+
+          <div className={styles.postList}>
+            {togetherPosts.map((post) => (
+              <TogetherFeedCard
+                key={post.id}
+                post={post}
+                onClick={() => onOpenTogetherPost?.(post.id)}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className={styles.aptPostList}>
+          {displayedPosts.map((p) => (
+            <article key={p.id} className={styles.postRow}>
+              <button type="button" onClick={() => onOpenPost?.(p.id)}>
+                <div className={styles.postText}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    {p.hasDot && (
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-primary)", display: "inline-block" }} />
+                    )}
+                    <span className={styles.categoryBadge}>{p.category}</span>
+                  </div>
+                  <h2>{p.title}</h2>
+                  <span className={styles.postViewCount}>
+                    <Eye size={13} /> {p.viewCount}
+                  </span>
+                </div>
+                {p.thumbnail && (
+                  <div className={`${styles.postThumb} ${styles[`tone_${p.thumbnail}` as keyof typeof styles] ?? ""}`}>
+                    {p.photoCount && p.photoCount > 1 ? <span>{p.photoCount}</span> : null}
+                  </div>
+                )}
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* Floating Action Button with Tooltip */}
+      <FloatingWriteButton
+        showTogetherTooltip={true}
+        onTooltipClick={onOpenTogetherIntro}
+        onClick={onWrite}
+      />
+    </section>
+  );
+}
+
 function CommunityFormScreen({
   onBack,
   onSubmit,
@@ -1722,6 +3184,84 @@ function CommunityFormScreen({
   );
 }
 
+
+function RealtimeDangerTicker({
+  dangerSignals,
+  onSelectDanger,
+}: {
+  dangerSignals: LocalBusiness[];
+  onSelectDanger?: (business: LocalBusiness) => void;
+}) {
+  // 서울안전누리(Nuri) 실시간 크롤링 위험 소식 목록 (2개씩 순환 표시)
+  const nuriAlerts = dangerSignals.map((d) => ({
+    title: d.name,
+    tag: d.riskType ? `${d.riskType}` : "공식 소식",
+    business: d,
+  }));
+
+  const fallbackAlerts = [
+    { title: "교통 통제·공지도 여기 모여요", tag: "공식 소식", business: null },
+    { title: "잠수교 보행로 및 차도 전면 통제", tag: "도로통제", business: null },
+    { title: "서울 동남권 호우주의보 발효 중", tag: "기상특보", business: null },
+    { title: "성내천·탄천 산책로 출입 통제", tag: "하천통제", business: null },
+    { title: "올림픽대로 여의교 부근 부분통제", tag: "도로공사", business: null },
+  ];
+
+  const streamAlerts = nuriAlerts.length >= 2 ? nuriAlerts : [...nuriAlerts, ...fallbackAlerts];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % streamAlerts.length);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, [streamAlerts.length]);
+
+  const safeIndex = streamAlerts.length > 0 ? currentIndex % streamAlerts.length : 0;
+  const item1 = streamAlerts[safeIndex] || streamAlerts[0] || fallbackAlerts[0];
+  const item2 = streamAlerts[(safeIndex + 1) % (streamAlerts.length || 1)] || streamAlerts[0] || fallbackAlerts[1];
+
+  return (
+    <div className={styles.realtimeNewsCard}>
+      <div className={styles.realtimeNewsHeader}>
+        <span className={styles.realtimeDot} />
+        <strong>실시간 소식</strong>
+      </div>
+      <div className={styles.realtimeNewsSlider}>
+        <div
+          key={`row1-${safeIndex}`}
+          className={styles.realtimeNewsRow}
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (item1?.business && onSelectDanger) {
+              onSelectDanger(item1.business);
+            }
+          }}
+        >
+          <p className={styles.realtimeNewsText}>{item1?.title}</p>
+          <small className={styles.realtimeNewsTag}>{item1?.tag}</small>
+        </div>
+        <div
+          key={`row2-${safeIndex}`}
+          className={styles.realtimeNewsRow}
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (item2?.business && onSelectDanger) {
+              onSelectDanger(item2.business);
+            }
+          }}
+        >
+          <p className={styles.realtimeNewsText}>{item2?.title}</p>
+          <small className={styles.realtimeNewsTag}>{item2?.tag}</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MapScreen({
   activeNeighborhood,
   categories,
@@ -1757,11 +3297,68 @@ function MapScreen({
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [centerRequest, setCenterRequest] = useState(0);
+  const [selectedDanger, setSelectedDanger] = useState<LocalBusiness | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const locationRequestRef = useRef(0);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY > 6 && sheetState !== "expanded") {
+      onSheetStateChange("expanded");
+    } else if (e.deltaY < -6 && sheetState === "expanded") {
+      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+        onSheetStateChange("half");
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartY.current === null) return;
+    const delta = touchStartY.current - e.touches[0].clientY;
+    if (delta > 12 && sheetState !== "expanded") {
+      onSheetStateChange("expanded");
+      touchStartY.current = null;
+    } else if (delta < -12 && sheetState === "expanded") {
+      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+        onSheetStateChange("half");
+        touchStartY.current = null;
+      }
+    }
+  };
+
+  const [selectedRestaurants, setSelectedRestaurants] = useState<Restaurant[]>([]);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
 
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
+  const visibleSelectedDanger = selectedDanger;
+
+  const selectDanger = useCallback((business: LocalBusiness) => {
+    if (business.category !== "danger") return;
+    setSelectedDanger(business);
+    if (selectedCategory !== "danger") {
+      onCategoryChange("danger");
+    }
+  }, [selectedCategory, onCategoryChange]);
+
+  function changeCategory(id: string) {
+    setSelectedDanger(null);
+    setSelectedRestaurants([]);
+    setSelectedRestaurantId(null);
+    onCategoryChange(id);
+  }
+
+  function changeQuery(value: string) {
+    setSelectedDanger(null);
+    setSelectedRestaurants([]);
+    setSelectedRestaurantId(null);
+    onQueryChange(value);
+  }
 
   function requestCurrentLocation() {
     if (isLocating) return;
@@ -1817,22 +3414,39 @@ function MapScreen({
           businesses={businesses}
           currentLocation={currentLocation}
           centerRequest={centerRequest}
+          selectedCategory={selectedCategory}
+          selectedRestaurantId={selectedRestaurantId}
+          onSelectBusiness={selectDanger}
+          onSelectRestaurants={(list, singleId) => {
+            setSelectedRestaurants(list);
+            setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
+          }}
+          onClearRestaurants={() => {
+            setSelectedRestaurants([]);
+            setSelectedRestaurantId(null);
+          }}
           onSearchBounds={(bounds) => {
             onSearchBounds(bounds);
-            onSheetStateChange("expanded");
+            onSheetStateChange("collapsed");
           }}
         />
         <div className={styles.mapSearch}>
           <Search size={27} />
           <input
             value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder="집 근처 업체 검색"
           />
           <button type="button" onClick={onOpenProfile} aria-label="프로필">
             <UserRound size={25} />
           </button>
         </div>
+        {sheetState !== "expanded" && selectedCategory !== "food" ? (
+          <RealtimeDangerTicker
+            dangerSignals={businesses.filter((b) => b.category === "danger")}
+            onSelectDanger={selectDanger}
+          />
+        ) : null}
         {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
         {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
         <div className={styles.mapControls}>
@@ -1849,9 +3463,23 @@ function MapScreen({
         <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
           <currentCategory.icon size={26} />
         </button>
+        {visibleSelectedDanger ? (
+          <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
+        ) : null}
+        {selectedCategory === "food" && selectedRestaurants.length > 0 && (
+          <RestaurantPreviewBar
+            restaurants={selectedRestaurants}
+            selectedRestaurantId={selectedRestaurantId}
+            onSelectRestaurant={(restaurant) => setSelectedRestaurantId(restaurant.id)}
+            onClose={() => {
+              setSelectedRestaurants([]);
+              setSelectedRestaurantId(null);
+            }}
+          />
+        )}
       </div>
 
-      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`}>
+      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
         <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "업체 패널 접기" : "업체 패널 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
           const panel = event.currentTarget.parentElement;
           onSheetStateChange(nextState);
@@ -1876,7 +3504,7 @@ function MapScreen({
                     type="button"
                     key={category.id}
                     className={selectedCategory === category.id ? styles.localCategoryActive : ""}
-                    onClick={() => onCategoryChange(category.id)}
+                    onClick={() => changeCategory(category.id)}
                   >
                     <span className={`${styles.localIcon} ${styles[`local_${category.tone}` as keyof typeof styles] ?? ""}`}>
                       <CategoryIcon size={27} />
@@ -1899,23 +3527,43 @@ function MapScreen({
                   title="검색 결과가 없어요"
                   body="다른 카테고리나 검색어로 다시 찾아보세요."
                   actionLabel="검색어 지우기"
-                  onAction={() => onQueryChange("")}
+                  onAction={() => changeQuery("")}
                 />
               ) : (
                 <div className={styles.businessGrid}>
-                  {businesses.map((business) => (
-                    <article key={business.id} className={styles.businessCard}>
-                      <button type="button" aria-label={`${business.name} 관심`}>
-                        <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
-                      </button>
-                      <div className={styles.businessImage}>{business.name.slice(0, 2)}</div>
-                      <h3>{business.name}</h3>
-                      <p>{business.summary}</p>
-                      <small>
-                        {business.distance} · {business.openNow ? "영업중" : "준비중"}
-                      </small>
-                    </article>
-                  ))}
+                  {businesses.map((business) => {
+                    const dangerVisual = getDangerVisual(business);
+                    return (
+                      <article key={business.id} className={styles.businessCard}>
+                        <button type="button" aria-label={`${business.name} 관심`}>
+                          <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
+                        </button>
+                        <div
+                          className={`${styles.businessImage} ${
+                            dangerVisual
+                              ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
+                              : ""
+                          }`}
+                        >
+                          {dangerVisual ? (
+                            <>
+                              <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
+                              <span>{dangerVisual.label}</span>
+                            </>
+                          ) : (
+                            business.name.slice(0, 2)
+                          )}
+                        </div>
+                        <h3>{business.name}</h3>
+                        <p>{business.summary}</p>
+                        <small>
+                          {dangerVisual
+                            ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
+                            : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
+                        </small>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1926,24 +3574,72 @@ function MapScreen({
   );
 }
 
+function createRestaurantMarkerIcon(isSelected: boolean) {
+  const size = isSelected ? 16 : 10;
+  const borderWidth = isSelected ? 3 : 2;
+  const shadow = isSelected
+    ? "0 2px 10px rgba(75, 0, 144, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.5)"
+    : "0 1px 4px rgba(0, 0, 0, 0.25)";
+
+  return {
+    content: `
+      <div style="
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
+        background: #4B0090;
+        border: ${borderWidth}px solid #FFFFFF;
+        box-shadow: ${shadow};
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      "></div>
+    `,
+    anchor: (window as any).naver?.maps?.Point
+      ? new (window as any).naver.maps.Point(size / 2, size / 2)
+      : { x: size / 2, y: size / 2 },
+  };
+}
+
 function NaverMapLayer({
   activeNeighborhood,
   businesses,
   currentLocation,
   centerRequest,
+  selectedCategory,
+  selectedRestaurantId,
+  onSelectBusiness,
+  onSelectRestaurants,
+  onClearRestaurants,
   onSearchBounds,
 }: {
   activeNeighborhood: string;
   businesses: LocalBusiness[];
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
+  selectedCategory?: string;
+  selectedRestaurantId?: string | null;
+  onSelectBusiness: (business: LocalBusiness) => void;
+  onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
+  onClearRestaurants: () => void;
   onSearchBounds: (bounds: MapSearchBounds) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapInstance | null>(null);
   const markerRefs = useRef<NaverMarkerInstance[]>([]);
   const [isNaverMapReady, setIsNaverMapReady] = useState(false);
+  const [isZoomTooLow, setIsZoomTooLow] = useState(false);
   const canUseNaverMap = Boolean(NAVER_MAP_KEY_ID && isNaverMapReady);
+
+  // Restaurant Layer 관리용 Refs
+  const isRestaurantMode = selectedCategory === "food";
+  const restaurantMarkersRef = useRef<any[]>([]);
+  const restaurantMarkerMapRef = useRef<Map<any, Restaurant>>(new Map());
+  const restaurantClusterRef = useRef<MarkerClustering | null>(null);
+  const restaurantRequestIdRef = useRef<number>(0);
+  const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const RESTAURANT_MIN_ZOOM = 13;
 
   useEffect(() => {
     if (!NAVER_MAP_KEY_ID) {
@@ -2003,31 +3699,214 @@ function NaverMapLayer({
     return () => placeMarker.setMap(null);
   }, [activeNeighborhood, currentLocation, centerRequest, canUseNaverMap]);
 
+  // 위험 신호 및 일반 비즈니스 마커
   useEffect(() => {
     const maps = window.naver?.maps;
     const map = mapRef.current;
-    if (!maps || !map || !canUseNaverMap) return;
+    if (!maps || !map || !canUseNaverMap || isRestaurantMode) return;
 
-    markerRefs.current = businesses.map(
-      (business) =>
-        new maps.Marker({
-          position: new maps.LatLng(business.lat, business.lng),
-          map,
-          title: business.name,
-        }),
-    );
+    markerRefs.current = businesses.map((business) => {
+      const visual = getDangerVisual(business);
+      const marker = new maps.Marker({
+        position: new maps.LatLng(business.lat, business.lng),
+        map,
+        title: business.name,
+        zIndex: visual ? 80 : 20,
+        icon: visual ? { content: createDangerMarkerContent(business, visual, onSelectBusiness) } : undefined,
+      });
+      if (visual) maps.Event?.addListener(marker, "click", () => onSelectBusiness(business));
+      return marker;
+    });
     return () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
-  }, [businesses, canUseNaverMap]);
+  }, [businesses, canUseNaverMap, onSelectBusiness, isRestaurantMode]);
+
+  // 음식점 전용 마커 & MarkerClustering & idle 디바운스 로직
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map || !canUseNaverMap || !isRestaurantMode) {
+      // 음식점 모드가 아닐 때 cleanup
+      if (restaurantClusterRef.current) {
+        restaurantClusterRef.current.clear();
+        restaurantClusterRef.current = null;
+      }
+      restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+      restaurantMarkersRef.current = [];
+      restaurantMarkerMapRef.current.clear();
+      previousBoundsRef.current = null;
+      setIsZoomTooLow(false);
+      return;
+    }
+
+    // 지도 빈 공간 클릭 시 음식점 선택 해제
+    const mapClickListener = maps.Event?.addListener(map, "click", () => {
+      onClearRestaurants();
+    });
+
+    const fetchRestaurantsForCurrentBounds = () => {
+      const zoom = map.getZoom();
+      if (zoom < RESTAURANT_MIN_ZOOM) {
+        setIsZoomTooLow(true);
+        if (restaurantClusterRef.current) {
+          restaurantClusterRef.current.clear();
+        }
+        restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+        restaurantMarkersRef.current = [];
+        restaurantMarkerMapRef.current.clear();
+        return;
+      }
+
+      setIsZoomTooLow(false);
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
+      const sw = bounds.getSW();
+      const ne = bounds.getNE();
+      const swLat = sw.lat();
+      const swLng = sw.lng();
+      const neLat = ne.lat();
+      const neLng = ne.lng();
+
+      // Bounds가 거의 변하지 않았으면 스킵
+      const prev = previousBoundsRef.current;
+      if (
+        prev &&
+        Math.abs(prev.swLat - swLat) < 0.0001 &&
+        Math.abs(prev.swLng - swLng) < 0.0001 &&
+        Math.abs(prev.neLat - neLat) < 0.0001 &&
+        Math.abs(prev.neLng - neLng) < 0.0001
+      ) {
+        return;
+      }
+      previousBoundsRef.current = { swLat, swLng, neLat, neLng };
+
+      const requestId = ++restaurantRequestIdRef.current;
+
+      getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 300 }).then((restaurants) => {
+        if (requestId !== restaurantRequestIdRef.current) return;
+
+        // 기존 마커 및 클러스터 정리
+        if (restaurantClusterRef.current) {
+          restaurantClusterRef.current.clear();
+          restaurantClusterRef.current = null;
+        }
+        restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+        restaurantMarkersRef.current = [];
+        restaurantMarkerMapRef.current.clear();
+
+        const newMarkers: any[] = [];
+
+        restaurants.forEach((restaurant) => {
+          const isSelected = selectedRestaurantId === restaurant.id;
+          const marker = new maps.Marker({
+            position: new maps.LatLng(restaurant.lat, restaurant.lng),
+            map,
+            title: restaurant.name,
+            zIndex: isSelected ? 1000 : 50,
+            icon: createRestaurantMarkerIcon(isSelected),
+          });
+
+          maps.Event?.addListener(marker, "click", (e: any) => {
+            if (e?.domEvent) {
+              e.domEvent.stopPropagation();
+            }
+            onSelectRestaurants([restaurant], restaurant.id);
+          });
+
+          restaurantMarkerMapRef.current.set(marker, restaurant);
+          newMarkers.push(marker);
+        });
+
+        restaurantMarkersRef.current = newMarkers;
+
+        // MarkerClustering 활성화
+        restaurantClusterRef.current = new MarkerClustering({
+          map,
+          markers: newMarkers,
+          minClusterSize: 2,
+          gridSize: 70,
+          averageCenter: true,
+          disableClickZoom: true,
+          onClusterClick: (_cluster, clusterMarkers) => {
+            const list = clusterMarkers
+              .map((m) => restaurantMarkerMapRef.current.get(m))
+              .filter(Boolean) as Restaurant[];
+            if (list.length > 0) {
+              onSelectRestaurants(list, null);
+            }
+          },
+        });
+      });
+    };
+
+    // 지도 idle 이벤트 리스너 (350ms debounce)
+    const idleListener = maps.Event?.addListener(map, "idle", () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        fetchRestaurantsForCurrentBounds();
+      }, 350);
+    });
+
+    // 최초 1회 즉시 실행
+    fetchRestaurantsForCurrentBounds();
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (idleListener && maps.Event) {
+        maps.Event.removeListener(idleListener);
+      }
+      if (mapClickListener && maps.Event) {
+        maps.Event.removeListener(mapClickListener);
+      }
+      if (restaurantClusterRef.current) {
+        restaurantClusterRef.current.clear();
+        restaurantClusterRef.current = null;
+      }
+      restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+      restaurantMarkersRef.current = [];
+      restaurantMarkerMapRef.current.clear();
+    };
+  }, [isRestaurantMode, canUseNaverMap, onSelectRestaurants, onClearRestaurants]);
+
+  // 선택된 마커 시각적 강조 변경 (selectedRestaurantId 변경 시)
+  useEffect(() => {
+    if (!isRestaurantMode) return;
+    restaurantMarkersRef.current.forEach((marker) => {
+      const rest = restaurantMarkerMapRef.current.get(marker);
+      if (!rest) return;
+      const isSelected = rest.id === selectedRestaurantId;
+      marker.setIcon(createRestaurantMarkerIcon(isSelected));
+      marker.setZIndex(isSelected ? 1000 : 50);
+    });
+  }, [selectedRestaurantId, isRestaurantMode]);
 
   return (
     <>
       <div className={styles.naverMapFrame}>
         <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
       </div>
-      {!canUseNaverMap ? <div className={styles.mapGrid} /> : null}
+      {isZoomTooLow && isRestaurantMode && (
+        <div className={styles.restaurantZoomAlert} role="status">
+          <span>🔍</span> 지도를 확대하면 음식점이 표시됩니다.
+        </div>
+      )}
+      {!canUseNaverMap ? (
+        <>
+          <div className={styles.mapGrid} />
+          <FallbackDangerMarkers
+            activeNeighborhood={activeNeighborhood}
+            businesses={businesses}
+            onSelectBusiness={onSelectBusiness}
+          />
+        </>
+      ) : null}
       <button
         type="button"
         className={styles.mapSearchAgain}
@@ -2044,6 +3923,138 @@ function NaverMapLayer({
         현 지도에서 검색
       </button>
     </>
+  );
+}
+
+function RestaurantPreviewBar({
+  restaurants,
+  selectedRestaurantId,
+  onSelectRestaurant,
+  onClose,
+}: {
+  restaurants: Restaurant[];
+  selectedRestaurantId: string | null;
+  onSelectRestaurant: (restaurant: Restaurant) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className={styles.restaurantPreviewBar} role="region" aria-label="음식점 목록">
+      {restaurants.map((restaurant) => {
+        const isSelected = restaurant.id === selectedRestaurantId;
+        const detailUrl = restaurant.placeUrl || restaurant.naverUrl || `https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`;
+
+        return (
+          <article
+            key={restaurant.id}
+            className={`${styles.restaurantCard} ${isSelected ? styles.restaurantCardSelected : ""}`}
+            onClick={() => onSelectRestaurant(restaurant)}
+          >
+            <div className={styles.restaurantCardHeader}>
+              <div>
+                <h4 className={styles.restaurantCardTitle}>{restaurant.name}</h4>
+                <span className={styles.restaurantCardCategory}>{restaurant.category || "음식점"}</span>
+              </div>
+            </div>
+            <p className={styles.restaurantCardAddress}>{restaurant.roadAddress || restaurant.address || "주소 정보 없음"}</p>
+            <div className={styles.restaurantCardFooter}>
+              <span className={styles.restaurantCardRating}>
+                {restaurant.phone ? `${restaurant.phone}` : `★ ${restaurant.rating ? restaurant.rating.toFixed(1) : "4.5"}`}
+              </span>
+              <a
+                href={detailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.restaurantCardDetailLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                상세보기 ›
+              </a>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+
+
+function createDangerMarkerContent(
+  business: LocalBusiness,
+  visual: DangerVisual,
+  onSelectBusiness: (business: LocalBusiness) => void,
+) {
+  const marker = document.createElement("div");
+  const toneClass = styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? "";
+  marker.className = `${styles.dangerMapMarker} ${toneClass}`;
+  marker.tabIndex = 0;
+  marker.setAttribute("role", "button");
+  marker.setAttribute("aria-label", `${visual.label}: ${business.name}`);
+  marker.innerHTML = `<span>${visual.emoji}</span>`;
+  marker.addEventListener("click", () => onSelectBusiness(business));
+  marker.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelectBusiness(business);
+  });
+  return marker;
+}
+
+function FallbackDangerMarkers({
+  activeNeighborhood,
+  businesses,
+  onSelectBusiness,
+}: {
+  activeNeighborhood: string;
+  businesses: LocalBusiness[];
+  onSelectBusiness: (business: LocalBusiness) => void;
+}) {
+  const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
+  const dangerBusinesses = businesses.filter((business) => business.category === "danger").slice(0, 18);
+
+  return (
+    <div className={styles.fallbackMarkers}>
+      {dangerBusinesses.map((business) => {
+        const visual = getDangerVisual(business) ?? DANGER_VISUALS.default;
+        const x = Math.min(92, Math.max(8, 50 + (business.lng - center.lng) * 4200));
+        const y = Math.min(88, Math.max(12, 50 - (business.lat - center.lat) * 5200));
+        return (
+          <button
+            type="button"
+            key={business.id}
+            className={`${styles.dangerMapMarker} ${styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? ""}`}
+            aria-label={`${visual.label}: ${business.name}`}
+            onClick={() => onSelectBusiness(business)}
+            style={{ left: `${x}%`, top: `${y}%` }}
+          >
+            <span>{visual.emoji}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DangerSignalCallout({ business, onClose }: { business: LocalBusiness; onClose: () => void }) {
+  const visual = getDangerVisual(business) ?? DANGER_VISUALS.default;
+  const toneClass = styles[`dangerMarker_${visual.tone}` as keyof typeof styles] ?? "";
+  const meta = [business.riskType ?? visual.label, business.neighborhoodName, business.distance].filter(Boolean).join(" · ");
+
+  return (
+    <aside className={`${styles.dangerCallout} ${toneClass}`} role="status" aria-live="polite">
+      <span className={styles.dangerCalloutAvatar} aria-hidden="true">{visual.emoji}</span>
+      <div className={styles.dangerCalloutBubble}>
+        <div className={styles.dangerCalloutTop}>
+          <span>안전 알림</span>
+          <button type="button" onClick={onClose} aria-label="위험 알림 닫기">
+            <X size={16} />
+          </button>
+        </div>
+        <strong>{business.name}</strong>
+        <p>{business.summary}</p>
+        <small>{meta}</small>
+      </div>
+    </aside>
   );
 }
 
@@ -2213,8 +4224,10 @@ function MyScreen({
   onOpenMenu,
   onOpenAllServices,
   onOpenDream,
+  onOpenAlba,
   onOpenSales,
   onOpenFavorites,
+  onOpenApartment,
 }: {
   activeNeighborhood: string;
   unreadCount: number;
@@ -2224,17 +4237,19 @@ function MyScreen({
   onOpenMenu: () => void;
   onOpenAllServices: () => void;
   onOpenDream: () => void;
+  onOpenAlba: () => void;
   onOpenSales: () => void;
   onOpenFavorites: () => void;
+  onOpenApartment?: () => void;
 }) {
   const services: IconItem[] = [
     { label: "중고거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
     { label: "모임", icon: UsersRound, tone: "violet" },
-    { label: "내 아파트", icon: Building2, tone: "blue" },
+    { label: "내 아파트", icon: Building2, tone: "violet", onClick: onOpenApartment },
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
-    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary" },
+    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
     { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];
 
@@ -2243,8 +4258,18 @@ function MyScreen({
       <ScreenHeader
         title="나의 가지"
         titleAccessory={
-          <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream}>
-            꿈가지
+          <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream} aria-label="꿈가지">
+            <span className={styles.dreamEntryLabel} aria-hidden="true">
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+              <span className={styles.dreamEntrySyllable}>
+                <Image src="/dream/dream-wordmark-no-outline.png" alt="" width={281} height={139} className={styles.dreamEntryWordmark} />
+              </span>
+            </span>
             <Image src="/dream/baby-elephant.png" alt="" width={36} height={29} className={styles.dreamEntryMascot} />
           </button>
         }
@@ -2317,21 +4342,30 @@ function DreamDashboardScreen({
   activeNeighborhood,
   onBack,
   onChangeNeighborhood,
+  onOpenNotice,
 }: {
   activeNeighborhood: string;
   onBack: () => void;
   onChangeNeighborhood: () => void;
+  onOpenNotice: () => void;
 }) {
   const facilityListRef = useRef<HTMLElement | null>(null);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const visibleFacilities = useMemo(
     () => DREAM_FACILITIES.filter((facility) => facility.neighborhoodName === activeNeighborhood),
     [activeNeighborhood],
   );
+  const visibleSelectedFacilityId = visibleFacilities.some((facility) => facility.id === selectedFacilityId)
+    ? selectedFacilityId
+    : null;
+  const selectedFacility = visibleFacilities.find((facility) => facility.id === visibleSelectedFacilityId) ?? null;
+  const selectFacility = useCallback((facility: DonationFacility | null) => {
+    setSelectedFacilityId(facility ? facility.id : null);
+  }, []);
   const totalCurrentAmount = visibleFacilities.reduce((sum, facility) => sum + facility.currentAmount, 0);
   const totalTargetAmount = visibleFacilities.reduce((sum, facility) => sum + facility.targetAmount, 0);
   const totalDonationCount = visibleFacilities.reduce((sum, facility) => sum + facility.donationCount, 0);
   const neighborhoodProgress = totalTargetAmount > 0 ? Math.round((totalCurrentAmount / totalTargetAmount) * 100) : 0;
-  const showFacilities = () => facilityListRef.current?.scrollIntoView({ block: "start" });
 
   return (
     <section className={`${styles.screen} ${styles.dreamScreen}`}>
@@ -2343,30 +4377,33 @@ function DreamDashboardScreen({
           </IconButton>
         }
       />
-      <section className={styles.dreamBanner} aria-label="꿈가지 나눔 캠페인">
-        <div className={styles.dreamBannerCopy}>
-          <span>우리 동네와 함께</span>
-          <h2>작은 나눔이 모여<br />꿈이 자라요</h2>
-          <button type="button" onClick={showFacilities}>
-            모금 현황 보기 <ChevronRight size={16} />
-          </button>
-        </div>
+      <button
+        type="button"
+        className={styles.dreamBanner}
+        aria-label="꿈가지 나눔 캠페인 공지사항 보기"
+        onClick={onOpenNotice}
+      >
         <Image
-          src="/dream/baby-elephant.png"
-          alt="꿈가지에서 활동하는 귀여운 아기 코끼리"
-          width={160}
-          height={128}
-          className={styles.dreamBannerMascot}
+          src="/dream/dream-main-banner.png"
+          alt="우리 동네와 함께, 꿈가지. 작은 나눔이 모여 꿈이 자라요"
+          width={1940}
+          height={809}
+          className={styles.dreamBannerImage}
           priority
         />
-      </section>
+      </button>
       <section className={styles.dreamMapPanel}>
-        <DreamMapLayer activeNeighborhood={activeNeighborhood} facilities={visibleFacilities} />
+        <DreamMapLayer
+          activeNeighborhood={activeNeighborhood}
+          facilities={visibleFacilities}
+          selectedFacility={selectedFacility}
+          onSelectFacility={selectFacility}
+        />
         <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
           <span className={styles.dreamMapTitleCopy}>
             <span>우리 동네 모금가지</span>
             <strong>{activeNeighborhood === "송파삼성래미안" ? "송파구" : activeNeighborhood}</strong>
-            <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 · 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
+            <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 - 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
           </span>
           <ChevronRight size={24} aria-hidden="true" />
         </button>
@@ -2393,16 +4430,21 @@ function DreamDashboardScreen({
         {visibleFacilities.map((facility) => {
           const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
           return (
-          <article key={facility.name} className={styles.dreamFacilityItem}>
-            <div>
-              <strong>{facility.name}</strong>
-              <span>{facility.facilityType} · 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
-            </div>
-            <em>{progress}%</em>
-            <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
-              <span style={{ width: `${Math.min(progress, 100)}%` }} />
-            </div>
-          </article>
+            <button
+              type="button"
+              key={facility.id}
+              className={`${styles.dreamFacilityItem} ${facility.id === visibleSelectedFacilityId ? styles.dreamFacilitySelected : ""}`}
+              onClick={() => selectFacility(facility)}
+            >
+              <div>
+                <strong>{facility.name}</strong>
+                <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
+              </div>
+              <em>{progress}%</em>
+              <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+                <span style={{ width: `${Math.min(progress, 100)}%` }} />
+              </div>
+            </button>
           );
         })}
       </section>
@@ -2410,12 +4452,58 @@ function DreamDashboardScreen({
   );
 }
 
+function DreamFacilityCallout({
+  facility,
+  onClose,
+}: {
+  facility: DonationFacility;
+  onClose: () => void;
+}) {
+  const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
+  return (
+    <aside className={styles.dreamFacilityCallout} role="dialog" aria-label={`${facility.name} 상세 정보`}>
+      <div className={styles.dreamFacilityCalloutTop}>
+        <span className={styles.dreamFacilityCalloutBadge}>
+          <Image src="/dream/baby-elephant.png" alt="" width={20} height={16} style={{ objectFit: "contain" }} />
+          꿈가지 나눔 시설
+        </span>
+        <button type="button" onClick={onClose} aria-label="닫기">
+          <X size={16} />
+        </button>
+      </div>
+      <strong>{facility.name}</strong>
+      <p>{facility.facilityType} · {facility.neighborhoodName}</p>
+      <div className={styles.dreamFacilityCalloutStats}>
+        <div>
+          <span>현재 모금액</span>
+          <strong>{facility.currentAmount.toLocaleString()}원</strong>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <span>목표액</span>
+          <strong>{facility.targetAmount.toLocaleString()}원</strong>
+        </div>
+      </div>
+      <div className={styles.dreamProgressTrack} role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${Math.min(progress, 100)}%` }} />
+      </div>
+      <div className={styles.dreamFacilityCalloutFooter}>
+        <small>{facility.donationCount}명의 이웃이 함께 참여했어요</small>
+        <em>{progress}%</em>
+      </div>
+    </aside>
+  );
+}
+
 function DreamMapLayer({
   activeNeighborhood,
   facilities,
+  selectedFacility,
+  onSelectFacility,
 }: {
   activeNeighborhood: string;
   facilities: DonationFacility[];
+  selectedFacility: DonationFacility | null;
+  onSelectFacility: (facility: DonationFacility | null) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapInstance | null>(null);
@@ -2478,28 +4566,39 @@ function DreamMapLayer({
     if (!maps || !map || !canUseNaverMap) return;
 
     markerRefs.current = facilities.map((facility) => {
-      const label = document.createElement("span");
-      label.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin}`;
-      label.textContent = facility.name;
-      return new maps.Marker({
+      const isSelected = facility.id === selectedFacility?.id;
+      const marker = new maps.Marker({
           position: new maps.LatLng(facility.lat, facility.lng),
           map,
           title: facility.name,
           zIndex: 90,
-          icon: { content: label },
+          icon: {
+            content: createDreamFacilityMarkerContent(
+              facility,
+              isSelected,
+              onSelectFacility,
+            ),
+          },
         });
+      return marker;
     });
     return () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
-  }, [facilities, canUseNaverMap]);
+  }, [facilities, selectedFacility, canUseNaverMap, onSelectFacility]);
 
   return (
     <div className={styles.dreamMapCanvas}>
       <div className={styles.naverMapFrame}>
         <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
       </div>
+      {selectedFacility && (
+        <DreamFacilityCallout
+          facility={selectedFacility}
+          onClose={() => onSelectFacility(null)}
+        />
+      )}
       {!canUseNaverMap && (
         <div className={styles.dreamMapUnavailable} role="status">
           <MapPinned size={28} />
@@ -2525,6 +4624,39 @@ function DreamMapLayer({
       </button>
     </div>
   );
+}
+
+function createDreamFacilityMarkerContent(
+  facility: DonationFacility,
+  selected: boolean,
+  onSelectFacility: (facility: DonationFacility | null) => void,
+) {
+  const marker = document.createElement("span");
+  marker.className = `${styles.dreamFacilityPin} ${styles.dreamLivePin} ${selected ? styles.dreamFacilityPinSelected : ""}`;
+  marker.tabIndex = 0;
+  marker.setAttribute("role", "button");
+  marker.setAttribute("aria-label", `${facility.name} 모금 현황`);
+
+  const mascot = document.createElement("span");
+  mascot.className = styles.dreamFacilityPinMascot;
+  const image = document.createElement("img");
+  image.src = "/dream/baby-elephant.png";
+  image.alt = "";
+  mascot.append(image);
+
+  const label = document.createElement("span");
+  label.className = styles.dreamFacilityPinLabel;
+  label.textContent = facility.name;
+
+  if (selected) marker.append(label);
+  marker.append(mascot);
+  marker.addEventListener("click", () => onSelectFacility(selected ? null : facility));
+  marker.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelectFacility(selected ? null : facility);
+  });
+  return marker;
 }
 
 function PromoCard() {
@@ -2587,7 +4719,13 @@ function MenuCard({
   );
 }
 
-function MyMenuScreen({ onBack }: { onBack: () => void }) {
+function MyMenuScreen({
+  onBack,
+  onOpenAlba,
+}: {
+  onBack: () => void;
+  onOpenAlba?: (tab: "manage") => void;
+}) {
   return (
     <section className={styles.screen}>
       <ScreenHeader
@@ -2622,7 +4760,7 @@ function MyMenuScreen({ onBack }: { onBack: () => void }) {
       <MenuCard
         title="나의 활동"
         items={[
-          { label: "알바 구인 공고", icon: NotebookTabs },
+          { label: "알바 구인 공고", icon: NotebookTabs, onClick: () => onOpenAlba?.("manage") },
           { label: "선생님 프로필 관리", icon: GraduationCap },
           { label: "참여중인 모임", icon: UsersRound },
           { label: "내 동네생활 글", icon: ReceiptText },
@@ -2836,7 +4974,640 @@ function FavoriteScreen({
   );
 }
 
-function AllServicesScreen({ onBack }: { onBack: () => void }) {
+const SEOUL_DISTRICTS = [
+  "종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구", "강북구",
+  "도봉구", "노원구", "은평구", "서대문구", "마포구", "양천구", "강서구", "구로구", "금천구",
+  "영등포구", "동작구", "관악구", "서초구", "강남구", "송파구", "강동구",
+];
+
+const REAL_ESTATE_DISTRICT_CENTERS: Record<string, { lat: number; lng: number }> = {
+  송파구: { lat: 37.5048, lng: 127.1147 },
+  용산구: { lat: 37.5324, lng: 126.9906 },
+  영등포구: { lat: 37.5263, lng: 126.8962 },
+  강남구: { lat: 37.5173, lng: 127.0473 },
+  마포구: { lat: 37.5663, lng: 126.9018 },
+};
+
+const REAL_ESTATE_PROPERTY_TYPES: Array<{
+  id: HouseTypeFilter;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { id: "apartment", label: "아파트", icon: Building2 },
+  { id: "one_room", label: "원룸", icon: House },
+  { id: "two_plus", label: "투룸+", icon: Home },
+  { id: "officetel", label: "오피스텔", icon: Building2 },
+  { id: "house", label: "주택", icon: House },
+  { id: "all", label: "전체", icon: Menu },
+];
+
+const DEPOSIT_FILTERS = [
+  { value: "", label: "보증금 전체" },
+  { value: "500", label: "보증금 500만 이하" },
+  { value: "1000", label: "보증금 1천만 이하" },
+  { value: "3000", label: "보증금 3천만 이하" },
+  { value: "5000", label: "보증금 5천만 이하" },
+  { value: "10000", label: "보증금 1억 이하" },
+];
+
+const MONTHLY_RENT_FILTERS = [
+  { value: "", label: "월세 전체" },
+  { value: "30", label: "월세 30만 이하" },
+  { value: "50", label: "월세 50만 이하" },
+  { value: "70", label: "월세 70만 이하" },
+  { value: "100", label: "월세 100만 이하" },
+  { value: "150", label: "월세 150만 이하" },
+];
+
+function districtFromNeighborhood(neighborhood: string) {
+  if (neighborhood.includes("당산")) return "영등포구";
+  if (neighborhood.includes("공릉")) return "노원구";
+  return "송파구";
+}
+
+function formatRentPrice(transaction: RentTransaction) {
+  if (transaction.rentType === "jeonse") return `전세 ${transaction.deposit.toLocaleString()}`;
+  return `월세 ${transaction.deposit.toLocaleString()}/${transaction.monthlyRent.toLocaleString()}`;
+}
+
+function formatArea(areaM2: number, usePyeong: boolean) {
+  return usePyeong ? `${(areaM2 / 3.3058).toFixed(1)}평` : `${areaM2.toFixed(1)}㎡`;
+}
+
+function displayBuildingName(transaction: RentTransaction) {
+  const name = transaction.buildingName?.trim();
+  if (name && !/^\([\d-]+\)$/.test(name)) return name;
+  return `${transaction.dong} ${transaction.houseTypeLabel}`;
+}
+
+function RealEstateScreen({ activeNeighborhood, onBack }: { activeNeighborhood: string; onBack: () => void }) {
+  const [view, setView] = useState<"home" | "map">("home");
+  const [selectedDistrict, setSelectedDistrict] = useState(() => districtFromNeighborhood(activeNeighborhood));
+  const [searchDraft, setSearchDraft] = useState("");
+  const [query, setQuery] = useState("");
+  const [houseType, setHouseType] = useState<HouseTypeFilter>("all");
+  const [rentType, setRentType] = useState<RentTypeFilter>("monthly");
+  const [depositMax, setDepositMax] = useState<number | undefined>();
+  const [monthlyRentMax, setMonthlyRentMax] = useState<number | undefined>();
+  const [usePyeong, setUsePyeong] = useState(false);
+  const [transactions, setTransactions] = useState<RentTransaction[]>([]);
+  const [notice, setNotice] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [mapBounds, setMapBounds] = useState<RealEstateBounds | null>(null);
+  const [outsideSeoul, setOutsideSeoul] = useState(false);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      getRentTransactions(
+        {
+          district: selectedDistrict,
+          q: query || undefined,
+          rentType,
+          houseType,
+          depositMax,
+          monthlyRentMax,
+          year: new Date().getFullYear(),
+          bounds: view === "map" && !outsideSeoul ? mapBounds : null,
+        },
+        controller.signal,
+      )
+        .then((response) => {
+          setTransactions(response.items);
+          setNotice(response.notice);
+        })
+        .catch((requestError) => {
+          if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+          setTransactions([]);
+          setError(requestError instanceof Error ? requestError.message : "실거래 정보를 불러오지 못했습니다.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 220);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [depositMax, houseType, mapBounds, monthlyRentMax, outsideSeoul, query, refreshKey, rentType, selectedDistrict, view]);
+
+  const buildings = useMemo(() => groupTransactionsByBuilding(transactions), [transactions]);
+  const selectedBuilding = useMemo(
+    () => buildings.find((building) => building.id === selectedBuildingId) ?? null,
+    [buildings, selectedBuildingId],
+  );
+  const recentTransactions = transactions.slice(0, 8);
+  const handleRealEstateViewportChange = useCallback((bounds: RealEstateBounds, isOutside: boolean) => {
+    setOutsideSeoul(isOutside);
+    if (!isOutside) setMapBounds(bounds);
+  }, []);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = searchDraft.trim().replace(/^서울특별시\s*/, "");
+    const district = SEOUL_DISTRICTS.find((item) => value.includes(item));
+    if (district) {
+      setSelectedDistrict(district);
+      setQuery("");
+      setMapBounds(null);
+      setSelectedBuildingId(null);
+      return;
+    }
+    setQuery(value);
+  }
+
+  const searchPlaceholder = query ? `${query} 검색 중` : `서울특별시 ${selectedDistrict}`;
+
+  if (view === "map") {
+    return (
+      <section className={styles.realEstateMapScreen}>
+        <RealEstateMap
+          district={selectedDistrict}
+          buildings={buildings}
+          selectedBuildingId={selectedBuildingId}
+          onSelectBuilding={(building) => setSelectedBuildingId(building.id)}
+          onViewportChange={handleRealEstateViewportChange}
+        />
+        <div className={styles.realEstateMapTop}>
+          <form className={styles.realEstateMapSearch} onSubmit={submitSearch}>
+            <button type="button" aria-label="부동산 홈으로" onClick={() => {
+              setView("home");
+              setMapBounds(null);
+              setSelectedBuildingId(null);
+            }}>
+              <X size={26} />
+            </button>
+            <label>
+              <Search size={21} />
+              <input
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder={searchPlaceholder}
+                list="real-estate-districts"
+              />
+            </label>
+          </form>
+          <RealEstateFilterBar
+            compact
+            houseType={houseType}
+            rentType={rentType}
+            depositMax={depositMax}
+            monthlyRentMax={monthlyRentMax}
+            onHouseTypeChange={setHouseType}
+            onRentTypeChange={setRentType}
+            onDepositMaxChange={setDepositMax}
+            onMonthlyRentMaxChange={setMonthlyRentMax}
+            onRefresh={() => setRefreshKey((value) => value + 1)}
+          />
+        </div>
+        {outsideSeoul ? (
+          <div className={styles.realEstateMapMessage} role="status">
+            <strong>서울 지역만 제공하고 있어요</strong>
+            <span>지도를 서울 안으로 이동해 주세요.</span>
+          </div>
+        ) : null}
+        {!loading && !outsideSeoul && buildings.length === 0 ? (
+          <div className={styles.realEstateMapMessage} role="status">
+            <strong>지도에 표시할 좌표가 없어요</strong>
+            <span>필터를 바꾸거나 서버의 Geocoding 설정을 확인해 주세요.</span>
+          </div>
+        ) : null}
+        <div className={styles.realEstateMapSummary} aria-live="polite">
+          <strong>거래 {transactions.length}건</strong>
+          <span />
+          <strong>건물 {buildings.length}개</strong>
+        </div>
+        {selectedBuilding ? (
+          <RealEstateBuildingSheet
+            building={selectedBuilding}
+            usePyeong={usePyeong}
+            onClose={() => setSelectedBuildingId(null)}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section className={styles.realEstateHome}>
+      <header className={styles.realEstateHeader}>
+        <IconButton label="닫기" onClick={onBack}><X size={28} /></IconButton>
+        <h1>가지부동산</h1>
+        <button type="button" className={styles.realEstateMapButton} onClick={() => setView("map")}>
+          <MapPinned size={19} /> 지도
+        </button>
+      </header>
+
+      <form className={styles.realEstateSearch} onSubmit={submitSearch}>
+        <Search size={24} />
+        <input
+          value={searchDraft}
+          onChange={(event) => setSearchDraft(event.target.value)}
+          placeholder={searchPlaceholder}
+          list="real-estate-districts"
+        />
+        <button type="submit">검색</button>
+      </form>
+      <datalist id="real-estate-districts">
+        {SEOUL_DISTRICTS.map((district) => <option key={district} value={district} />)}
+      </datalist>
+
+      <div className={styles.realEstateTypeGrid}>
+        {REAL_ESTATE_PROPERTY_TYPES.map((type) => {
+          const TypeIcon = type.icon;
+          return (
+            <button
+              type="button"
+              key={type.id}
+              className={houseType === type.id ? styles.realEstateTypeActive : ""}
+              onClick={() => setHouseType(type.id)}
+            >
+              <span><TypeIcon size={26} /></span>
+              {type.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <section className={styles.realEstateRecentSection}>
+        <div className={styles.realEstateSectionTitle}>
+          <div>
+            <span>서울시 공개 실거래</span>
+            <h2>{selectedDistrict} 최근 {rentType === "jeonse" ? "전세" : rentType === "monthly" ? "월세" : "전월세"}</h2>
+          </div>
+          <button type="button" onClick={() => setView("map")}>지도에서 보기 <ChevronRight size={17} /></button>
+        </div>
+        <div className={styles.realEstateRecentScroller}>
+          {recentTransactions.map((transaction) => (
+            <RealEstateCompactCard key={transaction.id} transaction={transaction} usePyeong={usePyeong} />
+          ))}
+        </div>
+      </section>
+
+      <RealEstateFilterBar
+        houseType={houseType}
+        rentType={rentType}
+        depositMax={depositMax}
+        monthlyRentMax={monthlyRentMax}
+        onHouseTypeChange={setHouseType}
+        onRentTypeChange={setRentType}
+        onDepositMaxChange={setDepositMax}
+        onMonthlyRentMaxChange={setMonthlyRentMax}
+        onRefresh={() => setRefreshKey((value) => value + 1)}
+      />
+
+      {notice ? <p className={styles.realEstateNotice}>{notice}</p> : null}
+      <div className={styles.realEstateListToolbar}>
+        <div>
+          <strong>최근 실거래</strong>
+          <span>{transactions.length}건</span>
+        </div>
+        <label className={styles.realEstatePyeongToggle}>
+          <input type="checkbox" checked={usePyeong} onChange={(event) => setUsePyeong(event.target.checked)} />
+          <span />
+          평수로 보기
+        </label>
+      </div>
+
+      {loading ? (
+        <div className={styles.realEstateState}><RefreshCw size={24} className={styles.realEstateSpinner} /> 실거래를 불러오는 중이에요</div>
+      ) : error ? (
+        <div className={styles.realEstateState} role="alert">
+          <strong>{error}</strong>
+          <button type="button" onClick={() => setRefreshKey((value) => value + 1)}>다시 시도</button>
+        </div>
+      ) : transactions.length === 0 ? (
+        <div className={styles.realEstateState}>
+          <strong>조건에 맞는 실거래가 없어요</strong>
+          <span>주택 유형이나 금액 조건을 바꿔보세요.</span>
+        </div>
+      ) : (
+        <div className={styles.realEstateTransactionList}>
+          {transactions.map((transaction) => (
+            <RealEstateTransactionRow key={transaction.id} transaction={transaction} usePyeong={usePyeong} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RealEstateFilterBar({
+  compact = false,
+  houseType,
+  rentType,
+  depositMax,
+  monthlyRentMax,
+  onHouseTypeChange,
+  onRentTypeChange,
+  onDepositMaxChange,
+  onMonthlyRentMaxChange,
+  onRefresh,
+}: {
+  compact?: boolean;
+  houseType: HouseTypeFilter;
+  rentType: RentTypeFilter;
+  depositMax?: number;
+  monthlyRentMax?: number;
+  onHouseTypeChange: (value: HouseTypeFilter) => void;
+  onRentTypeChange: (value: RentTypeFilter) => void;
+  onDepositMaxChange: (value: number | undefined) => void;
+  onMonthlyRentMaxChange: (value: number | undefined) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className={`${styles.realEstateFilterBar} ${compact ? styles.realEstateFilterBarCompact : ""}`}>
+      <button type="button" className={styles.realEstateFilterReset} aria-label="필터 새로고침" onClick={onRefresh}>
+        <RefreshCw size={19} />
+      </button>
+      <label>
+        <select value={houseType} onChange={(event) => onHouseTypeChange(event.target.value as HouseTypeFilter)} aria-label="주택 유형">
+          {REAL_ESTATE_PROPERTY_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
+        </select>
+        <ChevronDown size={16} />
+      </label>
+      <label>
+        <select value={rentType} onChange={(event) => onRentTypeChange(event.target.value as RentTypeFilter)} aria-label="거래 유형">
+          <option value="monthly">월세</option>
+          <option value="jeonse">전세</option>
+          <option value="all">전체</option>
+        </select>
+        <ChevronDown size={16} />
+      </label>
+      <label>
+        <select value={depositMax ?? ""} onChange={(event) => onDepositMaxChange(event.target.value ? Number(event.target.value) : undefined)} aria-label="보증금 상한">
+          {DEPOSIT_FILTERS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
+        </select>
+        <ChevronDown size={16} />
+      </label>
+      {rentType !== "jeonse" ? (
+        <label>
+          <select value={monthlyRentMax ?? ""} onChange={(event) => onMonthlyRentMaxChange(event.target.value ? Number(event.target.value) : undefined)} aria-label="월세 상한">
+            {MONTHLY_RENT_FILTERS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
+          </select>
+          <ChevronDown size={16} />
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+function RealEstateCompactCard({ transaction, usePyeong }: { transaction: RentTransaction; usePyeong: boolean }) {
+  return (
+    <article className={styles.realEstateCompactCard}>
+      <span className={styles.realEstateBadge}>실거래</span>
+      <small>{transaction.houseTypeLabel}</small>
+      <h3>{displayBuildingName(transaction)}</h3>
+      <strong>{formatRentPrice(transaction)}</strong>
+      <p>{transaction.dong} · {formatArea(transaction.areaM2, usePyeong)}{transaction.floor !== undefined && transaction.floor > 0 ? ` · ${transaction.floor}층` : ""}</p>
+      <time>{transaction.contractDate.slice(0, 7).replace("-", ".")} 계약</time>
+    </article>
+  );
+}
+
+function RealEstateTransactionRow({ transaction, usePyeong }: { transaction: RentTransaction; usePyeong: boolean }) {
+  return (
+    <article className={styles.realEstateTransactionRow}>
+      <div className={styles.realEstateTypeIcon}><Building2 size={26} /></div>
+      <div>
+        <span className={styles.realEstateBadge}>실거래</span>
+        <h3>{displayBuildingName(transaction)}</h3>
+        <strong>{formatRentPrice(transaction)}</strong>
+        <p>{transaction.dong} · {formatArea(transaction.areaM2, usePyeong)}{transaction.floor !== undefined && transaction.floor > 0 ? ` · ${transaction.floor}층` : ""}</p>
+        <time>{transaction.contractDate.slice(0, 7).replace("-", ".")} 계약 · {transaction.houseTypeLabel}</time>
+      </div>
+    </article>
+  );
+}
+
+function makeRealEstateMarker(
+  title: string,
+  detail: string,
+  selected: boolean,
+  kind: "dong" | "building",
+) {
+  const root = document.createElement("button");
+  root.type = "button";
+  root.className = `${styles.realEstateMarker} ${kind === "dong" ? styles.realEstateDongMarker : styles.realEstateBuildingMarker} ${selected ? styles.realEstateMarkerSelected : ""}`;
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  const caption = document.createElement("span");
+  caption.textContent = detail;
+  root.append(heading, caption);
+  return root;
+}
+
+function RealEstateMap({
+  district,
+  buildings,
+  selectedBuildingId,
+  onSelectBuilding,
+  onViewportChange,
+}: {
+  district: string;
+  buildings: PropertyBuilding[];
+  selectedBuildingId: string | null;
+  onSelectBuilding: (building: PropertyBuilding) => void;
+  onViewportChange: (bounds: RealEstateBounds, outsideSeoul: boolean) => void;
+}) {
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<NaverMapInstance | null>(null);
+  const markerRefs = useRef<NaverMarkerInstance[]>([]);
+  const listenerRefs = useRef<unknown[]>([]);
+  const [mapReady, setMapReady] = useState(false);
+  const [zoom, setZoom] = useState(13);
+  const center = REAL_ESTATE_DISTRICT_CENTERS[district] ?? { lat: 37.5665, lng: 126.978 };
+
+  useEffect(() => {
+    if (!NAVER_MAP_KEY_ID) return;
+    let mounted = true;
+    loadNaverMapScript(NAVER_MAP_KEY_ID)
+      .then(() => { if (mounted) setMapReady(Boolean(window.naver?.maps)); })
+      .catch(() => { if (mounted) setMapReady(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    if (!maps || !mapElementRef.current || !mapReady) return;
+    const position = new maps.LatLng(center.lat, center.lng);
+    if (!mapRef.current) {
+      mapRef.current = new maps.Map(mapElementRef.current, {
+        center: position,
+        zoom: 13,
+        logoControl: false,
+        mapDataControl: false,
+        mapTypeControl: false,
+        scaleControl: false,
+        zoomControl: false,
+      });
+      window.requestAnimationFrame(() => {
+        mapRef.current?.autoResize?.();
+        mapRef.current?.setCenter(position);
+      });
+    } else {
+      mapRef.current.setCenter(position);
+      mapRef.current.setZoom(13);
+    }
+  }, [center.lat, center.lng, mapReady]);
+
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps?.Event || !map || !mapReady) return;
+    let timer = 0;
+    const emitViewport = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const bounds = map.getBounds();
+        const sw = bounds.getSW();
+        const ne = bounds.getNE();
+        const nextBounds = { south: sw.lat(), north: ne.lat(), west: sw.lng(), east: ne.lng() };
+        if (nextBounds.north - nextBounds.south < 0.001 || nextBounds.east - nextBounds.west < 0.001) {
+          map.autoResize?.();
+          return;
+        }
+        const centerLat = (nextBounds.south + nextBounds.north) / 2;
+        const centerLng = (nextBounds.west + nextBounds.east) / 2;
+        const outsideSeoul = centerLat < 37.413 || centerLat > 37.715 || centerLng < 126.734 || centerLng > 127.269;
+        setZoom(map.getZoom());
+        onViewportChange(nextBounds, outsideSeoul);
+      }, 400);
+    };
+    const listener = maps.Event.addListener(map, "idle", emitViewport);
+    emitViewport();
+    return () => {
+      window.clearTimeout(timer);
+      maps.Event?.removeListener(listener);
+    };
+  }, [mapReady, onViewportChange]);
+
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map || !mapReady) return;
+    markerRefs.current.forEach((marker) => marker.setMap(null));
+    listenerRefs.current.forEach((listener) => maps.Event?.removeListener(listener));
+    markerRefs.current = [];
+    listenerRefs.current = [];
+
+    if (zoom < 15) {
+      groupBuildingsByDong(buildings).forEach((group) => {
+        const position = new maps.LatLng(group.lat, group.lng);
+        const content = makeRealEstateMarker(group.dong, `거래 ${group.transactionCount}`, false, "dong");
+        const marker = new maps.Marker({
+          position,
+          map,
+          title: `${group.dong} 거래 ${group.transactionCount}건`,
+          icon: { content, anchor: maps.Point ? new maps.Point(48, 62) : undefined },
+        });
+        const listener = maps.Event?.addListener(marker, "click", () => {
+          map.setCenter(position);
+          map.setZoom(15);
+        });
+        markerRefs.current.push(marker);
+        if (listener) listenerRefs.current.push(listener);
+      });
+    } else {
+      buildings.forEach((building) => {
+        const latest = building.latestTransaction;
+        const title = latest.rentType === "monthly" ? `월 ${latest.monthlyRent}` : "전세";
+        const detail = latest.rentType === "monthly" ? `보증 ${latest.deposit.toLocaleString()}` : latest.deposit.toLocaleString();
+        const position = new maps.LatLng(building.lat, building.lng);
+        const content = makeRealEstateMarker(title, detail, building.id === selectedBuildingId, "building");
+        const marker = new maps.Marker({
+          position,
+          map,
+          title: displayBuildingName(latest),
+          zIndex: building.id === selectedBuildingId ? 200 : 100,
+          icon: { content, anchor: maps.Point ? new maps.Point(44, 56) : undefined },
+        });
+        const listener = maps.Event?.addListener(marker, "click", () => onSelectBuilding(building));
+        markerRefs.current.push(marker);
+        if (listener) listenerRefs.current.push(listener);
+      });
+    }
+
+    return () => {
+      markerRefs.current.forEach((marker) => marker.setMap(null));
+      listenerRefs.current.forEach((listener) => maps.Event?.removeListener(listener));
+      markerRefs.current = [];
+      listenerRefs.current = [];
+    };
+  }, [buildings, mapReady, onSelectBuilding, selectedBuildingId, zoom]);
+
+  return (
+    <div className={styles.realEstateMapCanvas}>
+      <div ref={mapElementRef} className={styles.realEstateNaverMap} />
+      {!NAVER_MAP_KEY_ID ? (
+        <div className={styles.realEstateMapUnavailable}>
+          <MapPinned size={32} />
+          <strong>네이버 지도 키가 필요해요</strong>
+          <span>목록의 실거래 정보는 계속 확인할 수 있습니다.</span>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className={styles.realEstateRecenter}
+        aria-label={`${district} 중심으로 이동`}
+        onClick={() => {
+          const maps = window.naver?.maps;
+          if (!maps || !mapRef.current) return;
+          mapRef.current.setCenter(new maps.LatLng(center.lat, center.lng));
+          mapRef.current.setZoom(13);
+        }}
+      >
+        <Crosshair size={22} />
+      </button>
+    </div>
+  );
+}
+
+function RealEstateBuildingSheet({
+  building,
+  usePyeong,
+  onClose,
+}: {
+  building: PropertyBuilding;
+  usePyeong: boolean;
+  onClose: () => void;
+}) {
+  const latest = building.latestTransaction;
+  return (
+    <article className={styles.realEstateBuildingSheet}>
+      <button type="button" className={styles.realEstateSheetClose} aria-label="건물 정보 닫기" onClick={onClose}><X size={19} /></button>
+      <div className={styles.realEstateSheetHandle} />
+      <span className={styles.realEstateBadge}>실거래</span>
+      <h2>{displayBuildingName(latest)}</h2>
+      <strong>{formatRentPrice(latest)}만원</strong>
+      <p>{latest.dong} · {formatArea(latest.areaM2, usePyeong)}{latest.floor !== undefined && latest.floor > 0 ? ` · ${latest.floor}층` : ""}</p>
+      <time>{latest.contractDate.slice(0, 7).replace("-", ".")} 계약 · {latest.houseTypeLabel}</time>
+      <div className={styles.realEstateSheetTransactions}>
+        <b>최근 실거래 {building.transactionCount}건</b>
+        {building.transactions.slice(0, 3).map((transaction) => (
+          <span key={transaction.id}>{formatRentPrice(transaction)} · {transaction.contractDate.slice(0, 7).replace("-", ".")}</span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function AllServicesScreen({
+  onBack,
+  onOpenAlba,
+  onOpenRealEstate,
+  onOpenApartment,
+}: {
+  onBack: () => void;
+  onOpenAlba?: () => void;
+  onOpenRealEstate?: () => void;
+  onOpenApartment?: () => void;
+}) {
   const serviceCategories = [
     {
       title: "최근 사용",
@@ -2849,8 +5620,8 @@ function AllServicesScreen({ onBack }: { onBack: () => void }) {
       title: "동네 거래",
       items: [
         { label: "중고거래", icon: ShoppingBag, color: "#ff6f0f" },
-        { label: "알바", icon: Search, color: "#ff6f0f" },
-        { label: "부동산", icon: House, color: "#e64980" },
+        { label: "알바", icon: BriefcaseBusiness, color: "var(--color-primary)", onClick: onOpenAlba },
+        { label: "부동산", icon: House, color: "var(--color-primary)", onClick: onOpenRealEstate },
         { label: "중고차", icon: Truck, color: "#228be6" },
         { label: "스토어", icon: ShoppingBasket, color: "#fab005" },
         { label: "포장주문", icon: Utensils, color: "#ff922b" },
@@ -2870,7 +5641,7 @@ function AllServicesScreen({ onBack }: { onBack: () => void }) {
       items: [
         { label: "모임", icon: UsersRound, color: "#ff922b" },
         { label: "온라인 카페", icon: Coffee, color: "#fab005" },
-        { label: "내 아파트", icon: Building2, color: "#4d638c" },
+        { label: "내 아파트", icon: Building2, color: "var(--color-primary)", onClick: onOpenApartment },
         { label: "아파트 오픈게시판", icon: Building2, color: "#7950f2" },
         { label: "동네생활", icon: MessageCircle, color: "#22b8cf" },
         { label: "스토리", icon: Sparkles, color: "#ff6b6b" },
@@ -2942,7 +5713,12 @@ function AllServicesScreen({ onBack }: { onBack: () => void }) {
               {category.items.map((item, idx) => {
                 const ItemIcon = item.icon;
                 return (
-                  <button type="button" key={`${item.label}-${idx}`} className={styles.serviceItemButton}>
+                  <button
+                    type="button"
+                    key={`${item.label}-${idx}`}
+                    className={styles.serviceItemButton}
+                    onClick={item.onClick}
+                  >
                     <span className={styles.serviceItemIcon} style={{ color: item.color }}>
                       <ItemIcon size={22} />
                     </span>
@@ -3131,11 +5907,36 @@ function BottomNav({
   );
 }
 
-function FloatingWriteButton({ onClick }: { onClick: () => void }) {
+function FloatingWriteButton({
+  onClick,
+  showTogetherTooltip = false,
+  onTooltipClick,
+}: {
+  onClick: () => void;
+  showTogetherTooltip?: boolean;
+  onTooltipClick?: () => void;
+}) {
   return (
-    <button type="button" className={styles.floatingWrite} onClick={onClick}>
-      <Plus size={27} /> 글쓰기
-    </button>
+    <div className={styles.floatingWriteWrapper}>
+      {showTogetherTooltip && (
+        <div
+          className={styles.togetherFabTooltip}
+          onClick={onTooltipClick || onClick}
+          role="button"
+          tabIndex={0}
+        >
+          <span>같이해요 기능이 출시되었어요!</span>
+        </div>
+      )}
+      <button
+        type="button"
+        className={styles.circleFab}
+        onClick={onClick}
+        aria-label="글쓰기"
+      >
+        <Plus size={28} strokeWidth={2.4} />
+      </button>
+    </div>
   );
 }
 
@@ -3147,6 +5948,7 @@ function BottomSheet({
   onNeighborhoodChange,
   onProductWrite,
   onCommunityWrite,
+  onTogetherWrite,
   totalUnread,
   hasNetworkError,
   isGuestMode,
@@ -3160,6 +5962,7 @@ function BottomSheet({
   onNeighborhoodChange: (primary: string, secondary: string) => void;
   onProductWrite: () => void;
   onCommunityWrite: () => void;
+  onTogetherWrite?: () => void;
   totalUnread: number;
   hasNetworkError: boolean;
   isGuestMode: boolean;
@@ -3184,8 +5987,8 @@ function BottomSheet({
               <button type="button" onClick={onCommunityWrite}>
                 <UsersRound size={28} /> 동네생활
               </button>
-              <button type="button">
-                <MapPinned size={28} /> 모임
+              <button type="button" onClick={onTogetherWrite}>
+                <Users size={28} /> 같이해요
               </button>
               <button type="button">
                 <BriefcaseBusiness size={28} /> 가지알바
@@ -3278,4 +6081,669 @@ function formatPrice(product: ProductListItem) {
 function formatBadge(count: number) {
   if (count > 99) return "99+";
   return String(count);
+}
+
+const DREAM_NOTICE_ITEMS = [
+  {
+    id: "dream-launch",
+    title: "[공지] 꿈가지가 오픈되었어요",
+    date: "2026.09.01",
+  },
+] as const;
+
+function DreamNoticeScreen({ onBack }: { onBack: () => void }) {
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const selectedNotice = DREAM_NOTICE_ITEMS.find((notice) => notice.id === selectedNoticeId) ?? null;
+  const handleBack = selectedNotice ? () => setSelectedNoticeId(null) : onBack;
+
+  useEffect(() => {
+    document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
+  }, [selectedNoticeId]);
+
+  return (
+    <section className={`${styles.screen} ${styles.dreamScreen} ${styles.dreamNoticeScreen}`}>
+      <ScreenHeader
+        title="공지사항"
+        leading={
+          <IconButton label="뒤로" onClick={handleBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+
+      {selectedNotice ? (
+        <article className={styles.dreamNoticeDetail}>
+          <header className={styles.dreamNoticeDetailHeader}>
+            <h2>{selectedNotice.title}</h2>
+            <time dateTime={selectedNotice.date.replaceAll(".", "-")}>{selectedNotice.date}</time>
+          </header>
+
+          {selectedNotice.id === "dream-launch" && (
+            <div className={styles.dreamNoticeDetailBody}>
+              <p>
+                우리 동네 아이들의 작은 꿈을 함께 키우는 <strong>꿈가지가 문을 열었어요.</strong>
+              </p>
+              <p>
+                꿈가지는 지역사회의 도움이 필요한 아이들을 이웃과 함께 응원하고, 아이들이 자신의 꿈을 건강하게 키워갈 수 있도록 마음을 모으는 공간이에요.
+              </p>
+              <p>
+                작은 관심과 나눔이 아이들에게는 새로운 경험과 용기가 될 수 있어요. 우리 동네 아이들의 내일이 더 환하게 자랄 수 있도록 꿈가지와 함께해 주세요.
+              </p>
+            </div>
+          )}
+        </article>
+      ) : (
+        <div className={styles.dreamNoticeList} aria-label="공지사항 목록">
+          {DREAM_NOTICE_ITEMS.map((notice) => (
+            <button
+              key={notice.id}
+              type="button"
+              className={styles.dreamNoticeListItem}
+              onClick={() => setSelectedNoticeId(notice.id)}
+            >
+              <strong>{notice.title}</strong>
+              <time dateTime={notice.date.replaceAll(".", "-")}>{notice.date}</time>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+/* ==========================================================================
+   Gaji Alba Components
+   ========================================================================== */
+
+function AlbaMainScreen({
+  activeNeighborhood,
+  initialTab = "home",
+  initialCategory,
+  albas,
+  onBack,
+  onSelectAlba,
+  onWrite,
+  onToggleFavorite,
+}: {
+  activeNeighborhood: string;
+  initialTab?: "home" | "search" | "applications" | "manage";
+  initialCategory?: string;
+  albas: AlbaItem[];
+  onBack: () => void;
+  onSelectAlba: (id: string) => void;
+  onWrite: () => void;
+  onToggleFavorite: (id: string) => void;
+}) {
+  const [currentTab, setCurrentTab] = useState<"home" | "search" | "applications" | "manage">(initialTab);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory ?? null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const categories = [
+    { label: "이웃알바", icon: Heart },
+    { label: "걸어서10분", icon: Footprints },
+    { label: "단기알바", icon: Calendar },
+    { label: "식당/카페", icon: Utensils },
+    { label: "물류/현장", icon: Package },
+    { label: "레슨/과외", icon: BookOpen },
+  ];
+
+  const filteredAlbas = albas.filter((item) => {
+    if (selectedCategory && item.category !== selectedCategory) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.companyName.toLowerCase().includes(q) ||
+        item.neighborhoodName.toLowerCase().includes(q) ||
+        item.payLabel.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const appliedAlbas = albas.filter((item) => item.hasApplied);
+  const localName = activeNeighborhood;
+
+  return (
+    <section className={styles.albaScreen}>
+      <header className={styles.albaHeader}>
+        <button type="button" onClick={onBack} aria-label="닫기" className={styles.iconButton}>
+          <X size={26} />
+        </button>
+        <h1>당근알바</h1>
+        <div className={styles.albaHeaderActions}>
+          <button type="button" onClick={() => setCurrentTab("search")} className={styles.iconButton} aria-label="알바 검색">
+            <Search size={24} />
+          </button>
+          <button type="button" className={styles.iconButton} aria-label="메뉴">
+            <Menu size={26} />
+          </button>
+        </div>
+      </header>
+
+      {currentTab === "home" && (
+        <>
+          <section className={styles.albaTopSection}>
+            <button
+              type="button"
+              className={styles.albaPopularCard}
+              onClick={() => setSelectedCategory(null)}
+            >
+              <span className={styles.albaPopularCardCopy}>
+                <span>우리동네</span>
+                <strong>
+                  지금 많이 보는 공고
+                  <ChevronRight size={16} />
+                </strong>
+                <span className={styles.albaPopularDescription}>{localName} 근처에서 빠르게 지원할 수 있는 알바를 모았어요.</span>
+                <span className={styles.albaPopularStats}>
+                  <span>{albas.length}개 공고</span>
+                  <span>후기 기반 추천</span>
+                </span>
+              </span>
+              <span className={styles.albaPopularMapVisual} aria-hidden="true">
+                <BriefcaseBusiness size={22} />
+                <MapPin size={18} className={styles.albaPopularPinIcon} />
+              </span>
+            </button>
+
+            <div className={styles.albaCategoryGrid}>
+              {categories.map((cat) => {
+                const isSelected = selectedCategory === cat.label;
+                const CategoryIcon = cat.icon;
+                return (
+                  <button
+                    key={cat.label}
+                    type="button"
+                    className={`${styles.albaCategoryBtn} ${isSelected ? styles.albaCategoryBtnActive : ""}`}
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedCategory(isSelected ? null : cat.label)}
+                  >
+                    <span className={styles.albaCategoryIconCircle}>
+                      <CategoryIcon size={20} strokeWidth={2.1} />
+                    </span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className={styles.albaFeedSection}>
+            <div className={styles.albaFeedHeading}>
+              <h2>
+                {selectedCategory ? selectedCategory : `${localName} 인기 알바`}
+              </h2>
+              <small>{filteredAlbas.length}개 공고</small>
+            </div>
+
+            {filteredAlbas.length === 0 ? (
+              <StateBlock
+                title="해당하는 알바가 없어요"
+                body="다른 카테고리를 선택하거나 검색어를 변경해보세요."
+                actionLabel="전체 보기"
+                onAction={() => { setSelectedCategory(null); setSearchQuery(""); }}
+              />
+            ) : (
+              <div className={styles.albaGrid}>
+                {filteredAlbas.map((alba) => (
+                  <AlbaCardComponent
+                    key={alba.id}
+                    alba={alba}
+                    onSelect={() => onSelectAlba(alba.id)}
+                    onToggleFavorite={() => onToggleFavorite(alba.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {currentTab === "search" && (
+        <section className={styles.albaFeedSection}>
+          <div className={`${styles.mapSearch} ${styles.albaSearchField}`}>
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="직종, 업체명, 동네 등으로 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery("")} aria-label="검색어 지우기">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className={styles.albaGrid}>
+            {filteredAlbas.map((alba) => (
+              <AlbaCardComponent
+                key={alba.id}
+                alba={alba}
+                onSelect={() => onSelectAlba(alba.id)}
+                onToggleFavorite={() => onToggleFavorite(alba.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {currentTab === "applications" && (
+        <section className={styles.albaFeedSection}>
+          <div className={styles.albaFeedHeading}>
+            <h2>내가 지원한 알바 ({appliedAlbas.length})</h2>
+          </div>
+          {appliedAlbas.length === 0 ? (
+            <StateBlock
+              title="아직 지원한 알바가 없어요"
+              body="마음에 드는 동네 알바를 찾아서 지원해보세요."
+              actionLabel="알바 둘러보기"
+              onAction={() => setCurrentTab("home")}
+            />
+          ) : (
+            <div className={styles.albaGrid}>
+              {appliedAlbas.map((alba) => (
+                <AlbaCardComponent
+                  key={alba.id}
+                  alba={alba}
+                  onSelect={() => onSelectAlba(alba.id)}
+                  onToggleFavorite={() => onToggleFavorite(alba.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {currentTab === "manage" && (
+        <section className={styles.albaFeedSection}>
+          <div className={styles.albaFeedHeading}>
+            <h2>구인글 관리</h2>
+            <button
+              type="button"
+              className={styles.albaManageWriteBtn}
+              onClick={onWrite}
+            >
+              <Plus size={16} />
+              새 공고 작성
+            </button>
+          </div>
+          <div className={styles.albaGrid}>
+            {albas.slice(0, 2).map((alba) => (
+              <AlbaCardComponent
+                key={alba.id}
+                alba={alba}
+                onSelect={() => onSelectAlba(alba.id)}
+                onToggleFavorite={() => onToggleFavorite(alba.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <button type="button" className={styles.albaFloatingWrite} onClick={onWrite} aria-label="알바 공고 작성">
+        <Plus size={22} strokeWidth={2.5} />
+      </button>
+
+      <nav className={styles.albaBottomNav} aria-label="알바 메뉴">
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "home" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("home")}
+        >
+          <Home size={22} />
+          <span>알바 홈</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "search" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("search")}
+        >
+          <Search size={22} />
+          <span>알바 검색</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "applications" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("applications")}
+        >
+          <BriefcaseBusiness size={22} />
+          <span>지원 내역</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.albaNavBtn} ${currentTab === "manage" ? styles.albaNavBtnActive : ""}`}
+          onClick={() => setCurrentTab("manage")}
+        >
+          <FileText size={22} />
+          <span>구인글 관리</span>
+        </button>
+      </nav>
+    </section>
+  );
+}
+
+function AlbaCardComponent({
+  alba,
+  onSelect,
+  onToggleFavorite,
+}: {
+  alba: AlbaItem;
+  onSelect: () => void;
+  onToggleFavorite: () => void;
+}) {
+  return (
+    <article className={styles.albaCard} onClick={onSelect}>
+      <div className={styles.albaCardThumbFrame}>
+        <div className={styles.albaCardThumbVisual} style={{ background: alba.bgGradient }}>
+          <span className={styles.albaCardThumbEmoji}>{alba.thumbnailEmoji ?? "🏢"}</span>
+        </div>
+        <button
+          type="button"
+          className={`${styles.albaCardHeartBtn} ${alba.isFavorite ? styles.albaCardHeartBtnActive : ""}`}
+          aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
+        >
+          <Heart size={16} fill={alba.isFavorite ? "currentColor" : "none"} color="currentColor" />
+        </button>
+      </div>
+      <h3 className={styles.albaCardTitle}>{alba.title}</h3>
+      <div className={styles.albaCardPay}>{alba.payLabel}</div>
+      <div className={styles.albaCardMeta}>
+        {alba.companyName} · {alba.neighborhoodName}
+      </div>
+      <div className={styles.albaBadgeRow}>
+        {alba.badges.map((badge, idx) => (
+          <span
+            key={`${badge}-${idx}`}
+            className={`${styles.albaBadge} ${badge.includes("정직원") || badge.includes("모범") ? styles.albaBadgeGreen : ""}`}
+          >
+            {badge}
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function AlbaDetailScreen({
+  alba,
+  onBack,
+  onToggleFavorite,
+  onApply,
+}: {
+  alba: AlbaItem;
+  onBack: () => void;
+  onToggleFavorite: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <section className={styles.albaDetailScreen}>
+      <div className={styles.albaDetailHero} style={{ background: alba.bgGradient }}>
+        <div className={styles.albaDetailNavFloat}>
+          <button type="button" onClick={onBack} aria-label="뒤로">
+            <ChevronLeft size={24} />
+          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button type="button" aria-label="공유">
+              <Share2 size={20} />
+            </button>
+            <button type="button" aria-label="더보기">
+              <EllipsisVertical size={20} />
+            </button>
+          </div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <span style={{ fontSize: "3.5rem", display: "block", marginBottom: "8px" }}>{alba.thumbnailEmoji ?? "🏢"}</span>
+          <strong>{alba.companyName}</strong>
+        </div>
+      </div>
+
+      <div className={styles.albaDetailContent}>
+        <h1 className={styles.albaDetailTitle}>{alba.title}</h1>
+        <div className={styles.albaDetailCompanyRow}>
+          <span>{alba.companyName}</span> · <span>{alba.neighborhoodName}</span>
+          {alba.reviewCount && <span> · 후기 {alba.reviewCount}개</span>}
+        </div>
+
+        {/* Key Conditions Box */}
+        <div className={styles.albaDetailConditionBox}>
+          <div className={styles.albaDetailConditionItem}>
+            <Clock3 size={22} />
+            <div>
+              <span>급여</span><br />
+              <strong>{alba.payLabel}</strong>
+            </div>
+          </div>
+          <div className={styles.albaDetailConditionItem}>
+            <Calendar size={22} />
+            <div>
+              <span>근무 요일</span><br />
+              <strong>{alba.workingDays}</strong>
+            </div>
+          </div>
+          <div className={styles.albaDetailConditionItem}>
+            <Clock3 size={22} />
+            <div>
+              <span>근무 시간</span><br />
+              <strong>{alba.workingHours}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Duties */}
+        <h2 className={styles.albaDetailSectionHeading}>근무 내용 및 상세 정보</h2>
+        <div className={styles.albaDetailDuties}>
+          <p style={{ margin: "0 0 10px", fontWeight: 600 }}>{alba.details}</p>
+          <ul>
+            {alba.descriptionBullets.map((bullet, idx) => (
+              <li key={idx}>{bullet}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Location Info */}
+        <h2 className={styles.albaDetailSectionHeading}>근무지 위치</h2>
+        <div className={styles.albaDetailDuties}>
+          <strong>📍 {alba.detailLocation}</strong>
+          <p style={{ margin: "4px 0 0", color: "var(--color-muted)", fontSize: "0.8125rem" }}>
+            {alba.neighborhoodName}
+          </p>
+        </div>
+
+        <div className={styles.albaDetailStatsFooter}>
+          조회 {alba.viewCount} · 지원자 {alba.applicantCount}명 · 등록 {alba.createdAt}
+        </div>
+      </div>
+
+      {/* Fixed Bottom Action Bar */}
+      <footer className={styles.albaDetailActionBar}>
+        <button
+          type="button"
+          className={`${styles.albaDetailHeartBtn} ${alba.isFavorite ? styles.albaDetailHeartBtnActive : ""}`}
+          aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
+          onClick={onToggleFavorite}
+        >
+          <Heart size={22} fill={alba.isFavorite ? "currentColor" : "none"} color="currentColor" />
+        </button>
+        <button
+          type="button"
+          className={styles.albaDetailCallBtn}
+          onClick={() => alert(`전화문의: ${alba.phoneContact}`)}
+        >
+          전화문의
+        </button>
+        <button
+          type="button"
+          className={styles.albaDetailApplyBtn}
+          onClick={onApply}
+        >
+          {alba.hasApplied ? "지원 완료 ✓" : "지원하기"}
+        </button>
+      </footer>
+    </section>
+  );
+}
+
+function AlbaFormScreen({
+  activeNeighborhood,
+  onBack,
+  onSubmit,
+}: {
+  activeNeighborhood: string;
+  onBack: () => void;
+  onSubmit: (data: Omit<AlbaItem, "id" | "applicantCount" | "viewCount" | "isFavorite" | "hasApplied" | "createdAt">) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [payType, setPayType] = useState<"시급" | "일급" | "월급" | "연봉">("시급");
+  const [payAmount, setPayAmount] = useState(12000);
+  const [workingDays, setWorkingDays] = useState("월~금");
+  const [workingHours, setWorkingHours] = useState("09:00 ~ 18:00");
+  const [category, setCategory] = useState<AlbaItem["category"]>("식당/카페");
+  const [details, setDetails] = useState("");
+  const [detailLocation, setDetailLocation] = useState(`${activeNeighborhood} 인근`);
+  const [phoneContact, setPhoneContact] = useState("010-1234-5678");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !companyName.trim()) {
+      alert("공고 제목과 업체명을 입력해주세요.");
+      return;
+    }
+
+    const payLabel = `${payType} ${payAmount.toLocaleString()}원`;
+    onSubmit({
+      title,
+      companyName,
+      neighborhoodName: activeNeighborhood,
+      detailLocation,
+      payType,
+      payAmount,
+      payLabel,
+      workingDays,
+      workingHours,
+      category,
+      badges: ["모범구인"],
+      thumbnailTone: "custom",
+      thumbnailEmoji: "💼",
+      bgGradient: "linear-gradient(135deg, #7537c5 0%, #a970ff 100%)",
+      descriptionBullets: ["1. 상세 업무 협의 가능", "2. 친절하고 성실한 분 환영"],
+      details: details || "함께 즐겁게 일할 이웃을 모집합니다.",
+      phoneContact,
+    });
+  };
+
+  return (
+    <section className={styles.screen}>
+      <ScreenHeader
+        title="알바 구인 공고 등록"
+        leading={
+          <IconButton label="뒤로" onClick={onBack}>
+            <ChevronLeft size={27} />
+          </IconButton>
+        }
+      />
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px", padding: "0 4px 30px" }}>
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>공고 제목</label>
+          <input
+            type="text"
+            className={styles.formInput}
+            placeholder="예: [올리브영] 주말 매장 스태프 모집"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>업체명</label>
+          <input
+            type="text"
+            className={styles.formInput}
+            placeholder="예: 휴먼코드 / 무신사 스탠다드"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            required
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "10px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>급여 형태</label>
+            <select
+              value={payType}
+              onChange={(e) => setPayType(e.target.value as any)}
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            >
+              <option value="시급">시급</option>
+              <option value="일급">일급</option>
+              <option value="월급">월급</option>
+              <option value="연봉">연봉</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>금액 (원)</label>
+            <input
+              type="number"
+              value={payAmount}
+              onChange={(e) => setPayAmount(Number(e.target.value))}
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>근무 요일</label>
+            <input
+              type="text"
+              value={workingDays}
+              onChange={(e) => setWorkingDays(e.target.value)}
+              placeholder="예: 월~금 / 주말"
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>근무 시간</label>
+            <input
+              type="text"
+              value={workingHours}
+              onChange={(e) => setWorkingHours(e.target.value)}
+              placeholder="예: 09:00 ~ 18:00"
+              style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, marginBottom: "6px" }}>상세 설명</label>
+          <textarea
+            rows={4}
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            placeholder="근무 조건, 하는 일, 우대 사항 등을 상세히 적어주세요."
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className={styles.albaDetailApplyBtn}
+          style={{ width: "100%", height: "50px", marginTop: "10px" }}
+        >
+          공고 등록하기
+        </button>
+      </form>
+    </section>
+  );
 }

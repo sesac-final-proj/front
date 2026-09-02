@@ -64,3 +64,18 @@ background: linear-gradient(135deg, #3A2A69, #1A1730);
 /* 🪙 Gold / Coupon Accent (쿠폰/포인트 강조) */
 background: linear-gradient(135deg, #FAF2D8, #D7A94C); /* text: #3A2200 */
 ```
+
+---
+
+## 6. 🐘 Dream Blue Palettes (꿈가지 파란색 디자인 팔레트)
+
+디자인 보드 5번째 행(Blue Row) 기준 채택 컬러:
+
+| 구분 | Dark Mode Hex (우측 3번째) | Light Mode Hex (좌측 3번째) | 활용처 및 설명 |
+| --- | --- | --- | --- |
+| **Dream Banner Bg (배경)** | `#84BCF9` | `#CBDFFA` | 꿈가지 메인 배너 배경색 |
+| **Dream Banner Text (제목)** | `#0A1E3C` | `#103264` | 꿈가지 배너 타이틀/본문 |
+| **Dream Banner Sub (설명)** | `#1B3E6B` | `#255294` | 꿈가지 배너 서브 카피 |
+| **Dream Entry Bg (배지)** | `rgba(132, 188, 249, 0.16)` | `rgba(203, 223, 250, 0.6)` | 헤더 꿈가지 바로가기 배지 배경 |
+| **Dream Entry Text (텍스트)** | `#84BCF9` | `#145FCC` | 헤더 꿈가지 배지 텍스트 |
+
