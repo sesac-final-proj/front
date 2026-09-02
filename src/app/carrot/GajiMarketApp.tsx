@@ -66,6 +66,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
+import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+import { getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
 type TradeStatus = "SALE" | "RESERVED" | "SOLD";
@@ -232,6 +235,7 @@ type MapSearchBounds = { south: number; north: number; west: number; east: numbe
 type NaverMapInstance = {
   setCenter: (center: unknown) => void;
   setZoom: (zoom: number) => void;
+  getZoom: () => number;
   getBounds: () => {
     getSW: () => { lat: () => number; lng: () => number };
     getNE: () => { lat: () => number; lng: () => number };
@@ -240,13 +244,19 @@ type NaverMapInstance = {
 
 type NaverMarkerInstance = {
   setMap: (map: NaverMapInstance | null) => void;
+  setIcon?: (icon: any) => void;
+  setZIndex?: (zIndex: number) => void;
+  getPosition?: () => { lat: () => number; lng: () => number };
 };
 
 type NaverMapsNamespace = {
   Event?: {
-    addListener: (target: NaverMarkerInstance, eventName: string, listener: () => void) => unknown;
+    addListener: (target: any, eventName: string, listener: (...args: any[]) => void) => unknown;
+    removeListener: (listener: unknown) => void;
   };
   LatLng: new (lat: number, lng: number) => unknown;
+  Point?: new (x: number, y: number) => unknown;
+  LatLngBounds?: new (sw: unknown, ne: unknown) => unknown;
   Map: new (
     element: HTMLElement,
     options: {
@@ -265,9 +275,10 @@ type NaverMapsNamespace = {
     title?: string;
     opacity?: number;
     zIndex?: number;
-    icon?: { content: HTMLElement };
+    icon?: { content: HTMLElement | string; anchor?: unknown };
   }) => NaverMarkerInstance;
 };
+
 
 declare global {
   interface Window {
@@ -2401,8 +2412,9 @@ function RealtimeDangerTicker({
     return () => clearInterval(timer);
   }, [streamAlerts.length]);
 
-  const item1 = streamAlerts[currentIndex];
-  const item2 = streamAlerts[(currentIndex + 1) % streamAlerts.length];
+  const safeIndex = streamAlerts.length > 0 ? currentIndex % streamAlerts.length : 0;
+  const item1 = streamAlerts[safeIndex] || streamAlerts[0] || fallbackAlerts[0];
+  const item2 = streamAlerts[(safeIndex + 1) % (streamAlerts.length || 1)] || streamAlerts[0] || fallbackAlerts[1];
 
   return (
     <div className={styles.realtimeNewsCard}>
@@ -2412,32 +2424,32 @@ function RealtimeDangerTicker({
       </div>
       <div className={styles.realtimeNewsSlider}>
         <div
-          key={`row1-${currentIndex}`}
+          key={`row1-${safeIndex}`}
           className={styles.realtimeNewsRow}
           role="button"
           tabIndex={0}
           onClick={() => {
-            if (item1.business && onSelectDanger) {
+            if (item1?.business && onSelectDanger) {
               onSelectDanger(item1.business);
             }
           }}
         >
-          <p className={styles.realtimeNewsText}>{item1.title}</p>
-          <small className={styles.realtimeNewsTag}>{item1.tag}</small>
+          <p className={styles.realtimeNewsText}>{item1?.title}</p>
+          <small className={styles.realtimeNewsTag}>{item1?.tag}</small>
         </div>
         <div
-          key={`row2-${currentIndex}`}
+          key={`row2-${safeIndex}`}
           className={styles.realtimeNewsRow}
           role="button"
           tabIndex={0}
           onClick={() => {
-            if (item2.business && onSelectDanger) {
+            if (item2?.business && onSelectDanger) {
               onSelectDanger(item2.business);
             }
           }}
         >
-          <p className={styles.realtimeNewsText}>{item2.title}</p>
-          <small className={styles.realtimeNewsTag}>{item2.tag}</small>
+          <p className={styles.realtimeNewsText}>{item2?.title}</p>
+          <small className={styles.realtimeNewsTag}>{item2?.tag}</small>
         </div>
       </div>
     </div>
@@ -2514,23 +2526,31 @@ function MapScreen({
     }
   };
 
+  const [selectedRestaurants, setSelectedRestaurants] = useState<Restaurant[]>([]);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
-  const visibleSelectedDanger = selectedDanger && businesses.some((business) => business.id === selectedDanger.id)
-    ? selectedDanger
-    : null;
+  const visibleSelectedDanger = selectedDanger;
 
   const selectDanger = useCallback((business: LocalBusiness) => {
     if (business.category !== "danger") return;
     setSelectedDanger(business);
-  }, []);
+    if (selectedCategory !== "danger") {
+      onCategoryChange("danger");
+    }
+  }, [selectedCategory, onCategoryChange]);
 
   function changeCategory(id: string) {
     setSelectedDanger(null);
+    setSelectedRestaurants([]);
+    setSelectedRestaurantId(null);
     onCategoryChange(id);
   }
 
   function changeQuery(value: string) {
     setSelectedDanger(null);
+    setSelectedRestaurants([]);
+    setSelectedRestaurantId(null);
     onQueryChange(value);
   }
 
@@ -2588,10 +2608,20 @@ function MapScreen({
           businesses={businesses}
           currentLocation={currentLocation}
           centerRequest={centerRequest}
+          selectedCategory={selectedCategory}
+          selectedRestaurantId={selectedRestaurantId}
           onSelectBusiness={selectDanger}
+          onSelectRestaurants={(list, singleId) => {
+            setSelectedRestaurants(list);
+            setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
+          }}
+          onClearRestaurants={() => {
+            setSelectedRestaurants([]);
+            setSelectedRestaurantId(null);
+          }}
           onSearchBounds={(bounds) => {
             onSearchBounds(bounds);
-            onSheetStateChange("expanded");
+            onSheetStateChange("collapsed");
           }}
         />
         <div className={styles.mapSearch}>
@@ -2605,7 +2635,7 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" ? (
           <RealtimeDangerTicker
             dangerSignals={businesses.filter((b) => b.category === "danger")}
             onSelectDanger={selectDanger}
@@ -2630,6 +2660,17 @@ function MapScreen({
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
+        {selectedCategory === "food" && selectedRestaurants.length > 0 && (
+          <RestaurantPreviewBar
+            restaurants={selectedRestaurants}
+            selectedRestaurantId={selectedRestaurantId}
+            onSelectRestaurant={(restaurant) => setSelectedRestaurantId(restaurant.id)}
+            onClose={() => {
+              setSelectedRestaurants([]);
+              setSelectedRestaurantId(null);
+            }}
+          />
+        )}
       </div>
 
       <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
@@ -2727,26 +2768,72 @@ function MapScreen({
   );
 }
 
+function createRestaurantMarkerIcon(isSelected: boolean) {
+  const size = isSelected ? 16 : 10;
+  const borderWidth = isSelected ? 3 : 2;
+  const shadow = isSelected
+    ? "0 2px 10px rgba(75, 0, 144, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.5)"
+    : "0 1px 4px rgba(0, 0, 0, 0.25)";
+
+  return {
+    content: `
+      <div style="
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
+        background: #4B0090;
+        border: ${borderWidth}px solid #FFFFFF;
+        box-shadow: ${shadow};
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      "></div>
+    `,
+    anchor: (window as any).naver?.maps?.Point
+      ? new (window as any).naver.maps.Point(size / 2, size / 2)
+      : { x: size / 2, y: size / 2 },
+  };
+}
+
 function NaverMapLayer({
   activeNeighborhood,
   businesses,
   currentLocation,
   centerRequest,
+  selectedCategory,
+  selectedRestaurantId,
   onSelectBusiness,
+  onSelectRestaurants,
+  onClearRestaurants,
   onSearchBounds,
 }: {
   activeNeighborhood: string;
   businesses: LocalBusiness[];
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
+  selectedCategory?: string;
+  selectedRestaurantId?: string | null;
   onSelectBusiness: (business: LocalBusiness) => void;
+  onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
+  onClearRestaurants: () => void;
   onSearchBounds: (bounds: MapSearchBounds) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<NaverMapInstance | null>(null);
   const markerRefs = useRef<NaverMarkerInstance[]>([]);
   const [isNaverMapReady, setIsNaverMapReady] = useState(false);
+  const [isZoomTooLow, setIsZoomTooLow] = useState(false);
   const canUseNaverMap = Boolean(NAVER_MAP_KEY_ID && isNaverMapReady);
+
+  // Restaurant Layer 관리용 Refs
+  const isRestaurantMode = selectedCategory === "food";
+  const restaurantMarkersRef = useRef<any[]>([]);
+  const restaurantMarkerMapRef = useRef<Map<any, Restaurant>>(new Map());
+  const restaurantClusterRef = useRef<MarkerClustering | null>(null);
+  const restaurantRequestIdRef = useRef<number>(0);
+  const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const RESTAURANT_MIN_ZOOM = 13;
 
   useEffect(() => {
     if (!NAVER_MAP_KEY_ID) {
@@ -2806,10 +2893,11 @@ function NaverMapLayer({
     return () => placeMarker.setMap(null);
   }, [activeNeighborhood, currentLocation, centerRequest, canUseNaverMap]);
 
+  // 위험 신호 및 일반 비즈니스 마커
   useEffect(() => {
     const maps = window.naver?.maps;
     const map = mapRef.current;
-    if (!maps || !map || !canUseNaverMap) return;
+    if (!maps || !map || !canUseNaverMap || isRestaurantMode) return;
 
     markerRefs.current = businesses.map((business) => {
       const visual = getDangerVisual(business);
@@ -2827,13 +2915,182 @@ function NaverMapLayer({
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
-  }, [businesses, canUseNaverMap, onSelectBusiness]);
+  }, [businesses, canUseNaverMap, onSelectBusiness, isRestaurantMode]);
+
+  // 음식점 전용 마커 & MarkerClustering & idle 디바운스 로직
+  useEffect(() => {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map || !canUseNaverMap || !isRestaurantMode) {
+      // 음식점 모드가 아닐 때 cleanup
+      if (restaurantClusterRef.current) {
+        restaurantClusterRef.current.clear();
+        restaurantClusterRef.current = null;
+      }
+      restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+      restaurantMarkersRef.current = [];
+      restaurantMarkerMapRef.current.clear();
+      previousBoundsRef.current = null;
+      setIsZoomTooLow(false);
+      return;
+    }
+
+    // 지도 빈 공간 클릭 시 음식점 선택 해제
+    const mapClickListener = maps.Event?.addListener(map, "click", () => {
+      onClearRestaurants();
+    });
+
+    const fetchRestaurantsForCurrentBounds = () => {
+      const zoom = map.getZoom();
+      if (zoom < RESTAURANT_MIN_ZOOM) {
+        setIsZoomTooLow(true);
+        if (restaurantClusterRef.current) {
+          restaurantClusterRef.current.clear();
+        }
+        restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+        restaurantMarkersRef.current = [];
+        restaurantMarkerMapRef.current.clear();
+        return;
+      }
+
+      setIsZoomTooLow(false);
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
+      const sw = bounds.getSW();
+      const ne = bounds.getNE();
+      const swLat = sw.lat();
+      const swLng = sw.lng();
+      const neLat = ne.lat();
+      const neLng = ne.lng();
+
+      // Bounds가 거의 변하지 않았으면 스킵
+      const prev = previousBoundsRef.current;
+      if (
+        prev &&
+        Math.abs(prev.swLat - swLat) < 0.0001 &&
+        Math.abs(prev.swLng - swLng) < 0.0001 &&
+        Math.abs(prev.neLat - neLat) < 0.0001 &&
+        Math.abs(prev.neLng - neLng) < 0.0001
+      ) {
+        return;
+      }
+      previousBoundsRef.current = { swLat, swLng, neLat, neLng };
+
+      const requestId = ++restaurantRequestIdRef.current;
+
+      getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 300 }).then((restaurants) => {
+        if (requestId !== restaurantRequestIdRef.current) return;
+
+        // 기존 마커 및 클러스터 정리
+        if (restaurantClusterRef.current) {
+          restaurantClusterRef.current.clear();
+          restaurantClusterRef.current = null;
+        }
+        restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+        restaurantMarkersRef.current = [];
+        restaurantMarkerMapRef.current.clear();
+
+        const newMarkers: any[] = [];
+
+        restaurants.forEach((restaurant) => {
+          const isSelected = selectedRestaurantId === restaurant.id;
+          const marker = new maps.Marker({
+            position: new maps.LatLng(restaurant.lat, restaurant.lng),
+            map,
+            title: restaurant.name,
+            zIndex: isSelected ? 1000 : 50,
+            icon: createRestaurantMarkerIcon(isSelected),
+          });
+
+          maps.Event?.addListener(marker, "click", (e: any) => {
+            if (e?.domEvent) {
+              e.domEvent.stopPropagation();
+            }
+            onSelectRestaurants([restaurant], restaurant.id);
+          });
+
+          restaurantMarkerMapRef.current.set(marker, restaurant);
+          newMarkers.push(marker);
+        });
+
+        restaurantMarkersRef.current = newMarkers;
+
+        // MarkerClustering 활성화
+        restaurantClusterRef.current = new MarkerClustering({
+          map,
+          markers: newMarkers,
+          minClusterSize: 2,
+          gridSize: 70,
+          averageCenter: true,
+          disableClickZoom: true,
+          onClusterClick: (_cluster, clusterMarkers) => {
+            const list = clusterMarkers
+              .map((m) => restaurantMarkerMapRef.current.get(m))
+              .filter(Boolean) as Restaurant[];
+            if (list.length > 0) {
+              onSelectRestaurants(list, null);
+            }
+          },
+        });
+      });
+    };
+
+    // 지도 idle 이벤트 리스너 (350ms debounce)
+    const idleListener = maps.Event?.addListener(map, "idle", () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        fetchRestaurantsForCurrentBounds();
+      }, 350);
+    });
+
+    // 최초 1회 즉시 실행
+    fetchRestaurantsForCurrentBounds();
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (idleListener && maps.Event) {
+        maps.Event.removeListener(idleListener);
+      }
+      if (mapClickListener && maps.Event) {
+        maps.Event.removeListener(mapClickListener);
+      }
+      if (restaurantClusterRef.current) {
+        restaurantClusterRef.current.clear();
+        restaurantClusterRef.current = null;
+      }
+      restaurantMarkersRef.current.forEach((m) => m.setMap(null));
+      restaurantMarkersRef.current = [];
+      restaurantMarkerMapRef.current.clear();
+    };
+  }, [isRestaurantMode, canUseNaverMap, onSelectRestaurants, onClearRestaurants]);
+
+  // 선택된 마커 시각적 강조 변경 (selectedRestaurantId 변경 시)
+  useEffect(() => {
+    if (!isRestaurantMode) return;
+    restaurantMarkersRef.current.forEach((marker) => {
+      const rest = restaurantMarkerMapRef.current.get(marker);
+      if (!rest) return;
+      const isSelected = rest.id === selectedRestaurantId;
+      marker.setIcon(createRestaurantMarkerIcon(isSelected));
+      marker.setZIndex(isSelected ? 1000 : 50);
+    });
+  }, [selectedRestaurantId, isRestaurantMode]);
 
   return (
     <>
       <div className={styles.naverMapFrame}>
         <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
       </div>
+      {isZoomTooLow && isRestaurantMode && (
+        <div className={styles.restaurantZoomAlert} role="status">
+          <span>🔍</span> 지도를 확대하면 음식점이 표시됩니다.
+        </div>
+      )}
       {!canUseNaverMap ? (
         <>
           <div className={styles.mapGrid} />
@@ -2862,6 +3119,59 @@ function NaverMapLayer({
     </>
   );
 }
+
+function RestaurantPreviewBar({
+  restaurants,
+  selectedRestaurantId,
+  onSelectRestaurant,
+  onClose,
+}: {
+  restaurants: Restaurant[];
+  selectedRestaurantId: string | null;
+  onSelectRestaurant: (restaurant: Restaurant) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className={styles.restaurantPreviewBar} role="region" aria-label="음식점 목록">
+      {restaurants.map((restaurant) => {
+        const isSelected = restaurant.id === selectedRestaurantId;
+        const detailUrl = restaurant.placeUrl || restaurant.naverUrl || `https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`;
+
+        return (
+          <article
+            key={restaurant.id}
+            className={`${styles.restaurantCard} ${isSelected ? styles.restaurantCardSelected : ""}`}
+            onClick={() => onSelectRestaurant(restaurant)}
+          >
+            <div className={styles.restaurantCardHeader}>
+              <div>
+                <h4 className={styles.restaurantCardTitle}>{restaurant.name}</h4>
+                <span className={styles.restaurantCardCategory}>{restaurant.category || "음식점"}</span>
+              </div>
+            </div>
+            <p className={styles.restaurantCardAddress}>{restaurant.roadAddress || restaurant.address || "주소 정보 없음"}</p>
+            <div className={styles.restaurantCardFooter}>
+              <span className={styles.restaurantCardRating}>
+                {restaurant.phone ? `${restaurant.phone}` : `★ ${restaurant.rating ? restaurant.rating.toFixed(1) : "4.5"}`}
+              </span>
+              <a
+                href={detailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.restaurantCardDetailLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                상세보기 ›
+              </a>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+
 
 function createDangerMarkerContent(
   business: LocalBusiness,
@@ -3875,7 +4185,7 @@ function AllServicesScreen({
       title: "동네 거래",
       items: [
         { label: "중고거래", icon: ShoppingBag, color: "#ff6f0f" },
-        { label: "알바", icon: BriefcaseBusiness, color: "#ff6f0f", onClick: onOpenAlba },
+        { label: "알바", icon: BriefcaseBusiness, color: "var(--color-primary)", onClick: onOpenAlba },
         { label: "부동산", icon: House, color: "#e64980" },
         { label: "중고차", icon: Truck, color: "#228be6" },
         { label: "스토어", icon: ShoppingBasket, color: "#fab005" },
@@ -4403,12 +4713,12 @@ function AlbaMainScreen({
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories = [
-    { label: "이웃알바", emoji: "🧡", icon: Heart },
-    { label: "걸어서10분", emoji: "👟", icon: Footprints },
-    { label: "단기알바", emoji: "📅", icon: Calendar },
-    { label: "식당/카페", emoji: "🏪", icon: Utensils },
-    { label: "물류/현장", emoji: "📦", icon: Package },
-    { label: "레슨/과외", emoji: "📕", icon: BookOpen },
+    { label: "이웃알바", icon: Heart },
+    { label: "걸어서10분", icon: Footprints },
+    { label: "단기알바", icon: Calendar },
+    { label: "식당/카페", icon: Utensils },
+    { label: "물류/현장", icon: Package },
+    { label: "레슨/과외", icon: BookOpen },
   ];
 
   const filteredAlbas = albas.filter((item) => {
@@ -4426,6 +4736,7 @@ function AlbaMainScreen({
   });
 
   const appliedAlbas = albas.filter((item) => item.hasApplied);
+  const localName = activeNeighborhood;
 
   return (
     <section className={styles.albaScreen}>
@@ -4446,34 +4757,45 @@ function AlbaMainScreen({
 
       {currentTab === "home" && (
         <>
-          {/* Top Quick Area */}
           <section className={styles.albaTopSection}>
-            <div
+            <button
+              type="button"
               className={styles.albaPopularCard}
-              role="button"
-              tabIndex={0}
               onClick={() => setSelectedCategory(null)}
             >
-              <div className={styles.albaPopularCardCopy}>
+              <span className={styles.albaPopularCardCopy}>
                 <span>우리동네</span>
-                <strong>인기알바 보기 <ChevronRight size={16} /></strong>
-              </div>
-              <div className={styles.albaPopularMapVisual}>
-                <MapPin size={28} color="#ffffff" className={styles.albaPopularPinIcon} fill="#ff6f0f" />
-              </div>
-            </div>
+                <strong>
+                  지금 많이 보는 공고
+                  <ChevronRight size={16} />
+                </strong>
+                <span className={styles.albaPopularDescription}>{localName} 근처에서 빠르게 지원할 수 있는 알바를 모았어요.</span>
+                <span className={styles.albaPopularStats}>
+                  <span>{albas.length}개 공고</span>
+                  <span>후기 기반 추천</span>
+                </span>
+              </span>
+              <span className={styles.albaPopularMapVisual} aria-hidden="true">
+                <BriefcaseBusiness size={22} />
+                <MapPin size={18} className={styles.albaPopularPinIcon} />
+              </span>
+            </button>
 
             <div className={styles.albaCategoryGrid}>
               {categories.map((cat) => {
                 const isSelected = selectedCategory === cat.label;
+                const CategoryIcon = cat.icon;
                 return (
                   <button
                     key={cat.label}
                     type="button"
-                    className={`${styles.albaCategoryBtn} ${isSelected ? styles.chipActive : ""}`}
+                    className={`${styles.albaCategoryBtn} ${isSelected ? styles.albaCategoryBtnActive : ""}`}
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedCategory(isSelected ? null : cat.label)}
                   >
-                    <span className={styles.albaCategoryIconCircle}>{cat.emoji}</span>
+                    <span className={styles.albaCategoryIconCircle}>
+                      <CategoryIcon size={20} strokeWidth={2.1} />
+                    </span>
                     <span>{cat.label}</span>
                   </button>
                 );
@@ -4481,13 +4803,12 @@ function AlbaMainScreen({
             </div>
           </section>
 
-          {/* 2-Column Grid Feed */}
           <section className={styles.albaFeedSection}>
             <div className={styles.albaFeedHeading}>
               <h2>
-                {selectedCategory ? `${selectedCategory} 목록` : `${activeNeighborhood === "송파삼성래미안" ? "한남동" : activeNeighborhood}에서 많이 찾는 알바`}
+                {selectedCategory ? selectedCategory : `${localName} 인기 알바`}
               </h2>
-              <small>광고 ⓘ</small>
+              <small>{filteredAlbas.length}개 공고</small>
             </div>
 
             {filteredAlbas.length === 0 ? (
@@ -4515,7 +4836,7 @@ function AlbaMainScreen({
 
       {currentTab === "search" && (
         <section className={styles.albaFeedSection}>
-          <div className={styles.mapSearch} style={{ margin: "10px 0 16px" }}>
+          <div className={`${styles.mapSearch} ${styles.albaSearchField}`}>
             <Search size={20} />
             <input
               type="text"
@@ -4551,7 +4872,7 @@ function AlbaMainScreen({
           {appliedAlbas.length === 0 ? (
             <StateBlock
               title="아직 지원한 알바가 없어요"
-              body="마음에 드는 동네 알바를 찾아서 지원해보세요!"
+              body="마음에 드는 동네 알바를 찾아서 지원해보세요."
               actionLabel="알바 둘러보기"
               onAction={() => setCurrentTab("home")}
             />
@@ -4576,11 +4897,11 @@ function AlbaMainScreen({
             <h2>구인글 관리</h2>
             <button
               type="button"
-              className={styles.albaBadgeGreen}
-              style={{ border: 0, padding: "6px 12px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}
+              className={styles.albaManageWriteBtn}
               onClick={onWrite}
             >
-              + 새 공고 작성
+              <Plus size={16} />
+              새 공고 작성
             </button>
           </div>
           <div className={styles.albaGrid}>
@@ -4596,12 +4917,10 @@ function AlbaMainScreen({
         </section>
       )}
 
-      {/* Floating Orange Write Button */}
-      <button type="button" className={styles.albaFloatingWrite} onClick={onWrite}>
-        <Plus size={20} strokeWidth={2.5} /> 글쓰기
+      <button type="button" className={styles.albaFloatingWrite} onClick={onWrite} aria-label="알바 공고 작성">
+        <Plus size={22} strokeWidth={2.5} />
       </button>
 
-      {/* Alba 4-Tab Bottom Navigation Bar */}
       <nav className={styles.albaBottomNav} aria-label="알바 메뉴">
         <button
           type="button"
@@ -4653,18 +4972,18 @@ function AlbaCardComponent({
     <article className={styles.albaCard} onClick={onSelect}>
       <div className={styles.albaCardThumbFrame}>
         <div className={styles.albaCardThumbVisual} style={{ background: alba.bgGradient }}>
-          <span style={{ fontSize: "2rem" }}>{alba.thumbnailEmoji ?? "🏢"}</span>
+          <span className={styles.albaCardThumbEmoji}>{alba.thumbnailEmoji ?? "🏢"}</span>
         </div>
         <button
           type="button"
-          className={styles.albaCardHeartBtn}
+          className={`${styles.albaCardHeartBtn} ${alba.isFavorite ? styles.albaCardHeartBtnActive : ""}`}
           aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite();
           }}
         >
-          <Heart size={16} fill={alba.isFavorite ? "#ff6f0f" : "none"} color={alba.isFavorite ? "#ff6f0f" : "#ffffff"} />
+          <Heart size={16} fill={alba.isFavorite ? "currentColor" : "none"} color="currentColor" />
         </button>
       </div>
       <h3 className={styles.albaCardTitle}>{alba.title}</h3>
@@ -4780,11 +5099,11 @@ function AlbaDetailScreen({
       <footer className={styles.albaDetailActionBar}>
         <button
           type="button"
-          className={styles.albaDetailHeartBtn}
+          className={`${styles.albaDetailHeartBtn} ${alba.isFavorite ? styles.albaDetailHeartBtnActive : ""}`}
           aria-label={alba.isFavorite ? "관심 알바 해제" : "관심 알바 저장"}
           onClick={onToggleFavorite}
         >
-          <Heart size={22} fill={alba.isFavorite ? "#ff6f0f" : "none"} color={alba.isFavorite ? "#ff6f0f" : "currentColor"} />
+          <Heart size={22} fill={alba.isFavorite ? "currentColor" : "none"} color="currentColor" />
         </button>
         <button
           type="button"

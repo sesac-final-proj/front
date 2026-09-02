@@ -1583,19 +1583,19 @@
 }
 
 .sheet_collapsed {
-  height: calc(132px + env(safe-area-inset-bottom));
+  height: calc(186px + env(safe-area-inset-bottom));
   overflow-y: hidden;
 }
 
 .sheet_half {
-  height: calc(188px + env(safe-area-inset-bottom));
+  height: calc(186px + env(safe-area-inset-bottom));
   overflow-y: hidden;
 }
 
 .sheet_half .localCategoryGrid button:nth-child(n + 6),
 .sheet_half .localDots,
 .sheet_half .localResults,
-.sheet_collapsed .localCategoryGrid,
+.sheet_collapsed .localCategoryGrid button:nth-child(n + 6),
 .sheet_collapsed .localDots,
 .sheet_collapsed .localResults {
   display: none;
@@ -3601,6 +3601,18 @@
   background: var(--color-bg);
   color: var(--color-text);
   position: relative;
+  --alba-brand: var(--color-primary);
+  --alba-brand-hover: var(--color-primary-pressed);
+  --alba-brand-soft: rgba(169, 112, 255, 0.16);
+  --alba-brand-border: rgba(169, 112, 255, 0.45);
+  --alba-brand-shadow: rgba(169, 112, 255, 0.32);
+  --alba-positive-soft: rgba(32, 183, 122, 0.15);
+}
+
+.stage[data-theme="light"] .albaScreen {
+  --alba-brand-soft: rgba(117, 55, 197, 0.12);
+  --alba-brand-border: rgba(117, 55, 197, 0.36);
+  --alba-brand-shadow: rgba(117, 55, 197, 0.24);
 }
 
 .albaHeader {
@@ -3612,16 +3624,24 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--color-bg);
+  background: rgba(11, 11, 13, 0.94);
   border-bottom: 1px solid var(--color-line);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.stage[data-theme="light"] .albaHeader {
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .albaHeader h1 {
-  font-size: 1.1875rem;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
   font-weight: 700;
   margin: 0;
   text-align: center;
   flex: 1;
+  letter-spacing: 0;
 }
 
 .albaHeaderActions {
@@ -3630,149 +3650,343 @@
   gap: 6px;
 }
 
-/* Top Quick Area (Popular Banner + 2x3 Icon Grid) */
 .albaTopSection {
-  padding: 14px 16px 18px;
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 12px;
+  padding: 14px 16px 16px;
   border-bottom: 8px solid var(--color-surface-2);
 }
 
 .albaPopularCard {
-  background: linear-gradient(145deg, #2a2238 0%, #1c1726 100%);
-  border: 1px solid rgba(169, 112, 255, 0.2);
-  border-radius: 16px;
-  padding: 14px 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  width: 100%;
+  min-height: 96px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 14px 14px 14px 16px;
+  color: var(--color-text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 14px;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
   position: relative;
   overflow: hidden;
 }
 
-.stage[data-theme="light"] .albaPopularCard {
-  background: linear-gradient(145deg, #f0e6ff 0%, #e2d2fd 100%);
-  border-color: rgba(117, 55, 197, 0.2);
+.albaPopularCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--alba-brand);
 }
 
 .albaPopularCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(117, 55, 197, 0.25);
+  transform: translateY(-1px);
+  border-color: var(--alba-brand-border);
+  background: var(--color-surface-2);
 }
 
-.albaPopularCardCopy span {
+.albaPopularCard:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.albaPopularCard:focus-visible,
+.albaCategoryBtn:focus-visible,
+.albaFloatingWrite:focus-visible,
+.albaManageWriteBtn:focus-visible,
+.albaNavBtn:focus-visible,
+.albaCardHeartBtn:focus-visible {
+  outline: 2px solid var(--alba-brand);
+  outline-offset: 2px;
+}
+
+.albaPopularCardCopy {
   display: block;
-  font-size: 0.75rem;
+  min-width: 0;
+}
+
+.albaPopularCardCopy > span:first-child {
+  display: block;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
   color: var(--color-muted);
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .albaPopularCardCopy strong {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.9375rem;
-  font-weight: 800;
+  gap: 3px;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  font-weight: 700;
   color: var(--color-text);
-  margin-top: 2px;
+  margin-top: 1px;
+  letter-spacing: 0;
+}
+
+.albaPopularDescription {
+  display: block;
+  margin: 4px 0 0;
+  max-width: 22rem;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 400;
+  text-wrap: pretty;
+}
+
+.albaPopularStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.albaPopularStats span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--alba-brand-soft);
+  color: var(--alba-brand);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
 }
 
 .albaPopularMapVisual {
-  width: 100%;
-  height: 64px;
-  margin-top: 8px;
-  border-radius: 10px;
-  background: radial-gradient(circle at 50% 50%, #4c2882 0%, #201438 80%);
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  background: var(--alba-brand-soft);
+  color: var(--alba-brand);
   display: grid;
   place-items: center;
   position: relative;
+  justify-self: end;
+  overflow: hidden;
 }
 
-.stage[data-theme="light"] .albaPopularMapVisual {
-  background: radial-gradient(circle at 50% 50%, #c49eff 0%, #ab75fa 80%);
+.albaPopularMapVisual::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 14px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.24;
 }
 
 .albaPopularPinIcon {
-  animation: floatPin 2.4s ease-in-out infinite alternate;
-}
-
-@keyframes floatPin {
-  0% { transform: translateY(0px) scale(1); }
-  100% { transform: translateY(-4px) scale(1.06); }
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--alba-brand);
+  color: #ffffff;
 }
 
 .albaCategoryGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 8px 4px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .albaCategoryBtn {
-  border: 0;
-  background: transparent;
+  min-width: 0;
+  min-height: 72px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 6px 2px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 8px 4px;
+  border-radius: 8px;
   color: var(--color-text);
   font-size: 0.75rem;
+  line-height: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
+  letter-spacing: 0;
 }
 
 .albaCategoryBtn:hover {
   background: var(--color-surface-2);
 }
 
-.albaCategoryIconCircle {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-size: 1.125rem;
-  background: var(--color-surface-2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+.albaCategoryBtn:active {
+  transform: scale(0.98);
 }
 
-/* Feed Section & 2-Column Alba Grid */
+.albaCategoryBtnActive {
+  background: var(--alba-brand-soft);
+  border-color: var(--alba-brand-border);
+  color: var(--alba-brand);
+}
+
+.albaCategoryIconCircle {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-2);
+}
+
+.sheet_collapsed {
+  height: calc(140px + env(safe-area-inset-bottom));
+  overflow-y: hidden;
+}
+
+.sheet_half {
+  height: calc(186px + env(safe-area-inset-bottom));
+  overflow-y: hidden;
+}
+
+.sheet_half .localCategoryGrid button:nth-child(n + 6),
+.sheet_half .localDots,
+.sheet_half .localResults,
+.sheet_collapsed .localDots,
+.sheet_collapsed .localResults {
+  display: none;
+}
+
+.sheet_expanded {
+  height: calc(100% - 60px);
+  overflow-y: auto;
+  padding-bottom: calc(164px + env(safe-area-inset-bottom));
+}
+
+.localSheet > .sheetHandle {
+  position: sticky;
+  top: -4px;
+  z-index: 2;
+  background: inherit;
+  touch-action: manipulation;
+}
+
+.localSheet > .sheetHandle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.localSheet > .sheetHandle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.sheetHandle {
+  width: 100%;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.sheetHandle span {
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: #6f7480;
+}
+
+.localCategoryGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 6px;
+  grid-auto-rows: auto;
+  padding: 2px 0 6px;
+}
+
+.localCategoryGrid button {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.localIcon {
+  width: 100%;
+  max-width: 48px;
+  aspect-ratio: 1;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: #272c34;
+  color: var(--color-primary);
+}
+
+.albaCategoryIconCircle {
+  color: var(--color-muted);
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.albaCategoryBtnActive .albaCategoryIconCircle {
+  background: var(--alba-brand-soft);
+  color: var(--alba-brand);
+}
+
 .albaFeedSection {
-  padding: 18px 16px 24px;
+  padding: 18px 16px 28px;
+}
+
+.albaSearchField {
+  margin: 10px 0 16px;
 }
 
 .albaFeedHeading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .albaFeedHeading h2 {
-  font-size: 1.0625rem;
-  font-weight: 800;
+  min-width: 0;
+  font-size: 1.25rem;
+  line-height: 1.6875rem;
+  font-weight: 700;
   margin: 0;
+  letter-spacing: 0;
+  text-wrap: balance;
 }
 
 .albaFeedHeading small {
-  font-size: 0.6875rem;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1rem;
   color: var(--color-dim);
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  font-weight: 500;
 }
 
 .albaGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px 12px;
+  gap: 18px 12px;
 }
 
 .albaCard {
@@ -3783,17 +3997,18 @@
   flex-direction: column;
   cursor: pointer;
   position: relative;
+  min-width: 0;
 }
 
 .albaCardThumbFrame {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 12px;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--color-surface-2);
-  margin-bottom: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  margin-bottom: 9px;
+  border: 1px solid var(--color-line);
 }
 
 .albaCardThumbVisual {
@@ -3808,29 +4023,58 @@
   text-align: center;
   background-size: cover;
   background-position: center;
-  transition: transform 220ms ease;
+  transition: transform 180ms ease, filter 180ms ease;
+  filter: saturate(0.92);
 }
 
 .albaCard:hover .albaCardThumbVisual {
-  transform: scale(1.04);
+  transform: scale(1.025);
+  filter: saturate(1);
+}
+
+.albaCardThumbEmoji {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 1.65rem;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .albaCardHeartBtn {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 30px;
-  height: 30px;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(4px);
-  border: 0;
+  background: rgba(11, 11, 13, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 2;
-  transition: transform 120ms ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.stage[data-theme="light"] .albaCardHeartBtn {
+  background: rgba(255, 255, 255, 0.84);
+  border-color: rgba(17, 17, 20, 0.08);
+  color: #22252a;
+}
+
+.albaCardHeartBtn:hover,
+.albaCardHeartBtnActive {
+  background: var(--alba-brand);
+  border-color: transparent;
+  color: #ffffff;
 }
 
 .albaCardHeartBtn:active {
@@ -3838,35 +4082,40 @@
 }
 
 .albaCardTitle {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.375rem;
   color: var(--color-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  text-wrap: pretty;
+  letter-spacing: 0;
 }
 
 .albaCardPay {
-  font-size: 0.9375rem;
-  font-weight: 800;
-  color: #ff6f0f;
-  margin-bottom: 3px;
+  font-size: 1rem;
+  line-height: 1.375rem;
+  font-weight: 700;
+  color: var(--alba-brand);
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .stage[data-theme="dark"] .albaCardPay {
-  color: #ff8a3d;
+  color: var(--alba-brand);
 }
 
 .albaCardMeta {
   font-size: 0.75rem;
+  line-height: 1rem;
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .albaBadgeRow {
@@ -3878,14 +4127,15 @@
 .albaBadge {
   font-size: 0.6875rem;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
+  line-height: 0.9375rem;
+  padding: 3px 6px;
+  border-radius: 6px;
   background: var(--color-surface-2);
   color: var(--color-muted);
 }
 
 .albaBadgeGreen {
-  background: rgba(32, 183, 122, 0.15);
+  background: var(--alba-positive-soft);
   color: #20b77a;
 }
 
@@ -3894,40 +4144,63 @@
   color: #078452;
 }
 
-/* Alba Floating Action Button (Orange Danggeun Style) */
+.albaManageWriteBtn {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--alba-brand);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.albaManageWriteBtn:hover {
+  background: var(--alba-brand-hover);
+}
+
+.albaManageWriteBtn:active {
+  transform: scale(0.98);
+}
+
 .albaFloatingWrite {
   position: absolute;
   right: 18px;
   bottom: calc(82px + env(safe-area-inset-bottom));
-  min-width: 104px;
-  height: 46px;
-  border-radius: 999px;
-  background: #ff6f0f;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--alba-brand);
   color: #ffffff;
   border: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0 18px;
-  font-size: 15px;
-  font-weight: 800;
+  padding: 0;
   z-index: 65;
-  box-shadow: 0 8px 24px rgba(255, 111, 15, 0.48), 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 24px var(--alba-brand-shadow), 0 2px 6px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
 .albaFloatingWrite:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(255, 111, 15, 0.6);
+  background: var(--alba-brand-hover);
+  box-shadow: 0 12px 28px var(--alba-brand-shadow);
 }
 
 .albaFloatingWrite:active {
   transform: translateY(1px) scale(0.98);
 }
 
-/* Alba Dedicated 4-Tab Bottom Navigation Bar */
 .albaBottomNav {
   position: absolute;
   z-index: 60;
@@ -3938,7 +4211,7 @@
   padding: 6px 12px env(safe-area-inset-bottom);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: rgba(17, 17, 20, 0.92);
+  background: rgba(17, 17, 20, 0.94);
   border-top: 1px solid var(--color-line);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -3961,7 +4234,12 @@
   font-size: 0.6875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: color 120ms ease;
+  transition: color 140ms ease, transform 140ms ease;
+  letter-spacing: 0;
+}
+
+.albaNavBtn:active {
+  transform: scale(0.98);
 }
 
 .albaNavBtnActive {
@@ -3970,7 +4248,7 @@
 }
 
 .albaNavBtnActive svg {
-  color: #ff6f0f;
+  color: var(--alba-brand);
 }
 
 /* Alba Detail Screen (Matching user image 4) */
@@ -4056,7 +4334,7 @@
 }
 
 .albaDetailConditionItem svg {
-  color: #ff6f0f;
+  color: var(--alba-brand);
   flex-shrink: 0;
 }
 
@@ -4128,6 +4406,12 @@
   flex-shrink: 0;
 }
 
+.albaDetailHeartBtnActive {
+  color: var(--alba-brand);
+  border-color: var(--alba-brand-border);
+  background: var(--alba-brand-soft);
+}
+
 .albaDetailCallBtn {
   height: 48px;
   flex: 1;
@@ -4149,7 +4433,7 @@
   flex: 1.4;
   border-radius: 12px;
   border: 0;
-  background: #ff6f0f;
+  background: var(--alba-brand);
   color: #ffffff;
   font-size: 1rem;
   font-weight: 800;
@@ -4158,8 +4442,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  box-shadow: 0 4px 16px rgba(255, 111, 15, 0.4);
+  box-shadow: 0 4px 16px var(--alba-brand-shadow);
   transition: transform 120ms ease;
+}
+
+.albaDetailApplyBtn:hover {
+  background: var(--alba-brand-hover);
 }
 
 .albaDetailApplyBtn:active {
@@ -4427,4 +4715,239 @@
   border-color: #ff5252;
   background: rgba(255, 82, 82, 0.12);
   color: #ff5252;
+}
+
+/* ==========================================================================
+   Restaurant NAVER Maps Layer & Marker Clustering & Preview Bar
+   ========================================================================== */
+
+.restaurantMarker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4B0090;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, width 0.15s ease, height 0.15s ease;
+  user-select: none;
+}
+
+.restaurantMarker:hover {
+  transform: scale(1.3);
+}
+
+.restaurantMarkerActive {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4B0090;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 10px rgba(75, 0, 144, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  z-index: 1000 !important;
+}
+
+.restaurantZoomAlert {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 18, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #f0f0f5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 85;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: fadeInDown 0.2s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Bottom Navigation 위에 표시되는 가로 스와이프 음식점 카드 바 */
+.restaurantPreviewBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(72px + env(safe-area-inset-bottom) + 12px);
+  z-index: 120;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  padding: 0 16px 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  pointer-events: auto;
+  animation: fadeInUpCard 0.22s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.restaurantPreviewBar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes fadeInUpCard {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.restaurantCard {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 270px;
+  min-height: 110px;
+  border-radius: 16px;
+  background: #1c1d22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+  color: #FFFFFF;
+  position: relative;
+  text-decoration: none;
+}
+
+.restaurantCard:hover {
+  border-color: rgba(123, 44, 191, 0.7);
+  background: #23252c;
+  transform: translateY(-2px);
+}
+
+.restaurantCardSelected {
+  border-color: #8a3ffc !important;
+  background: #25232d !important;
+  box-shadow: 0 10px 28px rgba(75, 0, 144, 0.45), 0 0 0 1px #8a3ffc;
+  transform: translateY(-2px);
+}
+
+.restaurantCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.restaurantCardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0 0 4px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantCardCategory {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #bfa1f7;
+  margin-bottom: 6px;
+}
+
+.restaurantCardAddress {
+  font-size: 12px;
+  color: var(--color-muted, #9a9ba4);
+  line-height: 1.35;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.restaurantCardRating {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffd15c;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.restaurantCardDetailLink {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a87ffb;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mapSearchToast {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  background: rgba(30, 20, 50, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #f1e9ff;
+  border: 1px solid rgba(170, 130, 255, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: mapToastFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mapSearchToast > svg {
+  color: #b78eff;
+  flex-shrink: 0;
+}
+
+@keyframes mapToastFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
 }
