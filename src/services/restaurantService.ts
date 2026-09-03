@@ -13,8 +13,12 @@ export interface Restaurant {
   distance?: string;
   rating?: number;
   reviewCount?: number;
+  regularCount?: number;
+  benefit?: string;
+  tags?: string[];
   imageUrl?: string;
   thumbnailUrl?: string;
+  images?: string[];
 }
 
 export interface BoundsQueryParams {

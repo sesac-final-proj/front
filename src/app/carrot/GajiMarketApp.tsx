@@ -29,6 +29,7 @@ import {
   Dumbbell,
   Eye,
   Gem,
+  Gamepad2,
   GraduationCap,
   Headphones,
   Heart,
@@ -96,6 +97,9 @@ import {
   createTogetherPost,
   toggleTogetherJoin,
 } from "@/services/togetherService";
+import { KakaoMapLayer } from "./components/map/KakaoMapLayer";
+import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
+import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
 
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
@@ -142,6 +146,7 @@ type SubPage =
   | { type: "chat-room"; id: string }
   | { type: "my-menu" }
   | { type: "all-services" }
+  | { type: "merge-game" }
   | { type: "real-estate" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
@@ -1569,7 +1574,7 @@ export default function GajiMarketApp() {
     <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -1640,7 +1645,10 @@ export default function GajiMarketApp() {
               onOpenAlba={() => setSubPage({ type: "alba" })}
               onOpenRealEstate={openRealEstate}
               onOpenApartment={openApartmentFlow}
+              onOpenGame={() => setSubPage({ type: "merge-game" })}
             />
+          ) : subPage?.type === "merge-game" ? (
+            <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
               onBack={goBack}
@@ -1792,6 +1800,7 @@ export default function GajiMarketApp() {
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
+              theme={theme}
               onCategoryChange={setMapCategory}
               onSheetStateChange={setMapSheetState}
               onQueryChange={setMapQuery}
@@ -3331,6 +3340,7 @@ function MapScreen({
   hasSearchedArea,
   onSearchBounds,
   locationAllowed,
+  theme,
   onCategoryChange,
   onSheetStateChange,
   onQueryChange,
@@ -3346,6 +3356,7 @@ function MapScreen({
   hasSearchedArea: boolean;
   onSearchBounds: (bounds: MapSearchBounds) => void;
   locationAllowed: boolean;
+  theme: ThemeMode;
   onCategoryChange: (id: string) => void;
   onSheetStateChange: (state: "collapsed" | "half" | "expanded") => void;
   onQueryChange: (value: string) => void;
@@ -3398,12 +3409,18 @@ function MapScreen({
   const handleSelectRestaurants = useCallback((list: Restaurant[], singleId: string | null) => {
     setSelectedRestaurants(list);
     setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
-  }, []);
+    onSheetStateChange("half");
+  }, [onSheetStateChange]);
 
   const handleClearRestaurants = useCallback(() => {
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
   }, []);
+
+  const selectedRestaurant = useMemo(
+    () => restaurantResults.find((r) => r.id === selectedRestaurantId) ?? selectedRestaurants[0] ?? null,
+    [restaurantResults, selectedRestaurantId, selectedRestaurants],
+  );
 
   const selectDanger = useCallback((business: LocalBusiness) => {
     if (business.category !== "danger") return;
@@ -3508,14 +3525,13 @@ function MapScreen({
   return (
     <section className={styles.mapScreen}>
       <div className={styles.mapCanvas}>
-        <NaverMapLayer
+        <KakaoMapLayer
           activeNeighborhood={activeNeighborhood}
-          businesses={businesses}
           currentLocation={currentLocation}
           centerRequest={centerRequest}
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
-          onSelectBusiness={selectDanger}
+          theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
           onClearRestaurants={handleClearRestaurants}
@@ -3523,6 +3539,7 @@ function MapScreen({
             onSearchBounds(bounds);
             onSheetStateChange("collapsed");
           }}
+          coordsMap={NEIGHBORHOOD_COORDS}
         />
         <div className={styles.mapSearch}>
           <Search size={27} />
@@ -3560,17 +3577,6 @@ function MapScreen({
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
-        {selectedCategory === "food" && selectedRestaurants.length > 0 && (
-          <RestaurantPreviewBar
-            restaurants={selectedRestaurants}
-            selectedRestaurantId={selectedRestaurantId}
-            onSelectRestaurant={(restaurant) => setSelectedRestaurantId(restaurant.id)}
-            onClose={() => {
-              setSelectedRestaurants([]);
-              setSelectedRestaurantId(null);
-            }}
-          />
-        )}
       </div>
 
       <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
@@ -3587,6 +3593,12 @@ function MapScreen({
             body="현재 위치 권한을 허용하면 지도 업체와 동네 글을 더 정확하게 보여드려요."
             actionLabel="권한 허용"
             onAction={requestCurrentLocation}
+          />
+        ) : selectedCategory === "food" && selectedRestaurant ? (
+          <RestaurantDetailSheet
+            restaurant={selectedRestaurant}
+            theme={theme}
+            onClose={handleClearRestaurants}
           />
         ) : (
           <>
@@ -5777,11 +5789,13 @@ function AllServicesScreen({
   onOpenAlba,
   onOpenRealEstate,
   onOpenApartment,
+  onOpenGame,
 }: {
   onBack: () => void;
   onOpenAlba?: () => void;
   onOpenRealEstate?: () => void;
   onOpenApartment?: () => void;
+  onOpenGame?: () => void;
 }) {
   const serviceCategories = [
     {
@@ -5840,7 +5854,7 @@ function AllServicesScreen({
         { label: "선물가게", icon: CakeSlice, color: "#ff922b" },
         { label: "동네걷기", icon: Dumbbell, color: "#ff922b" },
         { label: "당근이네", icon: Sparkles, color: "#20b77a" },
-        { label: "게임", icon: Headphones, color: "#ff922b" },
+        { label: "게임", icon: Gamepad2, color: "#ff922b", onClick: onOpenGame },
         { label: "당근메이드", icon: House, color: "#ff922b" },
       ],
     },
