@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFallbackRestaurants } from "@/services/restaurantService";
+import { getFallbackRestaurants, getCategoryFallbackImage } from "@/services/restaurantService";
 
 interface KakaoPlaceDocument {
   id: string;
@@ -9,6 +9,7 @@ interface KakaoPlaceDocument {
   category_group_name: string;
   phone: string;
   address_name: string;
+  roadAddress?: string;
   road_address_name: string;
   x: string; // lng
   y: string; // lat
@@ -24,6 +25,59 @@ interface KakaoCategorySearchResponse {
     same_name: any;
   };
   documents: KakaoPlaceDocument[];
+}
+
+// In-memory cache to ensure instant response times for repeated places
+const imageCache = new Map<string, string>();
+
+async function fetchPlaceThumbnail(
+  kakaoApiKey: string,
+  placeName: string,
+  addressName: string,
+  category: string,
+): Promise<string> {
+  const cacheKey = `${placeName}|${addressName}`;
+  if (imageCache.has(cacheKey)) {
+    return imageCache.get(cacheKey)!;
+  }
+
+  try {
+    const region = addressName.split(/\s+/).slice(0, 2).join(" ");
+    const query = `${region} ${placeName}`.trim();
+    const params = new URLSearchParams({
+      query,
+      size: "1",
+    });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
+
+    const res = await fetch(`https://dapi.kakao.com/v2/search/image?${params}`, {
+      headers: {
+        Authorization: `KakaoAK ${kakaoApiKey}`,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      const firstDoc = data.documents?.[0];
+      const thumb = firstDoc?.thumbnail_url || firstDoc?.image_url;
+      if (thumb) {
+        imageCache.set(cacheKey, thumb);
+        if (imageCache.size > 2000) {
+          const firstKey = imageCache.keys().next().value;
+          if (firstKey) imageCache.delete(firstKey);
+        }
+        return thumb;
+      }
+    }
+  } catch {
+    // Ignore timeout / network errors and gracefully use category fallback image
+  }
+
+  return getCategoryFallbackImage(category);
 }
 
 export async function GET(request: Request) {
@@ -87,10 +141,22 @@ export async function GET(request: Request) {
       }
 
       if (allPlaces.length > 0) {
-        const normalizedRestaurants = allPlaces.slice(0, limit).map((place) => {
+        const topPlaces = allPlaces.slice(0, limit);
+
+        // 카카오 이미지 검색 API를 통해 썸네일 병렬 조회
+        const thumbnailPromises = topPlaces.map((place) => {
+          const categoryParts = place.category_name.split(" > ");
+          const simplifiedCategory = categoryParts.length > 1 ? categoryParts.slice(1).join(" · ") : place.category_name;
+          return fetchPlaceThumbnail(kakaoApiKey, place.place_name, place.address_name, simplifiedCategory);
+        });
+
+        const thumbnails = await Promise.all(thumbnailPromises);
+
+        const normalizedRestaurants = topPlaces.map((place, idx) => {
           // "음식점 > 한식 > 육류,고기" -> "한식" 또는 서브 카테고리 추출
           const categoryParts = place.category_name.split(" > ");
           const simplifiedCategory = categoryParts.length > 1 ? categoryParts.slice(1).join(" · ") : place.category_name;
+          const thumb = thumbnails[idx] || getCategoryFallbackImage(simplifiedCategory);
 
           return {
             id: `kakao-${place.id}`,
@@ -103,6 +169,8 @@ export async function GET(request: Request) {
             lng: parseFloat(place.x),
             placeUrl: place.place_url,
             naverUrl: `https://map.naver.com/v5/search/${encodeURIComponent(place.place_name)}`,
+            imageUrl: thumb,
+            thumbnailUrl: thumb,
             source: "kakao_local_api",
           };
         });
