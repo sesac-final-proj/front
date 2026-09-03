@@ -97,7 +97,7 @@ import {
   createTogetherPost,
   toggleTogetherJoin,
 } from "@/services/togetherService";
-import { KakaoMapLayer } from "./components/map/KakaoMapLayer";
+import { KakaoMapLayer, KAKAO_MAP_KEY, loadKakaoMapScript } from "./components/map/KakaoMapLayer";
 import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
 import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
 
@@ -4696,22 +4696,22 @@ function DreamMapLayer({
   onSelectFacility: (facility: DonationFacility | null) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<NaverMapInstance | null>(null);
-  const markerRefs = useRef<NaverMarkerInstance[]>([]);
-  const [isNaverMapReady, setIsNaverMapReady] = useState(false);
-  const [hasMapError, setHasMapError] = useState(!NAVER_MAP_KEY_ID);
-  const canUseNaverMap = Boolean(NAVER_MAP_KEY_ID && isNaverMapReady);
+  const mapRef = useRef<any>(null);
+  const overlayRefs = useRef<any[]>([]);
+  const [isKakaoMapReady, setIsKakaoMapReady] = useState(false);
+  const [hasMapError, setHasMapError] = useState(false);
+  const canUseKakaoMap = Boolean(KAKAO_MAP_KEY && isKakaoMapReady);
 
   useEffect(() => {
-    if (!NAVER_MAP_KEY_ID) return;
+    if (!KAKAO_MAP_KEY) return;
     let isMounted = true;
-    loadNaverMapScript(NAVER_MAP_KEY_ID)
+    loadKakaoMapScript(KAKAO_MAP_KEY)
       .then(() => {
-        if (isMounted) setIsNaverMapReady(Boolean(window.naver?.maps));
+        if (isMounted) setIsKakaoMapReady(Boolean((window as any).kakao?.maps?.Map));
       })
       .catch(() => {
         if (isMounted) {
-          setIsNaverMapReady(false);
+          setIsKakaoMapReady(false);
           setHasMapError(true);
         }
       });
@@ -4722,66 +4722,63 @@ function DreamMapLayer({
   }, []);
 
   useEffect(() => {
+    const kakao = (window as any).kakao;
     const mapElement = mapElementRef.current;
-    const maps = window.naver?.maps;
-    if (!mapElement || !maps || !canUseNaverMap) return;
+    if (!mapElement || !kakao?.maps?.Map || !canUseKakaoMap) return;
 
     const centerCoord = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
-    const center = new maps.LatLng(centerCoord.lat, centerCoord.lng);
-    const zoom = mapElement.clientHeight < 420 ? 14 : 15;
+    const center = new kakao.maps.LatLng(centerCoord.lat, centerCoord.lng);
+    const level = 4;
+
     if (!mapRef.current) {
-      mapRef.current = new maps.Map(mapElement, {
+      mapRef.current = new kakao.maps.Map(mapElement, {
         center,
-        zoom,
-        logoControl: false,
-        mapDataControl: false,
-        mapTypeControl: false,
-        scaleControl: false,
-        zoomControl: false,
+        level,
+      });
+
+      kakao.maps.event.addListener(mapRef.current, "click", () => {
+        onSelectFacility(null);
       });
     } else {
       mapRef.current.setCenter(center);
-      mapRef.current.setZoom(zoom);
+      mapRef.current.setLevel(level);
     }
-    const resizeObserver = new ResizeObserver(() => {
-      mapRef.current?.setZoom(mapElement.clientHeight < 420 ? 14 : 15);
-    });
-    resizeObserver.observe(mapElement);
-    return () => resizeObserver.disconnect();
-  }, [activeNeighborhood, canUseNaverMap]);
+  }, [activeNeighborhood, canUseKakaoMap]);
 
   useEffect(() => {
-    const maps = window.naver?.maps;
+    const kakao = (window as any).kakao;
     const map = mapRef.current;
-    if (!maps || !map || !canUseNaverMap) return;
+    if (!kakao?.maps || !map || !canUseKakaoMap) return;
 
-    markerRefs.current = facilities.map((facility) => {
+    overlayRefs.current.forEach((overlay) => overlay.setMap(null));
+    overlayRefs.current = [];
+
+    const newOverlays: any[] = [];
+    facilities.forEach((facility) => {
       const isSelected = facility.id === selectedFacility?.id;
-      const marker = new maps.Marker({
-          position: new maps.LatLng(facility.lat, facility.lng),
-          map,
-          title: facility.name,
-          zIndex: 90,
-          icon: {
-            content: createDreamFacilityMarkerContent(
-              facility,
-              isSelected,
-              onSelectFacility,
-            ),
-          },
-        });
-      return marker;
+      const content = createDreamFacilityMarkerContent(facility, isSelected, onSelectFacility);
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(facility.lat, facility.lng),
+        content,
+        yAnchor: 1.0,
+        zIndex: isSelected ? 100 : 50,
+      });
+      overlay.setMap(map);
+      newOverlays.push(overlay);
     });
+
+    overlayRefs.current = newOverlays;
+
     return () => {
-      markerRefs.current.forEach((marker) => marker.setMap(null));
-      markerRefs.current = [];
+      overlayRefs.current.forEach((overlay) => overlay.setMap(null));
+      overlayRefs.current = [];
     };
-  }, [facilities, selectedFacility, canUseNaverMap, onSelectFacility]);
+  }, [facilities, selectedFacility, canUseKakaoMap, onSelectFacility]);
 
   return (
     <div className={styles.dreamMapCanvas}>
-      <div className={styles.naverMapFrame}>
-        <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
+      <div className={styles.kakaoMapFrame}>
+        <div ref={mapElementRef} className={styles.kakaoMapLayer} aria-hidden={!canUseKakaoMap} />
       </div>
       {selectedFacility && (
         <DreamFacilityCallout
@@ -4789,7 +4786,7 @@ function DreamMapLayer({
           onClose={() => onSelectFacility(null)}
         />
       )}
-      {!canUseNaverMap && (
+      {!canUseKakaoMap && (
         <div className={styles.dreamMapUnavailable} role="status">
           <MapPinned size={28} />
           <span>{hasMapError ? "지도를 불러오지 못했어요" : "지도를 연결하고 있어요"}</span>
@@ -4801,13 +4798,13 @@ function DreamMapLayer({
         className={styles.dreamMapRecenter}
         aria-label="우리 동네 위치로"
         title="우리 동네 위치로"
-        disabled={!canUseNaverMap}
+        disabled={!canUseKakaoMap}
         onClick={() => {
-          const maps = window.naver?.maps;
+          const kakao = (window as any).kakao;
           const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
-          if (!maps || !mapRef.current) return;
-          mapRef.current.setCenter(new maps.LatLng(center.lat, center.lng));
-          mapRef.current.setZoom((mapElementRef.current?.clientHeight ?? 540) < 420 ? 14 : 15);
+          if (!kakao?.maps || !mapRef.current) return;
+          mapRef.current.setCenter(new kakao.maps.LatLng(center.lat, center.lng));
+          mapRef.current.setLevel(4);
         }}
       >
         <Crosshair size={22} />

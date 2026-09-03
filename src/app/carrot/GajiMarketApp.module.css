@@ -1537,7 +1537,7 @@
   position: absolute;
   z-index: 2;
   right: 17px;
-  top: 190px;
+  top: 118px;
   display: grid;
   gap: 12px;
 }
@@ -4818,8 +4818,8 @@
 
 @media (max-height: 600px) {
   .mapControls {
-    top: 146px;
-    grid-template-columns: repeat(3, 44px);
+    top: 104px;
+    grid-template-columns: 44px;
     gap: 8px;
   }
 
