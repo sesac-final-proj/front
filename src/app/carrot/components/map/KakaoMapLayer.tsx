@@ -1,6 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import {
+  getCongestionLevelLabel,
+  getSeedPastelTheme,
+  type CongestionZone,
+} from "@/services/congestionService";
 import type { Restaurant } from "@/services/restaurantService";
 import { getRestaurantsByBounds } from "@/services/restaurantService";
 import styles from "../../GajiMarketApp.module.css";
@@ -171,12 +176,116 @@ export function createRestaurantOverlayElement(
   return container;
 }
 
+// SEED Design System (seed-design.io) 기반 자연스럽게 녹아드는 파스텔 열지도 및 카토그래픽 텍스트 (박스 없는 자연스러운 지도 융합)
+export function createSeedPastelHeatmapElement(
+  zone: CongestionZone,
+  isDark: boolean,
+  onClick?: () => void,
+): HTMLDivElement {
+  const theme = getSeedPastelTheme(zone.currentScore);
+  const container = document.createElement("div");
+  container.style.position = "relative";
+  container.style.display = "flex";
+  container.style.alignItems = "center";
+  container.style.justifyContent = "center";
+  container.style.cursor = "pointer";
+  container.style.userSelect = "none";
+
+  // 사용자가 제공한 레퍼런스처럼 넓고 대기처럼 퍼지는 부드러운 히트맵 영역 (210px ~ 330px)
+  const diameter = Math.round(210 + (zone.currentScore / 100) * 120);
+  const radius = diameter / 2;
+  const gradId = `seed-heat-${zone.id.replace(/[^a-zA-Z0-9_-]/g, "")}-${isDark ? "dark" : "light"}`;
+
+  container.style.width = `${diameter}px`;
+  container.style.height = `${diameter}px`;
+
+  const heatmapInner = isDark ? theme.heatmapInnerDark : theme.heatmapInnerLight;
+  const heatmapMid = isDark ? theme.heatmapMidDark : theme.heatmapMidLight;
+  const heatmapOuter = isDark ? theme.heatmapOuterDark : theme.heatmapOuterLight;
+
+
+  container.innerHTML = `
+    <!-- 1. SEED Pastel Atmospheric Heatmap Cloud (지도에 넓고 자연스럽게 스며드는 파스텔 열지도 구름) -->
+    <svg width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}" style="
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      filter: blur(${isDark ? "14px" : "18px"});
+      mix-blend-mode: ${isDark ? "screen" : "multiply"};
+      opacity: ${isDark ? "0.88" : "0.78"};
+      transform-origin: center;
+      animation: seedHeatmapPulse 4s ease-in-out infinite alternate;
+    ">
+      <defs>
+        <radialGradient id="${gradId}" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${heatmapInner}" />
+          <stop offset="35%" stop-color="${heatmapMid}" />
+          <stop offset="70%" stop-color="${heatmapOuter}" />
+          <stop offset="100%" stop-color="transparent" />
+        </radialGradient>
+      </defs>
+      <circle cx="${radius}" cy="${radius}" r="${radius - 10}" fill="url(#${gradId})" />
+    </svg>
+
+    <!-- 2. 점과 글씨 테두리 없이 히트맵 안에 순수하게 녹아드는 타이포그래피 -->
+    <div style="
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      pointer-events: auto;
+      transform: translateY(0);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    ">
+      <!-- 구역 상호/명칭 (은은하고 약한 흰색 글씨 테두리 적용) -->
+      <span style="
+        font-family: 'Pretendard', sans-serif;
+        font-size: 14px;
+        font-weight: 850;
+        color: ${isDark ? "#FFFFFF" : "#111827"};
+        letter-spacing: -0.4px;
+        line-height: 1.2;
+        white-space: nowrap;
+        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
+      ">
+        ${zone.name}
+      </span>
+
+      <!-- 혼잡도 퍼센트 및 상태 텍스트 (은은하고 약한 흰색 글씨 테두리 적용) -->
+      <span style="
+        margin-top: 2px;
+        font-family: 'Pretendard', sans-serif;
+        font-size: 11.5px;
+        font-weight: 750;
+        color: ${isDark ? theme.badgeBorder : theme.badgeText};
+        letter-spacing: -0.2px;
+        white-space: nowrap;
+        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
+      ">
+        ${zone.currentScore}% · ${theme.label}
+      </span>
+    </div>
+  `;
+
+  if (onClick) {
+    container.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+  }
+
+  return container;
+}
+
 export interface KakaoMapLayerProps {
   activeNeighborhood: string;
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
   selectedCategory?: string;
   selectedRestaurantId?: string | null;
+  congestionZones?: CongestionZone[];
   theme: "dark" | "light";
   onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
   onRestaurantsLoaded: (restaurants: Restaurant[]) => void;
@@ -191,6 +300,7 @@ export function KakaoMapLayer({
   centerRequest,
   selectedCategory,
   selectedRestaurantId,
+  congestionZones = [],
   theme,
   onSelectRestaurants,
   onRestaurantsLoaded,
@@ -207,7 +317,9 @@ export function KakaoMapLayer({
   const canUseKakaoMap = Boolean(KAKAO_MAP_KEY && isKakaoMapReady);
 
   const isRestaurantMode = selectedCategory === "food";
+  const isCongestionMode = selectedCategory === "congestion";
   const restaurantOverlaysRef = useRef<any[]>([]);
+  const congestionOverlaysRef = useRef<any[]>([]);
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -526,6 +638,82 @@ export function KakaoMapLayer({
 
     restaurantOverlaysRef.current = newOverlays;
   }, [selectedRestaurantId, isRestaurantMode, canUseKakaoMap, isDark]);
+
+  // 6. Congestion Layer: 카카오 지도 위 SEED Design 파스텔 히트맵 오버레이
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isCongestionMode) {
+      congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      congestionOverlaysRef.current = [];
+      return;
+    }
+
+    congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    congestionOverlaysRef.current = [];
+
+    const newOverlays = congestionZones.map((zone) => {
+      const el = createSeedPastelHeatmapElement(zone, isDark, () => {
+        map.panTo(new kakao.maps.LatLng(zone.lat, zone.lng));
+      });
+
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(zone.lat, zone.lng),
+        content: el,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        zIndex: 120,
+      });
+      overlay.setMap(map);
+      return overlay;
+    });
+
+    congestionOverlaysRef.current = newOverlays;
+
+    // 만약 현재 지도 뷰포트 내에 혼잡도 구역이 하나도 보이지 않는다면 첫 번째 구역으로 부드럽게 이동
+    if (congestionZones.length > 0) {
+      try {
+        const bounds = map.getBounds();
+        if (bounds) {
+          const anyVisible = congestionZones.some((z) =>
+            bounds.contain(new kakao.maps.LatLng(z.lat, z.lng)),
+          );
+          if (!anyVisible) {
+            map.panTo(new kakao.maps.LatLng(congestionZones[0].lat, congestionZones[0].lng));
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    // 지도 이동 시 현재 화면 바운드 업데이트
+    const onCongestionIdle = () => {
+      try {
+        const bounds = map.getBounds();
+        if (bounds) {
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          onSearchBounds({
+            south: sw.getLat(),
+            north: ne.getLat(),
+            west: sw.getLng(),
+            east: ne.getLng(),
+          });
+        }
+      } catch {
+        // silent
+      }
+    };
+
+    kakao.maps.event.addListener(map, "idle", onCongestionIdle);
+
+    return () => {
+      kakao.maps.event.removeListener(map, "idle", onCongestionIdle);
+      congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      congestionOverlaysRef.current = [];
+    };
+  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark, onSearchBounds]);
 
   return (
     <>

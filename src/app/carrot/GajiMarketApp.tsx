@@ -73,6 +73,17 @@ import {
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+import {
+  getCongestionDelta,
+  getCongestionLevelLabel,
+  getCongestionZonesForNeighborhood,
+  getCongestionZonesForBounds,
+  getCongestionZonesNearCenter,
+  getSeedPastelTheme,
+  SEED_PASTEL_COLOR_BOARD,
+  summarizeCongestion,
+  type CongestionZone,
+} from "@/services/congestionService";
 import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
 import { AuthRequiredError, getProduct, listProducts, setFavorite } from "@/services/tradeService";
 import type { TradeProduct } from "@/types/trade";
@@ -99,7 +110,7 @@ import {
   createTogetherPost,
   toggleTogetherJoin,
 } from "@/services/togetherService";
-import { KakaoMapLayer } from "./components/map/KakaoMapLayer";
+import { KakaoMapLayer, KAKAO_MAP_KEY, loadKakaoMapScript } from "./components/map/KakaoMapLayer";
 import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
 import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
 
@@ -344,7 +355,6 @@ declare global {
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_KEY_ID = process.env.NEXT_PUBLIC_NAVER_MAP_NCP_KEY_ID ?? "";
-const KAKAO_MAP_SCRIPT_ID = "kakao-map-sdk";
 const KAKAO_MAP_JS_KEY = process.env.NEXT_PUBLIC_KAKAO_JS_KEY ?? "";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
@@ -421,52 +431,6 @@ function loadNaverMapScript(keyId: string) {
   });
 
   return naverMapScriptPromise;
-}
-
-let kakaoMapScriptPromise: Promise<void> | null = null;
-
-// autoload=false + kakao.maps.load(cb) — 카카오 권장 패턴. 스크립트 로드 완료 시점과
-// maps 네임스페이스 초기화 완료 시점이 달라서, autoload 기본값(true)에 기대면
-// 드물게 window.kakao.maps가 아직 비어있는 채로 쓰다가 에러난다.
-function loadKakaoMapScript(jsKey: string) {
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-  if (window.kakao?.maps?.Map) {
-    return Promise.resolve();
-  }
-  if (kakaoMapScriptPromise) {
-    return kakaoMapScriptPromise;
-  }
-
-  kakaoMapScriptPromise = new Promise<void>((resolve, reject) => {
-    const onScriptLoaded = () => {
-      if (!window.kakao?.maps) {
-        reject(new Error("Kakao map SDK missing after script load"));
-        return;
-      }
-      window.kakao.maps.load(() => resolve());
-    };
-
-    const existingScript = document.getElementById(KAKAO_MAP_SCRIPT_ID) as HTMLScriptElement | null;
-    if (existingScript) {
-      existingScript.addEventListener("load", onScriptLoaded, { once: true });
-      existingScript.addEventListener("error", () => reject(new Error("Kakao map script failed to load")), {
-        once: true,
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = KAKAO_MAP_SCRIPT_ID;
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(jsKey)}&autoload=false`;
-    script.async = true;
-    script.addEventListener("load", onScriptLoaded, { once: true });
-    script.addEventListener("error", () => reject(new Error("Kakao map script failed to load")), { once: true });
-    document.head.appendChild(script);
-  });
-
-  return kakaoMapScriptPromise;
 }
 
 function apiUrl(path: string) {
@@ -606,6 +570,17 @@ function matchesBusinessQuery(business: LocalBusiness, query: string) {
     business.neighborhoodName.includes(trimmedQuery) ||
     (business.districtName?.includes(trimmedQuery) ?? false) ||
     (business.riskType?.includes(trimmedQuery) ?? false)
+  );
+}
+
+function matchesCongestionQuery(zone: CongestionZone, query: string) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) return true;
+  return (
+    zone.name.includes(trimmedQuery) ||
+    zone.summary.includes(trimmedQuery) ||
+    zone.neighborhoodName.includes(trimmedQuery) ||
+    zone.districtName.includes(trimmedQuery)
   );
 }
 
@@ -884,6 +859,7 @@ const initialChats: ChatRoom[] = [
 
 const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "food", name: "음식점", icon: Utensils, tone: "orange" },
+  { id: "congestion", name: "혼잡도 분석", icon: Footprints, tone: "cyan" },
   { id: "cafe", name: "카페", icon: Coffee, tone: "yellow" },
   { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
@@ -2079,12 +2055,14 @@ export default function GajiMarketApp() {
           ) : activeTab === "map" ? (
             <MapScreen
               activeNeighborhood={activeNeighborhood}
+              secondaryNeighborhood={secondaryNeighborhood}
               categories={LOCAL_CATEGORIES}
               selectedCategory={mapCategory}
               sheetState={mapSheetState}
               query={mapQuery}
               businesses={businesses}
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
+              searchBounds={mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
               theme={theme}
@@ -3758,12 +3736,14 @@ function RealtimeDangerTicker({
 
 function MapScreen({
   activeNeighborhood,
+  secondaryNeighborhood,
   categories,
   selectedCategory,
   sheetState,
   query,
   businesses,
   hasSearchedArea,
+  searchBounds,
   onSearchBounds,
   locationAllowed,
   theme,
@@ -3774,12 +3754,14 @@ function MapScreen({
   onOpenProfile,
 }: {
   activeNeighborhood: string;
+  secondaryNeighborhood: string;
   categories: LocalCategory[];
   selectedCategory: string;
   sheetState: "collapsed" | "half" | "expanded";
   query: string;
   businesses: LocalBusiness[];
   hasSearchedArea: boolean;
+  searchBounds: MapSearchBounds | null;
   onSearchBounds: (bounds: MapSearchBounds) => void;
   locationAllowed: boolean;
   theme: ThemeMode;
@@ -3790,6 +3772,7 @@ function MapScreen({
   onOpenProfile: () => void;
 }) {
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
+  const isCongestionMode = selectedCategory === "congestion";
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [centerRequest, setCenterRequest] = useState(0);
@@ -3877,12 +3860,32 @@ function MapScreen({
     () => restaurantResults.map((restaurant, index) => restaurantToLocalBusiness(restaurant, activeNeighborhood, index)),
     [activeNeighborhood, restaurantResults],
   );
+  const congestionZones = useMemo(() => {
+    let list: CongestionZone[] = [];
+    if (searchBounds) {
+      list = getCongestionZonesForBounds(searchBounds);
+    }
+    if (list.length === 0) {
+      list = getCongestionZonesForNeighborhood(activeNeighborhood, secondaryNeighborhood);
+    }
+    if (list.length === 0) {
+      const centerCoord =
+        currentLocation ??
+        NEIGHBORHOOD_COORDS[activeNeighborhood] ??
+        NEIGHBORHOOD_COORDS["송파삼성래미안"] ??
+        { lat: 37.5133, lng: 127.1001 };
+      list = getCongestionZonesNearCenter(centerCoord.lat, centerCoord.lng);
+    }
+    return list.filter((zone) => matchesCongestionQuery(zone, query));
+  }, [activeNeighborhood, currentLocation, query, searchBounds, secondaryNeighborhood]);
   const displayedBusinesses = useMemo(
     () =>
       selectedCategory === "food"
         ? restaurantBusinesses.filter((business) => matchesBusinessQuery(business, query))
+        : isCongestionMode
+          ? []
         : businesses,
-    [businesses, query, restaurantBusinesses, selectedCategory],
+    [businesses, isCongestionMode, query, restaurantBusinesses, selectedCategory],
   );
 
   function changeCategory(id: string) {
@@ -3891,6 +3894,9 @@ function MapScreen({
     setSelectedRestaurantId(null);
     if (id !== "food") {
       setRestaurantResults([]);
+    }
+    if (id === "congestion" || id === "food") {
+      onSheetStateChange("half");
     }
     onCategoryChange(id);
   }
@@ -3957,6 +3963,7 @@ function MapScreen({
           centerRequest={centerRequest}
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
+          congestionZones={isCongestionMode ? congestionZones : []}
           theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
@@ -3978,7 +3985,7 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" && selectedCategory !== "food" ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode ? (
           <RealtimeDangerTicker
             dangerSignals={businesses.filter((b) => b.category === "danger")}
             onSelectDanger={selectDanger}
@@ -3997,9 +4004,11 @@ function MapScreen({
             <Crosshair size={25} />
           </button>
         </div>
-        <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
-          <currentCategory.icon size={26} />
-        </button>
+        {!isCongestionMode && selectedCategory !== "food" && (
+          <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
+            <currentCategory.icon size={26} />
+          </button>
+        )}
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
@@ -4061,85 +4070,254 @@ function MapScreen({
               <span />
               <span />
             </div>
-            <section className={styles.localResults}>
-              <h2 aria-live="polite">
-                {hasSearchedArea || selectedCategory === "food"
-                  ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
-                  : "이런 동네 가게 알고 있었나요?"}
-              </h2>
-              {displayedBusinesses.length === 0 ? (
-                <StateBlock
-                  title="검색 결과가 없어요"
-                  body="다른 카테고리나 검색어로 다시 찾아보세요."
-                  actionLabel="검색어 지우기"
-                  onAction={() => changeQuery("")}
-                />
-              ) : (
-                <div className={styles.businessGrid}>
-                  {displayedBusinesses.map((business) => {
-                    const dangerVisual = getDangerVisual(business);
-                    const isFood = business.category === "food";
-                    const isSelected = selectedRestaurantId === business.id;
-                    const thumbUrl = business.imageUrl || business.thumbnailUrl;
+            {isCongestionMode ? (
+              <CongestionAnalysisSection
+                zones={congestionZones}
+                hasSearchedArea={hasSearchedArea}
+                onClearQuery={() => changeQuery("")}
+              />
+            ) : (
+              <section className={styles.localResults}>
+                <h2 aria-live="polite">
+                  {hasSearchedArea || selectedCategory === "food"
+                    ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
+                    : "이런 동네 가게 알고 있었나요?"}
+                </h2>
+                {displayedBusinesses.length === 0 ? (
+                  <StateBlock
+                    title="검색 결과가 없어요"
+                    body="다른 카테고리나 검색어로 다시 찾아보세요."
+                    actionLabel="검색어 지우기"
+                    onAction={() => changeQuery("")}
+                  />
+                ) : (
+                  <div className={styles.businessGrid}>
+                    {displayedBusinesses.map((business) => {
+                      const dangerVisual = getDangerVisual(business);
+                      const isFood = business.category === "food";
+                      const isSelected = selectedRestaurantId === business.id;
+                      const thumbUrl = business.imageUrl || business.thumbnailUrl;
 
-                    return (
-                      <article
-                        key={business.id}
-                        className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
-                        onClick={() => handleCardClick(business)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <button
-                          type="button"
-                          aria-label={`${business.name} 관심`}
-                          onClick={(e) => e.stopPropagation()}
+                      return (
+                        <article
+                          key={business.id}
+                          className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
+                          onClick={() => handleCardClick(business)}
+                          style={{ cursor: "pointer" }}
                         >
-                          <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
-                        </button>
-                        <div
-                          className={`${styles.businessImage} ${
-                            dangerVisual
-                              ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
-                              : ""
-                          }`}
-                        >
-                          {dangerVisual ? (
-                            <>
-                              <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
-                              <span>{dangerVisual.label}</span>
-                            </>
-                          ) : thumbUrl ? (
-                            <img
-                              src={thumbUrl}
-                              alt={business.name}
-                              className={styles.businessThumbImg}
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            business.name.slice(0, 2)
-                          )}
-                        </div>
-                        <h3>{business.name}</h3>
-                        <p>{business.summary}</p>
-                        <small>
-                          {dangerVisual
-                            ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
-                            : isFood
-                              ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
-                              : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
-                        </small>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+                          <button
+                            type="button"
+                            aria-label={`${business.name} 관심`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
+                          </button>
+                          <div
+                            className={`${styles.businessImage} ${
+                              dangerVisual
+                                ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
+                                : ""
+                            }`}
+                          >
+                            {dangerVisual ? (
+                              <>
+                                <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
+                                <span>{dangerVisual.label}</span>
+                              </>
+                            ) : thumbUrl ? (
+                              <img
+                                src={thumbUrl}
+                                alt={business.name}
+                                className={styles.businessThumbImg}
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              business.name.slice(0, 2)
+                            )}
+                          </div>
+                          <h3>{business.name}</h3>
+                          <p>{business.summary}</p>
+                          <small>
+                            {dangerVisual
+                              ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
+                              : isFood
+                                ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
+                                : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
+                          </small>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
           </>
         )}
       </div>
+    </section>
+  );
+}
+
+function CongestionAnalysisSection({
+  zones,
+  hasSearchedArea,
+  onClearQuery,
+}: {
+  zones: CongestionZone[];
+  hasSearchedArea: boolean;
+  onClearQuery: () => void;
+}) {
+  const summary = summarizeCongestion(zones);
+  const peakZone = summary.peakZone;
+  const avgTheme = summary.averageTheme;
+
+  return (
+    <section className={`${styles.localResults} ${styles.congestionSection}`}>
+      <div className={styles.congestionHeader}>
+        <div>
+          <h2 aria-live="polite">{hasSearchedArea ? "현 지도 혼잡도 분석" : "동네 혼잡도 분석"}</h2>
+          <p>SEED 디자인 기반 %당 파스텔 히트맵으로 실시간 인파를 분석해요.</p>
+        </div>
+        <span className={styles.congestionLiveBadge} style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>
+          평균 {summary.averageScore}% · {avgTheme.label}
+        </span>
+      </div>
+
+      {/* SEED Design 파스텔 컬러보드 범례 (%당 색상표) */}
+      <div className={styles.seedColorBoardLegend}>
+        <div className={styles.seedColorBoardHeader}>
+          <span>🎨 SEED 파스텔 혼잡도 컬러보드</span>
+          <small>seed-design.io scale</small>
+        </div>
+        <div className={styles.seedColorBoardPills}>
+          {SEED_PASTEL_COLOR_BOARD.map((item) => (
+            <div
+              key={item.rangeLabel}
+              className={styles.seedColorBoardPill}
+              style={{
+                background: item.badgeBg,
+                borderColor: item.badgeBorder,
+                color: item.badgeText,
+              }}
+            >
+              <span className={styles.seedPillDot} style={{ background: item.tagColor }} />
+              <strong>{item.rangeLabel}</strong>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {zones.length === 0 ? (
+        <StateBlock
+          title="혼잡도 결과가 없어요"
+          body="다른 지역이나 검색어로 다시 확인해 보세요."
+          actionLabel="검색어 지우기"
+          onAction={onClearQuery}
+        />
+      ) : (
+        <>
+          <div className={styles.congestionSummaryGrid}>
+            <article className={styles.congestionSummaryCard} style={{ background: avgTheme.cardBg, borderColor: avgTheme.badgeBorder }}>
+              <span>현재 동네 평균</span>
+              <strong style={{ color: avgTheme.badgeText }}>{summary.averageScore}<small>%</small></strong>
+              <em style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>{avgTheme.label}</em>
+            </article>
+            <article className={styles.congestionSummaryCard}>
+              <span>가장 붐비는 장소</span>
+              <strong>{peakZone?.name ?? "확인 중"}</strong>
+              <em style={{ background: "#FFF1F2", color: "#E11D48", borderColor: "#FECDD3" }}>{summary.crowdedCount}곳 주의</em>
+            </article>
+          </div>
+
+          <div className={styles.congestionZoneList}>
+            {zones.map((zone) => {
+              const delta = getCongestionDelta(zone);
+              const theme = getSeedPastelTheme(zone.currentScore);
+              return (
+                <article
+                  key={zone.id}
+                  className={styles.congestionZoneCard}
+                  style={{
+                    borderLeft: `4px solid ${theme.tagColor}`,
+                    background: "var(--color-bg-elevated)",
+                  }}
+                >
+                  <div className={styles.congestionZoneTop}>
+                    <div>
+                      <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
+                      <span className={styles.congestionZoneSummary}>{zone.summary}</span>
+                    </div>
+                    <span
+                      className={styles.seedZoneBadge}
+                      style={{
+                        background: theme.badgeBg,
+                        color: theme.badgeText,
+                        borderColor: theme.badgeBorder,
+                      }}
+                    >
+                      <span className={styles.seedPillDot} style={{ background: theme.tagColor }} />
+                      {zone.currentScore}% · {theme.label}
+                    </span>
+                  </div>
+
+                  {/* SEED Pastel Meter Track */}
+                  <div className={styles.congestionMeter} role="progressbar" aria-label={`${zone.name} 혼잡도 ${zone.currentScore}%`} aria-valuenow={zone.currentScore} aria-valuemin={0} aria-valuemax={100}>
+                    <span style={{ width: `${zone.currentScore}%`, background: theme.meterGradient }} />
+                  </div>
+
+                  {/* 24시간 시간대별 트렌드 미니 차트 (있는 경우) */}
+                  {zone.hourlyTrends && zone.hourlyTrends.length > 0 && (
+                    <div className={styles.seedHourlyChart}>
+                      <span className={styles.seedHourlyLabel}>시간대별 혼잡 추이</span>
+                      <div className={styles.seedHourlyBars}>
+                        {zone.hourlyTrends.map((val, idx) => {
+                          const barTheme = getSeedPastelTheme(val);
+                          const isCurrent = idx === 6; // current hour representation
+                          return (
+                            <div key={idx} className={styles.seedHourlyBarItem} title={`${idx + 12}시: ${val}% (${barTheme.label})`}>
+                              <div className={styles.seedHourlyBarTrack}>
+                                <div
+                                  className={styles.seedHourlyBarFill}
+                                  style={{
+                                    height: `${val}%`,
+                                    background: barTheme.tagColor,
+                                    opacity: isCurrent ? 1 : 0.6,
+                                  }}
+                                />
+                              </div>
+                              <span className={styles.seedHourlyBarTime} style={{ fontWeight: isCurrent ? 800 : 500 }}>
+                                {idx + 12}시
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 추천 방문 팁 */}
+                  {zone.recommendation && (
+                    <div className={styles.seedRecommendationBox} style={{ background: theme.badgeBg, borderColor: theme.badgeBorder }}>
+                      <span style={{ color: theme.badgeText }}>💡 {zone.recommendation}</span>
+                    </div>
+                  )}
+
+                  <footer className={styles.congestionZoneFooter}>
+                    <span>{zone.distance} · {zone.updatedAt}</span>
+                    <span style={{ color: delta > 0 ? "#E11D48" : "#027A48", fontWeight: 700 }}>
+                      {delta >= 0 ? `평소보다 +${delta}% 혼잡` : `평소보다 ${Math.abs(delta)}% 여유`}
+                    </span>
+                  </footer>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -5133,22 +5311,22 @@ function DreamMapLayer({
   onSelectFacility: (facility: DonationFacility | null) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<NaverMapInstance | null>(null);
-  const markerRefs = useRef<NaverMarkerInstance[]>([]);
-  const [isNaverMapReady, setIsNaverMapReady] = useState(false);
-  const [hasMapError, setHasMapError] = useState(!NAVER_MAP_KEY_ID);
-  const canUseNaverMap = Boolean(NAVER_MAP_KEY_ID && isNaverMapReady);
+  const mapRef = useRef<any>(null);
+  const overlayRefs = useRef<any[]>([]);
+  const [isKakaoMapReady, setIsKakaoMapReady] = useState(false);
+  const [hasMapError, setHasMapError] = useState(false);
+  const canUseKakaoMap = Boolean(KAKAO_MAP_KEY && isKakaoMapReady);
 
   useEffect(() => {
-    if (!NAVER_MAP_KEY_ID) return;
+    if (!KAKAO_MAP_KEY) return;
     let isMounted = true;
-    loadNaverMapScript(NAVER_MAP_KEY_ID)
+    loadKakaoMapScript(KAKAO_MAP_KEY)
       .then(() => {
-        if (isMounted) setIsNaverMapReady(Boolean(window.naver?.maps));
+        if (isMounted) setIsKakaoMapReady(Boolean((window as any).kakao?.maps?.Map));
       })
       .catch(() => {
         if (isMounted) {
-          setIsNaverMapReady(false);
+          setIsKakaoMapReady(false);
           setHasMapError(true);
         }
       });
@@ -5159,66 +5337,63 @@ function DreamMapLayer({
   }, []);
 
   useEffect(() => {
+    const kakao = (window as any).kakao;
     const mapElement = mapElementRef.current;
-    const maps = window.naver?.maps;
-    if (!mapElement || !maps || !canUseNaverMap) return;
+    if (!mapElement || !kakao?.maps?.Map || !canUseKakaoMap) return;
 
     const centerCoord = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
-    const center = new maps.LatLng(centerCoord.lat, centerCoord.lng);
-    const zoom = mapElement.clientHeight < 420 ? 14 : 15;
+    const center = new kakao.maps.LatLng(centerCoord.lat, centerCoord.lng);
+    const level = 4;
+
     if (!mapRef.current) {
-      mapRef.current = new maps.Map(mapElement, {
+      mapRef.current = new kakao.maps.Map(mapElement, {
         center,
-        zoom,
-        logoControl: false,
-        mapDataControl: false,
-        mapTypeControl: false,
-        scaleControl: false,
-        zoomControl: false,
+        level,
+      });
+
+      kakao.maps.event.addListener(mapRef.current, "click", () => {
+        onSelectFacility(null);
       });
     } else {
       mapRef.current.setCenter(center);
-      mapRef.current.setZoom(zoom);
+      mapRef.current.setLevel(level);
     }
-    const resizeObserver = new ResizeObserver(() => {
-      mapRef.current?.setZoom(mapElement.clientHeight < 420 ? 14 : 15);
-    });
-    resizeObserver.observe(mapElement);
-    return () => resizeObserver.disconnect();
-  }, [activeNeighborhood, canUseNaverMap]);
+  }, [activeNeighborhood, canUseKakaoMap]);
 
   useEffect(() => {
-    const maps = window.naver?.maps;
+    const kakao = (window as any).kakao;
     const map = mapRef.current;
-    if (!maps || !map || !canUseNaverMap) return;
+    if (!kakao?.maps || !map || !canUseKakaoMap) return;
 
-    markerRefs.current = facilities.map((facility) => {
+    overlayRefs.current.forEach((overlay) => overlay.setMap(null));
+    overlayRefs.current = [];
+
+    const newOverlays: any[] = [];
+    facilities.forEach((facility) => {
       const isSelected = facility.id === selectedFacility?.id;
-      const marker = new maps.Marker({
-          position: new maps.LatLng(facility.lat, facility.lng),
-          map,
-          title: facility.name,
-          zIndex: 90,
-          icon: {
-            content: createDreamFacilityMarkerContent(
-              facility,
-              isSelected,
-              onSelectFacility,
-            ),
-          },
-        });
-      return marker;
+      const content = createDreamFacilityMarkerContent(facility, isSelected, onSelectFacility);
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(facility.lat, facility.lng),
+        content,
+        yAnchor: 1.0,
+        zIndex: isSelected ? 100 : 50,
+      });
+      overlay.setMap(map);
+      newOverlays.push(overlay);
     });
+
+    overlayRefs.current = newOverlays;
+
     return () => {
-      markerRefs.current.forEach((marker) => marker.setMap(null));
-      markerRefs.current = [];
+      overlayRefs.current.forEach((overlay) => overlay.setMap(null));
+      overlayRefs.current = [];
     };
-  }, [facilities, selectedFacility, canUseNaverMap, onSelectFacility]);
+  }, [facilities, selectedFacility, canUseKakaoMap, onSelectFacility]);
 
   return (
     <div className={styles.dreamMapCanvas}>
-      <div className={styles.naverMapFrame}>
-        <div ref={mapElementRef} className={styles.naverMapLayer} aria-hidden={!canUseNaverMap} />
+      <div className={styles.kakaoMapFrame}>
+        <div ref={mapElementRef} className={styles.kakaoMapLayer} aria-hidden={!canUseKakaoMap} />
       </div>
       {selectedFacility && (
         <DreamFacilityCallout
@@ -5226,7 +5401,7 @@ function DreamMapLayer({
           onClose={() => onSelectFacility(null)}
         />
       )}
-      {!canUseNaverMap && (
+      {!canUseKakaoMap && (
         <div className={styles.dreamMapUnavailable} role="status">
           <MapPinned size={28} />
           <span>{hasMapError ? "지도를 불러오지 못했어요" : "지도를 연결하고 있어요"}</span>
@@ -5238,13 +5413,13 @@ function DreamMapLayer({
         className={styles.dreamMapRecenter}
         aria-label="우리 동네 위치로"
         title="우리 동네 위치로"
-        disabled={!canUseNaverMap}
+        disabled={!canUseKakaoMap}
         onClick={() => {
-          const maps = window.naver?.maps;
+          const kakao = (window as any).kakao;
           const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? NEIGHBORHOOD_COORDS.송파삼성래미안;
-          if (!maps || !mapRef.current) return;
-          mapRef.current.setCenter(new maps.LatLng(center.lat, center.lng));
-          mapRef.current.setZoom((mapElementRef.current?.clientHeight ?? 540) < 420 ? 14 : 15);
+          if (!kakao?.maps || !mapRef.current) return;
+          mapRef.current.setCenter(new kakao.maps.LatLng(center.lat, center.lng));
+          mapRef.current.setLevel(4);
         }}
       >
         <Crosshair size={22} />
