@@ -77,6 +77,8 @@ import {
   getCongestionDelta,
   getCongestionLevelLabel,
   getCongestionZonesForNeighborhood,
+  getCongestionZonesForBounds,
+  getCongestionZonesNearCenter,
   getSeedPastelTheme,
   SEED_PASTEL_COLOR_BOARD,
   summarizeCongestion,
@@ -3479,19 +3481,24 @@ function MapScreen({
     () => restaurantResults.map((restaurant, index) => restaurantToLocalBusiness(restaurant, activeNeighborhood, index)),
     [activeNeighborhood, restaurantResults],
   );
-  const congestionZones = useMemo(
-    () =>
-      getCongestionZonesForNeighborhood(activeNeighborhood, secondaryNeighborhood)
-        .filter((zone) =>
-          !searchBounds ||
-          (zone.lat >= searchBounds.south &&
-            zone.lat <= searchBounds.north &&
-            zone.lng >= searchBounds.west &&
-            zone.lng <= searchBounds.east),
-        )
-        .filter((zone) => matchesCongestionQuery(zone, query)),
-    [activeNeighborhood, query, searchBounds, secondaryNeighborhood],
-  );
+  const congestionZones = useMemo(() => {
+    let list: CongestionZone[] = [];
+    if (searchBounds) {
+      list = getCongestionZonesForBounds(searchBounds);
+    }
+    if (list.length === 0) {
+      list = getCongestionZonesForNeighborhood(activeNeighborhood, secondaryNeighborhood);
+    }
+    if (list.length === 0) {
+      const centerCoord =
+        currentLocation ??
+        NEIGHBORHOOD_COORDS[activeNeighborhood] ??
+        NEIGHBORHOOD_COORDS["송파삼성래미안"] ??
+        { lat: 37.5133, lng: 127.1001 };
+      list = getCongestionZonesNearCenter(centerCoord.lat, centerCoord.lng);
+    }
+    return list.filter((zone) => matchesCongestionQuery(zone, query));
+  }, [activeNeighborhood, currentLocation, query, searchBounds, secondaryNeighborhood]);
   const displayedBusinesses = useMemo(
     () =>
       selectedCategory === "food"
@@ -3508,6 +3515,9 @@ function MapScreen({
     setSelectedRestaurantId(null);
     if (id !== "food") {
       setRestaurantResults([]);
+    }
+    if (id === "congestion" || id === "food") {
+      onSheetStateChange("half");
     }
     onCategoryChange(id);
   }
@@ -3615,9 +3625,11 @@ function MapScreen({
             <Crosshair size={25} />
           </button>
         </div>
-        <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
-          <currentCategory.icon size={26} />
-        </button>
+        {!isCongestionMode && selectedCategory !== "food" && (
+          <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
+            <currentCategory.icon size={26} />
+          </button>
+        )}
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}

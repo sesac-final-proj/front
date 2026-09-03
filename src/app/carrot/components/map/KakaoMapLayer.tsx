@@ -176,7 +176,7 @@ export function createRestaurantOverlayElement(
   return container;
 }
 
-// SEED Design System (seed-design.io) 기반 %당 파스텔 히트맵 오버레이 엘리먼트
+// SEED Design System (seed-design.io) 기반 자연스럽게 녹아드는 파스텔 열지도 및 카토그래픽 텍스트 (박스 없는 자연스러운 지도 융합)
 export function createSeedPastelHeatmapElement(
   zone: CongestionZone,
   isDark: boolean,
@@ -191,76 +191,78 @@ export function createSeedPastelHeatmapElement(
   container.style.cursor = "pointer";
   container.style.userSelect = "none";
 
-  // 혼잡도 점수에 비례한 부드러운 히트맵 반경 계산 (160px ~ 240px)
-  const diameter = Math.round(160 + (zone.currentScore / 100) * 80);
+  // 사용자가 제공한 레퍼런스처럼 넓고 대기처럼 퍼지는 부드러운 히트맵 영역 (210px ~ 330px)
+  const diameter = Math.round(210 + (zone.currentScore / 100) * 120);
   const radius = diameter / 2;
-  const gradId = `seed-heat-${zone.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const gradId = `seed-heat-${zone.id.replace(/[^a-zA-Z0-9_-]/g, "")}-${isDark ? "dark" : "light"}`;
 
   container.style.width = `${diameter}px`;
   container.style.height = `${diameter}px`;
 
+  const heatmapInner = isDark ? theme.heatmapInnerDark : theme.heatmapInnerLight;
+  const heatmapMid = isDark ? theme.heatmapMidDark : theme.heatmapMidLight;
+  const heatmapOuter = isDark ? theme.heatmapOuterDark : theme.heatmapOuterLight;
+
+
   container.innerHTML = `
-    <!-- 1. SEED Pastel Multi-layer Radial Heatmap Disk (부드러운 파스텔 방사형 열지도) -->
+    <!-- 1. SEED Pastel Atmospheric Heatmap Cloud (지도에 넓고 자연스럽게 스며드는 파스텔 열지도 구름) -->
     <svg width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}" style="
       position: absolute;
       inset: 0;
       pointer-events: none;
-      filter: blur(8px);
+      filter: blur(${isDark ? "14px" : "18px"});
+      mix-blend-mode: ${isDark ? "screen" : "multiply"};
+      opacity: ${isDark ? "0.88" : "0.78"};
       transform-origin: center;
-      animation: seedHeatmapPulse 3.2s ease-in-out infinite alternate;
+      animation: seedHeatmapPulse 4s ease-in-out infinite alternate;
     ">
       <defs>
         <radialGradient id="${gradId}" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="${theme.heatmapInner}" />
-          <stop offset="40%" stop-color="${theme.heatmapMid}" />
-          <stop offset="80%" stop-color="${theme.heatmapOuter}" />
+          <stop offset="0%" stop-color="${heatmapInner}" />
+          <stop offset="35%" stop-color="${heatmapMid}" />
+          <stop offset="70%" stop-color="${heatmapOuter}" />
           <stop offset="100%" stop-color="transparent" />
         </radialGradient>
       </defs>
-      <circle cx="${radius}" cy="${radius}" r="${radius - 6}" fill="url(#${gradId})" />
+      <circle cx="${radius}" cy="${radius}" r="${radius - 10}" fill="url(#${gradId})" />
     </svg>
 
-    <!-- 2. SEED Design 파스텔 중앙 플로팅 뱃지 마커 -->
+    <!-- 2. 점과 글씨 테두리 없이 히트맵 안에 순수하게 녹아드는 타이포그래피 -->
     <div style="
       position: relative;
       z-index: 10;
-      display: inline-flex;
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 999px;
-      background: ${isDark ? "#1C2027" : "#FFFFFF"};
-      border: 1.5px solid ${theme.badgeBorder};
-      box-shadow: 0 4px 16px rgba(0, 0, 0, ${isDark ? "0.45" : "0.12"}), ${theme.glowShadow};
+      text-align: center;
+      pointer-events: auto;
       transform: translateY(0);
-      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     ">
+      <!-- 구역 상호/명칭 (은은하고 약한 흰색 글씨 테두리 적용) -->
       <span style="
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: ${theme.tagColor};
-        box-shadow: 0 0 6px ${theme.tagColor};
-        flex-shrink: 0;
-      "></span>
-      <span style="
-        font-size: 12px;
-        font-weight: 750;
-        color: ${isDark ? "#FFFFFF" : "#191F28"};
+        font-family: 'Pretendard', sans-serif;
+        font-size: 14px;
+        font-weight: 850;
+        color: ${isDark ? "#FFFFFF" : "#111827"};
+        letter-spacing: -0.4px;
+        line-height: 1.2;
         white-space: nowrap;
-        letter-spacing: -0.3px;
+        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
       ">
         ${zone.name}
       </span>
+
+      <!-- 혼잡도 퍼센트 및 상태 텍스트 (은은하고 약한 흰색 글씨 테두리 적용) -->
       <span style="
+        margin-top: 2px;
+        font-family: 'Pretendard', sans-serif;
         font-size: 11.5px;
-        font-weight: 850;
-        color: ${theme.badgeText};
-        background: ${theme.badgeBg};
-        padding: 1.5px 7px;
-        border-radius: 999px;
-        border: 1px solid ${theme.badgeBorder};
+        font-weight: 750;
+        color: ${isDark ? theme.badgeBorder : theme.badgeText};
+        letter-spacing: -0.2px;
         white-space: nowrap;
+        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
       ">
         ${zone.currentScore}% · ${theme.label}
       </span>
@@ -668,11 +670,50 @@ export function KakaoMapLayer({
 
     congestionOverlaysRef.current = newOverlays;
 
+    // 만약 현재 지도 뷰포트 내에 혼잡도 구역이 하나도 보이지 않는다면 첫 번째 구역으로 부드럽게 이동
+    if (congestionZones.length > 0) {
+      try {
+        const bounds = map.getBounds();
+        if (bounds) {
+          const anyVisible = congestionZones.some((z) =>
+            bounds.contain(new kakao.maps.LatLng(z.lat, z.lng)),
+          );
+          if (!anyVisible) {
+            map.panTo(new kakao.maps.LatLng(congestionZones[0].lat, congestionZones[0].lng));
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    // 지도 이동 시 현재 화면 바운드 업데이트
+    const onCongestionIdle = () => {
+      try {
+        const bounds = map.getBounds();
+        if (bounds) {
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          onSearchBounds({
+            south: sw.getLat(),
+            north: ne.getLat(),
+            west: sw.getLng(),
+            east: ne.getLng(),
+          });
+        }
+      } catch {
+        // silent
+      }
+    };
+
+    kakao.maps.event.addListener(map, "idle", onCongestionIdle);
+
     return () => {
+      kakao.maps.event.removeListener(map, "idle", onCongestionIdle);
       congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
       congestionOverlaysRef.current = [];
     };
-  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark]);
+  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark, onSearchBounds]);
 
   return (
     <>

@@ -26,6 +26,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        {/* Pretendard 한국어 폰트 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css"
+        />
+        {/* Iconify Solar 아이콘 */}
+        <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js" async />
+      </head>
       <body>
         {children}
         <RegisterSW />
