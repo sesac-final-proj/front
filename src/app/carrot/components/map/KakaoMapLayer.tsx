@@ -215,11 +215,14 @@ export function KakaoMapLayer({
 
   // Stable callback refs
   const onSelectRestaurantsRef = useRef(onSelectRestaurants);
-  onSelectRestaurantsRef.current = onSelectRestaurants;
   const onRestaurantsLoadedRef = useRef(onRestaurantsLoaded);
-  onRestaurantsLoadedRef.current = onRestaurantsLoaded;
   const onClearRestaurantsRef = useRef(onClearRestaurants);
-  onClearRestaurantsRef.current = onClearRestaurants;
+
+  useEffect(() => {
+    onSelectRestaurantsRef.current = onSelectRestaurants;
+    onRestaurantsLoadedRef.current = onRestaurantsLoaded;
+    onClearRestaurantsRef.current = onClearRestaurants;
+  }, [onSelectRestaurants, onRestaurantsLoaded, onClearRestaurants]);
 
   const isDark = theme === "dark";
 

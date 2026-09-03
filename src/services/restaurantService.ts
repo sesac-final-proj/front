@@ -74,6 +74,22 @@ export const CATEGORY_FOOD_IMAGES: Record<string, string> = {
   기타: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300&q=80",
 };
 
+const KAKAO_PLACE_URL_RE = /^https?:\/\/(?:place\.map|map)\.kakao\.com\//i;
+
+export function getKakaoPlaceUrl(restaurant: Pick<Restaurant, "id" | "name" | "placeUrl">): string {
+  const placeUrl = restaurant.placeUrl?.trim();
+  if (placeUrl && KAKAO_PLACE_URL_RE.test(placeUrl)) {
+    return placeUrl;
+  }
+
+  const kakaoPlaceId = restaurant.id.startsWith("kakao-") ? restaurant.id.slice("kakao-".length) : restaurant.id;
+  if (/^\d+$/.test(kakaoPlaceId)) {
+    return `https://place.map.kakao.com/${kakaoPlaceId}`;
+  }
+
+  return `https://map.kakao.com/link/search/${encodeURIComponent(restaurant.name)}`;
+}
+
 export function getCategoryFallbackImage(category?: string): string {
   if (!category) return CATEGORY_FOOD_IMAGES.기타;
   for (const [key, url] of Object.entries(CATEGORY_FOOD_IMAGES)) {
@@ -103,7 +119,7 @@ export function getFallbackRestaurants({
       results.push({
         id: `sample-rest-${index}`,
         ...item,
-        placeUrl: `https://map.naver.com/v5/search/${encodeURIComponent(item.name)}`,
+        placeUrl: getKakaoPlaceUrl({ id: `sample-rest-${index}`, name: item.name }),
         imageUrl: fallbackImg,
         thumbnailUrl: fallbackImg,
       });
@@ -133,15 +149,16 @@ export function getFallbackRestaurants({
       const name = `${names[i % names.length]} ${i + 1}호점`;
       const category = categories[i % categories.length];
       const fallbackImg = getCategoryFallbackImage(category);
+      const id = `dynamic-rest-${i}-${Math.round(lat * 10000)}`;
       results.push({
-        id: `dynamic-rest-${i}-${Math.round(lat * 10000)}`,
+        id,
         name,
         category,
         roadAddress: `서울 주변 골목길 ${i + 12}번길`,
         lat,
         lng,
         naverUrl: `https://map.naver.com/v5/search/${encodeURIComponent(name)}`,
-        placeUrl: `https://map.naver.com/v5/search/${encodeURIComponent(name)}`,
+        placeUrl: getKakaoPlaceUrl({ id, name }),
         imageUrl: fallbackImg,
         thumbnailUrl: fallbackImg,
         rating: 4.2 + ((i % 8) * 0.1),

@@ -2001,6 +2001,64 @@
   border-radius: 2px;
 }
 
+.restaurantDetailContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.restaurantDetailContentTitle {
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 850;
+  color: var(--color-text);
+}
+
+.restaurantDetailContentText {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.restaurantDetailMetaList {
+  display: grid;
+  gap: 7px;
+}
+
+.restaurantDetailMetaItem {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.restaurantDetailMetaLabel {
+  flex: 0 0 34px;
+  color: var(--color-dim);
+  font-weight: 750;
+}
+
+.restaurantDetailKakaoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  border-radius: 8px;
+  background: #ff6f0f;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(255, 111, 15, 0.24);
+}
+
 .localSheet {
   position: absolute;
   z-index: 5;

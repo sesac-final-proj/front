@@ -73,7 +73,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
-import { getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
 import {
   getRentTransactions,
   groupBuildingsByDong,
@@ -514,7 +514,7 @@ function restaurantToLocalBusiness(
     summary: address,
     lat: restaurant.lat,
     lng: restaurant.lng,
-    sourceUrl: restaurant.placeUrl || restaurant.naverUrl,
+    sourceUrl: getKakaoPlaceUrl(restaurant),
     source: restaurant.source,
     imageUrl: restaurant.imageUrl || restaurant.thumbnailUrl,
     thumbnailUrl: restaurant.thumbnailUrl || restaurant.imageUrl,
@@ -3789,11 +3789,14 @@ function NaverMapLayer({
 
   // Stable callback refs to decouple from effect cleanup/re-renders
   const onSelectRestaurantsRef = useRef(onSelectRestaurants);
-  onSelectRestaurantsRef.current = onSelectRestaurants;
   const onRestaurantsLoadedRef = useRef(onRestaurantsLoaded);
-  onRestaurantsLoadedRef.current = onRestaurantsLoaded;
   const onClearRestaurantsRef = useRef(onClearRestaurants);
-  onClearRestaurantsRef.current = onClearRestaurants;
+
+  useEffect(() => {
+    onSelectRestaurantsRef.current = onSelectRestaurants;
+    onRestaurantsLoadedRef.current = onRestaurantsLoaded;
+    onClearRestaurantsRef.current = onClearRestaurants;
+  }, [onSelectRestaurants, onRestaurantsLoaded, onClearRestaurants]);
 
   const RESTAURANT_MIN_ZOOM = 13;
 
@@ -4110,7 +4113,7 @@ function RestaurantPreviewBar({
       </button>
       {restaurants.map((restaurant) => {
         const isSelected = restaurant.id === selectedRestaurantId;
-        const detailUrl = restaurant.placeUrl || restaurant.naverUrl || `https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`;
+        const detailUrl = getKakaoPlaceUrl(restaurant);
         const thumb = restaurant.imageUrl || restaurant.thumbnailUrl;
 
         return (
