@@ -1768,6 +1768,20 @@
   background: #eef1f4;
 }
 
+/* 꿈가지(나눔 시설): 다크/블랙모드에서도 항상 카카오 일반(밝은 기본) 지도로 유지 */
+.dreamMapCanvas .kakaoMapLayer,
+.dreamMapCanvas .kakaoMapStandardLayer {
+  background: #eef1f4 !important;
+}
+
+.stage:not([data-theme="light"]) .dreamMapCanvas img,
+.stage[data-theme="light"] .dreamMapCanvas img,
+.dreamMapCanvas img[src*="daumcdn"],
+.dreamMapCanvas img[src*="kakaocdn"],
+.dreamMapCanvas img[src*="kakao"] {
+  filter: none !important;
+}
+
 /* Restaurant Detail Sheet (사진 3번) */
 .restaurantDetailSheet {
   display: flex;

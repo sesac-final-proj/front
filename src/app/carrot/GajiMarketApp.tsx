@@ -73,6 +73,13 @@ import {
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+import {
+  getCongestionDelta,
+  getCongestionLevelLabel,
+  getCongestionZonesForNeighborhood,
+  summarizeCongestion,
+  type CongestionZone,
+} from "@/services/congestionService";
 import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
 import {
   getRentTransactions,
@@ -533,6 +540,17 @@ function matchesBusinessQuery(business: LocalBusiness, query: string) {
   );
 }
 
+function matchesCongestionQuery(zone: CongestionZone, query: string) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) return true;
+  return (
+    zone.name.includes(trimmedQuery) ||
+    zone.summary.includes(trimmedQuery) ||
+    zone.neighborhoodName.includes(trimmedQuery) ||
+    zone.districtName.includes(trimmedQuery)
+  );
+}
+
 const initialProducts: ProductListItem[] = [
   {
     id: "p1",
@@ -762,6 +780,7 @@ const initialChats: ChatRoom[] = [
 
 const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "food", name: "음식점", icon: Utensils, tone: "orange" },
+  { id: "congestion", name: "혼잡도 분석", icon: Footprints, tone: "cyan" },
   { id: "cafe", name: "카페", icon: Coffee, tone: "yellow" },
   { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
@@ -1792,12 +1811,14 @@ export default function GajiMarketApp() {
           ) : activeTab === "map" ? (
             <MapScreen
               activeNeighborhood={activeNeighborhood}
+              secondaryNeighborhood={secondaryNeighborhood}
               categories={LOCAL_CATEGORIES}
               selectedCategory={mapCategory}
               sheetState={mapSheetState}
               query={mapQuery}
               businesses={businesses}
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
+              searchBounds={mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
               theme={theme}
@@ -3332,12 +3353,14 @@ function RealtimeDangerTicker({
 
 function MapScreen({
   activeNeighborhood,
+  secondaryNeighborhood,
   categories,
   selectedCategory,
   sheetState,
   query,
   businesses,
   hasSearchedArea,
+  searchBounds,
   onSearchBounds,
   locationAllowed,
   theme,
@@ -3348,12 +3371,14 @@ function MapScreen({
   onOpenProfile,
 }: {
   activeNeighborhood: string;
+  secondaryNeighborhood: string;
   categories: LocalCategory[];
   selectedCategory: string;
   sheetState: "collapsed" | "half" | "expanded";
   query: string;
   businesses: LocalBusiness[];
   hasSearchedArea: boolean;
+  searchBounds: MapSearchBounds | null;
   onSearchBounds: (bounds: MapSearchBounds) => void;
   locationAllowed: boolean;
   theme: ThemeMode;
@@ -3364,6 +3389,7 @@ function MapScreen({
   onOpenProfile: () => void;
 }) {
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
+  const isCongestionMode = selectedCategory === "congestion";
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [centerRequest, setCenterRequest] = useState(0);
@@ -3451,12 +3477,27 @@ function MapScreen({
     () => restaurantResults.map((restaurant, index) => restaurantToLocalBusiness(restaurant, activeNeighborhood, index)),
     [activeNeighborhood, restaurantResults],
   );
+  const congestionZones = useMemo(
+    () =>
+      getCongestionZonesForNeighborhood(activeNeighborhood, secondaryNeighborhood)
+        .filter((zone) =>
+          !searchBounds ||
+          (zone.lat >= searchBounds.south &&
+            zone.lat <= searchBounds.north &&
+            zone.lng >= searchBounds.west &&
+            zone.lng <= searchBounds.east),
+        )
+        .filter((zone) => matchesCongestionQuery(zone, query)),
+    [activeNeighborhood, query, searchBounds, secondaryNeighborhood],
+  );
   const displayedBusinesses = useMemo(
     () =>
       selectedCategory === "food"
         ? restaurantBusinesses.filter((business) => matchesBusinessQuery(business, query))
+        : isCongestionMode
+          ? []
         : businesses,
-    [businesses, query, restaurantBusinesses, selectedCategory],
+    [businesses, isCongestionMode, query, restaurantBusinesses, selectedCategory],
   );
 
   function changeCategory(id: string) {
@@ -3531,6 +3572,7 @@ function MapScreen({
           centerRequest={centerRequest}
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
+          congestionZones={isCongestionMode ? congestionZones : []}
           theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
@@ -3552,7 +3594,7 @@ function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" && selectedCategory !== "food" ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode ? (
           <RealtimeDangerTicker
             dangerSignals={businesses.filter((b) => b.category === "danger")}
             onSelectDanger={selectDanger}
@@ -3624,85 +3666,165 @@ function MapScreen({
               <span />
               <span />
             </div>
-            <section className={styles.localResults}>
-              <h2 aria-live="polite">
-                {hasSearchedArea || selectedCategory === "food"
-                  ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
-                  : "이런 동네 가게 알고 있었나요?"}
-              </h2>
-              {displayedBusinesses.length === 0 ? (
-                <StateBlock
-                  title="검색 결과가 없어요"
-                  body="다른 카테고리나 검색어로 다시 찾아보세요."
-                  actionLabel="검색어 지우기"
-                  onAction={() => changeQuery("")}
-                />
-              ) : (
-                <div className={styles.businessGrid}>
-                  {displayedBusinesses.map((business) => {
-                    const dangerVisual = getDangerVisual(business);
-                    const isFood = business.category === "food";
-                    const isSelected = selectedRestaurantId === business.id;
-                    const thumbUrl = business.imageUrl || business.thumbnailUrl;
+            {isCongestionMode ? (
+              <CongestionAnalysisSection
+                zones={congestionZones}
+                hasSearchedArea={hasSearchedArea}
+                onClearQuery={() => changeQuery("")}
+              />
+            ) : (
+              <section className={styles.localResults}>
+                <h2 aria-live="polite">
+                  {hasSearchedArea || selectedCategory === "food"
+                    ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
+                    : "이런 동네 가게 알고 있었나요?"}
+                </h2>
+                {displayedBusinesses.length === 0 ? (
+                  <StateBlock
+                    title="검색 결과가 없어요"
+                    body="다른 카테고리나 검색어로 다시 찾아보세요."
+                    actionLabel="검색어 지우기"
+                    onAction={() => changeQuery("")}
+                  />
+                ) : (
+                  <div className={styles.businessGrid}>
+                    {displayedBusinesses.map((business) => {
+                      const dangerVisual = getDangerVisual(business);
+                      const isFood = business.category === "food";
+                      const isSelected = selectedRestaurantId === business.id;
+                      const thumbUrl = business.imageUrl || business.thumbnailUrl;
 
-                    return (
-                      <article
-                        key={business.id}
-                        className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
-                        onClick={() => handleCardClick(business)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <button
-                          type="button"
-                          aria-label={`${business.name} 관심`}
-                          onClick={(e) => e.stopPropagation()}
+                      return (
+                        <article
+                          key={business.id}
+                          className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
+                          onClick={() => handleCardClick(business)}
+                          style={{ cursor: "pointer" }}
                         >
-                          <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
-                        </button>
-                        <div
-                          className={`${styles.businessImage} ${
-                            dangerVisual
-                              ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
-                              : ""
-                          }`}
-                        >
-                          {dangerVisual ? (
-                            <>
-                              <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
-                              <span>{dangerVisual.label}</span>
-                            </>
-                          ) : thumbUrl ? (
-                            <img
-                              src={thumbUrl}
-                              alt={business.name}
-                              className={styles.businessThumbImg}
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            business.name.slice(0, 2)
-                          )}
-                        </div>
-                        <h3>{business.name}</h3>
-                        <p>{business.summary}</p>
-                        <small>
-                          {dangerVisual
-                            ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
-                            : isFood
-                              ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
-                              : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
-                        </small>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+                          <button
+                            type="button"
+                            aria-label={`${business.name} 관심`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
+                          </button>
+                          <div
+                            className={`${styles.businessImage} ${
+                              dangerVisual
+                                ? `${styles.dangerBusinessImage} ${styles[`dangerThumb_${dangerVisual.tone}` as keyof typeof styles] ?? ""}`
+                                : ""
+                            }`}
+                          >
+                            {dangerVisual ? (
+                              <>
+                                <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
+                                <span>{dangerVisual.label}</span>
+                              </>
+                            ) : thumbUrl ? (
+                              <img
+                                src={thumbUrl}
+                                alt={business.name}
+                                className={styles.businessThumbImg}
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              business.name.slice(0, 2)
+                            )}
+                          </div>
+                          <h3>{business.name}</h3>
+                          <p>{business.summary}</p>
+                          <small>
+                            {dangerVisual
+                              ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
+                              : isFood
+                                ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
+                                : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
+                          </small>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
           </>
         )}
       </div>
+    </section>
+  );
+}
+
+function CongestionAnalysisSection({
+  zones,
+  hasSearchedArea,
+  onClearQuery,
+}: {
+  zones: CongestionZone[];
+  hasSearchedArea: boolean;
+  onClearQuery: () => void;
+}) {
+  const summary = summarizeCongestion(zones);
+  const peakZone = summary.peakZone;
+
+  return (
+    <section className={`${styles.localResults} ${styles.congestionSection}`}>
+      <div className={styles.congestionHeader}>
+        <div>
+          <h2 aria-live="polite">{hasSearchedArea ? "현 지도 혼잡도 분석" : "동네 혼잡도 분석"}</h2>
+          <p>가게 방문 전 붐비는 구간을 먼저 확인해요.</p>
+        </div>
+        <span className={styles.congestionLiveBadge}>지도 연동</span>
+      </div>
+      {zones.length === 0 ? (
+        <StateBlock
+          title="혼잡도 결과가 없어요"
+          body="다른 지역이나 검색어로 다시 확인해 보세요."
+          actionLabel="검색어 지우기"
+          onAction={onClearQuery}
+        />
+      ) : (
+        <>
+          <div className={styles.congestionSummaryGrid}>
+            <article className={styles.congestionSummaryCard}>
+              <span>현재 평균</span>
+              <strong>{summary.averageScore}<small>%</small></strong>
+              <em>{getCongestionLevelLabel(summary.averageLevel)}</em>
+            </article>
+            <article className={styles.congestionSummaryCard}>
+              <span>붐비는 장소</span>
+              <strong>{peakZone?.name ?? "확인 중"}</strong>
+              <em>{summary.crowdedCount}곳 주의</em>
+            </article>
+          </div>
+          <div className={styles.congestionZoneList}>
+            {zones.map((zone) => {
+              const delta = getCongestionDelta(zone);
+              const toneClass = styles[`congestionCard_${zone.level}` as keyof typeof styles] ?? "";
+              return (
+                <article key={zone.id} className={`${styles.congestionZoneCard} ${toneClass}`}>
+                  <div className={styles.congestionZoneTop}>
+                    <div>
+                      <strong>{zone.name}</strong>
+                      <span>{zone.summary}</span>
+                    </div>
+                    <em>{getCongestionLevelLabel(zone.level)}</em>
+                  </div>
+                  <div className={styles.congestionMeter} role="progressbar" aria-label={`${zone.name} 혼잡도`} aria-valuenow={zone.currentScore} aria-valuemin={0} aria-valuemax={100}>
+                    <span style={{ width: `${zone.currentScore}%` }} />
+                  </div>
+                  <footer className={styles.congestionZoneFooter}>
+                    <span>{zone.distance} · {zone.updatedAt}</span>
+                    <span>{delta >= 0 ? `평소보다 +${delta}%` : `평소보다 ${delta}%`}</span>
+                  </footer>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }

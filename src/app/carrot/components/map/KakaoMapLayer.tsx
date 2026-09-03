@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { getCongestionLevelLabel, type CongestionZone } from "@/services/congestionService";
 import type { Restaurant } from "@/services/restaurantService";
 import { getRestaurantsByBounds } from "@/services/restaurantService";
 import styles from "../../GajiMarketApp.module.css";
@@ -171,12 +172,33 @@ export function createRestaurantOverlayElement(
   return container;
 }
 
+function createCongestionOverlayElement(zone: CongestionZone): HTMLDivElement {
+  const toneClass = styles[`congestionMapMarker_${zone.level}` as keyof typeof styles] ?? "";
+  const container = document.createElement("div");
+  container.className = `${styles.congestionMapMarker} ${toneClass}`;
+  container.setAttribute("role", "img");
+  container.setAttribute("aria-label", `${zone.name} 혼잡도 ${zone.currentScore}%, ${getCongestionLevelLabel(zone.level)}`);
+
+  const score = document.createElement("strong");
+  score.textContent = `${zone.currentScore}%`;
+
+  const label = document.createElement("span");
+  label.textContent = zone.name;
+
+  const level = document.createElement("em");
+  level.textContent = getCongestionLevelLabel(zone.level);
+
+  container.append(score, label, level);
+  return container;
+}
+
 export interface KakaoMapLayerProps {
   activeNeighborhood: string;
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
   selectedCategory?: string;
   selectedRestaurantId?: string | null;
+  congestionZones?: CongestionZone[];
   theme: "dark" | "light";
   onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
   onRestaurantsLoaded: (restaurants: Restaurant[]) => void;
@@ -191,6 +213,7 @@ export function KakaoMapLayer({
   centerRequest,
   selectedCategory,
   selectedRestaurantId,
+  congestionZones = [],
   theme,
   onSelectRestaurants,
   onRestaurantsLoaded,
@@ -207,7 +230,9 @@ export function KakaoMapLayer({
   const canUseKakaoMap = Boolean(KAKAO_MAP_KEY && isKakaoMapReady);
 
   const isRestaurantMode = selectedCategory === "food";
+  const isCongestionMode = selectedCategory === "congestion";
   const restaurantOverlaysRef = useRef<any[]>([]);
+  const congestionOverlaysRef = useRef<any[]>([]);
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -526,6 +551,38 @@ export function KakaoMapLayer({
 
     restaurantOverlaysRef.current = newOverlays;
   }, [selectedRestaurantId, isRestaurantMode, canUseKakaoMap, isDark]);
+
+  // 6. Congestion Layer: 카카오 지도 위 혼잡도 분석 오버레이
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isCongestionMode) {
+      congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      congestionOverlaysRef.current = [];
+      return;
+    }
+
+    congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    congestionOverlaysRef.current = [];
+
+    const newOverlays = congestionZones.map((zone) => {
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(zone.lat, zone.lng),
+        content: createCongestionOverlayElement(zone),
+        yAnchor: 1,
+        zIndex: 120,
+      });
+      overlay.setMap(map);
+      return overlay;
+    });
+
+    congestionOverlaysRef.current = newOverlays;
+
+    return () => {
+      congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      congestionOverlaysRef.current = [];
+    };
+  }, [canUseKakaoMap, congestionZones, isCongestionMode]);
 
   return (
     <>
