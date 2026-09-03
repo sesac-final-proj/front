@@ -29,6 +29,7 @@ import {
   Dumbbell,
   Eye,
   Gem,
+  Gamepad2,
   GraduationCap,
   Headphones,
   Heart,
@@ -72,7 +73,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
-import { getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
 import {
   getRentTransactions,
   groupBuildingsByDong,
@@ -96,6 +97,9 @@ import {
   createTogetherPost,
   toggleTogetherJoin,
 } from "@/services/togetherService";
+import { KakaoMapLayer } from "./components/map/KakaoMapLayer";
+import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
+import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
 
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
@@ -142,6 +146,7 @@ type SubPage =
   | { type: "chat-room"; id: string }
   | { type: "my-menu" }
   | { type: "all-services" }
+  | { type: "merge-game" }
   | { type: "real-estate" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
@@ -224,6 +229,8 @@ type LocalBusiness = {
   observedAt?: string | null;
   sourceUrl?: string | null;
   source?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
 };
 
 type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
@@ -507,8 +514,10 @@ function restaurantToLocalBusiness(
     summary: address,
     lat: restaurant.lat,
     lng: restaurant.lng,
-    sourceUrl: restaurant.placeUrl || restaurant.naverUrl,
+    sourceUrl: getKakaoPlaceUrl(restaurant),
     source: restaurant.source,
+    imageUrl: restaurant.imageUrl || restaurant.thumbnailUrl,
+    thumbnailUrl: restaurant.thumbnailUrl || restaurant.imageUrl,
   };
 }
 
@@ -752,17 +761,17 @@ const initialChats: ChatRoom[] = [
 ];
 
 const LOCAL_CATEGORIES: LocalCategory[] = [
-  { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
-  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
-  { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
-  { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
   { id: "food", name: "음식점", icon: Utensils, tone: "orange" },
-  { id: "delivery", name: "용달", icon: Truck, tone: "blue" },
-  { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
   { id: "cafe", name: "카페", icon: Coffee, tone: "yellow" },
+  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
+  { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
+  { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
+  { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
+  { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
   { id: "class", name: "클래스", icon: CakeSlice, tone: "amber" },
   { id: "academy", name: "학원", icon: GraduationCap, tone: "sky" },
   { id: "clean", name: "청소", icon: SprayCan, tone: "green" },
+  { id: "delivery", name: "용달", icon: Truck, tone: "blue" },
 ];
 
 const LOCAL_BUSINESSES: LocalBusiness[] = [
@@ -1174,7 +1183,7 @@ export default function GajiMarketApp() {
   const [communityTab, setCommunityTab] = useState("동네생활");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
-  const [mapCategory, setMapCategory] = useState<string>("danger");
+  const [mapCategory, setMapCategory] = useState<string>("food");
   const [mapSheetState, setMapSheetState] = useState<"collapsed" | "half" | "expanded">("half");
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchArea, setMapSearchArea] = useState<{ neighborhood: string; bounds: MapSearchBounds } | null>(null);
@@ -1565,7 +1574,7 @@ export default function GajiMarketApp() {
     <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -1636,7 +1645,10 @@ export default function GajiMarketApp() {
               onOpenAlba={() => setSubPage({ type: "alba" })}
               onOpenRealEstate={openRealEstate}
               onOpenApartment={openApartmentFlow}
+              onOpenGame={() => setSubPage({ type: "merge-game" })}
             />
+          ) : subPage?.type === "merge-game" ? (
+            <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
               onBack={goBack}
@@ -1788,6 +1800,7 @@ export default function GajiMarketApp() {
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
+              theme={theme}
               onCategoryChange={setMapCategory}
               onSheetStateChange={setMapSheetState}
               onQueryChange={setMapQuery}
@@ -3327,6 +3340,7 @@ function MapScreen({
   hasSearchedArea,
   onSearchBounds,
   locationAllowed,
+  theme,
   onCategoryChange,
   onSheetStateChange,
   onQueryChange,
@@ -3342,6 +3356,7 @@ function MapScreen({
   hasSearchedArea: boolean;
   onSearchBounds: (bounds: MapSearchBounds) => void;
   locationAllowed: boolean;
+  theme: ThemeMode;
   onCategoryChange: (id: string) => void;
   onSheetStateChange: (state: "collapsed" | "half" | "expanded") => void;
   onQueryChange: (value: string) => void;
@@ -3391,6 +3406,45 @@ function MapScreen({
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [restaurantResults, setRestaurantResults] = useState<Restaurant[]>([]);
 
+  const handleSelectRestaurants = useCallback((list: Restaurant[], singleId: string | null) => {
+    setSelectedRestaurants(list);
+    setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
+    onSheetStateChange("half");
+  }, [onSheetStateChange]);
+
+  const handleClearRestaurants = useCallback(() => {
+    setSelectedRestaurants([]);
+    setSelectedRestaurantId(null);
+  }, []);
+
+  const selectedRestaurant = useMemo(
+    () => restaurantResults.find((r) => r.id === selectedRestaurantId) ?? selectedRestaurants[0] ?? null,
+    [restaurantResults, selectedRestaurantId, selectedRestaurants],
+  );
+
+  const selectDanger = useCallback((business: LocalBusiness) => {
+    if (business.category !== "danger") return;
+    setSelectedDanger(business);
+    if (selectedCategory !== "danger") {
+      onCategoryChange("danger");
+    }
+  }, [selectedCategory, onCategoryChange]);
+
+  const handleCardClick = useCallback((business: LocalBusiness) => {
+    if (business.category === "food") {
+      const matched = restaurantResults.find((r) => r.id === business.id);
+      if (matched) {
+        setSelectedRestaurants([matched]);
+        setSelectedRestaurantId(matched.id);
+        setCurrentLocation({ lat: matched.lat, lng: matched.lng });
+        setCenterRequest((v) => v + 1);
+        onSheetStateChange("half");
+      }
+    } else if (business.category === "danger") {
+      selectDanger(business);
+    }
+  }, [restaurantResults, onSheetStateChange, selectDanger]);
+
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
   const visibleSelectedDanger = selectedDanger;
   const restaurantBusinesses = useMemo(
@@ -3404,14 +3458,6 @@ function MapScreen({
         : businesses,
     [businesses, query, restaurantBusinesses, selectedCategory],
   );
-
-  const selectDanger = useCallback((business: LocalBusiness) => {
-    if (business.category !== "danger") return;
-    setSelectedDanger(business);
-    if (selectedCategory !== "danger") {
-      onCategoryChange("danger");
-    }
-  }, [selectedCategory, onCategoryChange]);
 
   function changeCategory(id: string) {
     setSelectedDanger(null);
@@ -3479,27 +3525,21 @@ function MapScreen({
   return (
     <section className={styles.mapScreen}>
       <div className={styles.mapCanvas}>
-        <NaverMapLayer
+        <KakaoMapLayer
           activeNeighborhood={activeNeighborhood}
-          businesses={businesses}
           currentLocation={currentLocation}
           centerRequest={centerRequest}
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
-          onSelectBusiness={selectDanger}
-          onSelectRestaurants={(list, singleId) => {
-            setSelectedRestaurants(list);
-            setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
-          }}
+          theme={theme}
+          onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
-          onClearRestaurants={() => {
-            setSelectedRestaurants([]);
-            setSelectedRestaurantId(null);
-          }}
+          onClearRestaurants={handleClearRestaurants}
           onSearchBounds={(bounds) => {
             onSearchBounds(bounds);
             onSheetStateChange("collapsed");
           }}
+          coordsMap={NEIGHBORHOOD_COORDS}
         />
         <div className={styles.mapSearch}>
           <Search size={27} />
@@ -3537,17 +3577,6 @@ function MapScreen({
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
-        {selectedCategory === "food" && selectedRestaurants.length > 0 && (
-          <RestaurantPreviewBar
-            restaurants={selectedRestaurants}
-            selectedRestaurantId={selectedRestaurantId}
-            onSelectRestaurant={(restaurant) => setSelectedRestaurantId(restaurant.id)}
-            onClose={() => {
-              setSelectedRestaurants([]);
-              setSelectedRestaurantId(null);
-            }}
-          />
-        )}
       </div>
 
       <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
@@ -3564,6 +3593,12 @@ function MapScreen({
             body="현재 위치 권한을 허용하면 지도 업체와 동네 글을 더 정확하게 보여드려요."
             actionLabel="권한 허용"
             onAction={requestCurrentLocation}
+          />
+        ) : selectedCategory === "food" && selectedRestaurant ? (
+          <RestaurantDetailSheet
+            restaurant={selectedRestaurant}
+            theme={theme}
+            onClose={handleClearRestaurants}
           />
         ) : (
           <>
@@ -3606,9 +3641,22 @@ function MapScreen({
                 <div className={styles.businessGrid}>
                   {displayedBusinesses.map((business) => {
                     const dangerVisual = getDangerVisual(business);
+                    const isFood = business.category === "food";
+                    const isSelected = selectedRestaurantId === business.id;
+                    const thumbUrl = business.imageUrl || business.thumbnailUrl;
+
                     return (
-                      <article key={business.id} className={styles.businessCard}>
-                        <button type="button" aria-label={`${business.name} 관심`}>
+                      <article
+                        key={business.id}
+                        className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
+                        onClick={() => handleCardClick(business)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <button
+                          type="button"
+                          aria-label={`${business.name} 관심`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
                         </button>
                         <div
@@ -3623,6 +3671,16 @@ function MapScreen({
                               <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
                               <span>{dangerVisual.label}</span>
                             </>
+                          ) : thumbUrl ? (
+                            <img
+                              src={thumbUrl}
+                              alt={business.name}
+                              className={styles.businessThumbImg}
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
+                            />
                           ) : (
                             business.name.slice(0, 2)
                           )}
@@ -3632,7 +3690,7 @@ function MapScreen({
                         <small>
                           {dangerVisual
                             ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
-                            : business.category === "food"
+                            : isFood
                               ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
                               : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
                         </small>
@@ -3650,24 +3708,37 @@ function MapScreen({
 }
 
 function createRestaurantMarkerIcon(isSelected: boolean) {
-  const size = isSelected ? 16 : 10;
-  const borderWidth = isSelected ? 3 : 2;
+  const size = isSelected ? 32 : 26;
+  const bgColor = isSelected ? "#e05800" : "#ff6f0f";
+  const scale = isSelected ? "scale(1.15)" : "scale(1)";
   const shadow = isSelected
-    ? "0 2px 10px rgba(255, 111, 15, 0.65), 0 0 0 2px rgba(255, 255, 255, 0.5)"
-    : "0 1px 4px rgba(0, 0, 0, 0.25)";
+    ? "0 4px 14px rgba(255, 111, 15, 0.7), 0 0 0 3px rgba(255, 255, 255, 0.9)"
+    : "0 2px 8px rgba(0, 0, 0, 0.32)";
 
   return {
     content: `
       <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
         width: ${size}px;
         height: ${size}px;
         border-radius: 50%;
-        background: #ff6f0f;
-        border: ${borderWidth}px solid #FFFFFF;
+        background: ${bgColor};
+        border: 2px solid #FFFFFF;
         box-shadow: ${shadow};
         cursor: pointer;
-        transition: transform 0.15s ease;
-      "></div>
+        transform: ${scale};
+        transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        user-select: none;
+      ">
+        <svg width="${isSelected ? 18 : 14}" height="${isSelected ? 18 : 14}" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2" />
+          <path d="M15 11v11" />
+          <path d="M5 2v4a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3V2" />
+          <path d="M8 9v13" />
+        </svg>
+      </div>
     `,
     anchor: (window as any).naver?.maps?.Point
       ? new (window as any).naver.maps.Point(size / 2, size / 2)
@@ -3715,6 +3786,17 @@ function NaverMapLayer({
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Stable callback refs to decouple from effect cleanup/re-renders
+  const onSelectRestaurantsRef = useRef(onSelectRestaurants);
+  const onRestaurantsLoadedRef = useRef(onRestaurantsLoaded);
+  const onClearRestaurantsRef = useRef(onClearRestaurants);
+
+  useEffect(() => {
+    onSelectRestaurantsRef.current = onSelectRestaurants;
+    onRestaurantsLoadedRef.current = onRestaurantsLoaded;
+    onClearRestaurantsRef.current = onClearRestaurants;
+  }, [onSelectRestaurants, onRestaurantsLoaded, onClearRestaurants]);
 
   const RESTAURANT_MIN_ZOOM = 13;
 
@@ -3820,16 +3902,17 @@ function NaverMapLayer({
 
     // 지도 빈 공간 클릭 시 음식점 선택 해제
     const mapClickListener = maps.Event?.addListener(map, "click", () => {
-      onClearRestaurants();
+      onClearRestaurantsRef.current();
     });
 
     const fetchRestaurantsForCurrentBounds = () => {
       const zoom = map.getZoom();
       if (zoom < RESTAURANT_MIN_ZOOM) {
         setIsZoomTooLow(true);
-        onRestaurantsLoaded([]);
+        onRestaurantsLoadedRef.current([]);
         if (restaurantClusterRef.current) {
           restaurantClusterRef.current.clear();
+          restaurantClusterRef.current = null;
         }
         restaurantMarkersRef.current.forEach((m) => m.setMap(null));
         restaurantMarkersRef.current = [];
@@ -3848,10 +3931,11 @@ function NaverMapLayer({
       const neLat = ne.lat();
       const neLng = ne.lng();
 
-      // Bounds가 거의 변하지 않았으면 스킵
+      // Bounds가 거의 변하지 않았고 이미 마커가 있으면 스킵
       const prev = previousBoundsRef.current;
       if (
         prev &&
+        restaurantMarkersRef.current.length > 0 &&
         Math.abs(prev.swLat - swLat) < 0.0001 &&
         Math.abs(prev.swLng - swLng) < 0.0001 &&
         Math.abs(prev.neLat - neLat) < 0.0001 &&
@@ -3865,7 +3949,7 @@ function NaverMapLayer({
 
       getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 300 }).then((restaurants) => {
         if (requestId !== restaurantRequestIdRef.current) return;
-        onRestaurantsLoaded(restaurants);
+        onRestaurantsLoadedRef.current(restaurants);
 
         // 기존 마커 및 클러스터 정리
         if (restaurantClusterRef.current) {
@@ -3892,7 +3976,7 @@ function NaverMapLayer({
             if (e?.domEvent) {
               e.domEvent.stopPropagation();
             }
-            onSelectRestaurants([restaurant], restaurant.id);
+            onSelectRestaurantsRef.current([restaurant], restaurant.id);
           });
 
           restaurantMarkerMapRef.current.set(marker, restaurant);
@@ -3914,7 +3998,7 @@ function NaverMapLayer({
               .map((m) => restaurantMarkerMapRef.current.get(m))
               .filter(Boolean) as Restaurant[];
             if (list.length > 0) {
-              onSelectRestaurants(list, null);
+              onSelectRestaurantsRef.current(list, null);
             }
           },
         });
@@ -3951,8 +4035,9 @@ function NaverMapLayer({
       restaurantMarkersRef.current.forEach((m) => m.setMap(null));
       restaurantMarkersRef.current = [];
       restaurantMarkerMapRef.current.clear();
+      previousBoundsRef.current = null;
     };
-  }, [isRestaurantMode, canUseNaverMap, onSelectRestaurants, onRestaurantsLoaded, onClearRestaurants]);
+  }, [isRestaurantMode, canUseNaverMap]);
 
   // 선택된 마커 시각적 강조 변경 (selectedRestaurantId 변경 시)
   useEffect(() => {
@@ -4018,9 +4103,18 @@ function RestaurantPreviewBar({
 }) {
   return (
     <div className={styles.restaurantPreviewBar} role="region" aria-label="음식점 목록">
+      <button
+        type="button"
+        className={styles.restaurantPreviewCloseBtn}
+        onClick={onClose}
+        aria-label="닫기"
+      >
+        ✕
+      </button>
       {restaurants.map((restaurant) => {
         const isSelected = restaurant.id === selectedRestaurantId;
-        const detailUrl = restaurant.placeUrl || restaurant.naverUrl || `https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`;
+        const detailUrl = getKakaoPlaceUrl(restaurant);
+        const thumb = restaurant.imageUrl || restaurant.thumbnailUrl;
 
         return (
           <article
@@ -4029,7 +4123,24 @@ function RestaurantPreviewBar({
             onClick={() => onSelectRestaurant(restaurant)}
           >
             <div className={styles.restaurantCardHeader}>
-              <div>
+              {thumb ? (
+                <div className={styles.restaurantCardThumb}>
+                  <img
+                    src={thumb}
+                    alt={restaurant.name}
+                    className={styles.restaurantCardImg}
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className={styles.restaurantCardThumbFallback}>
+                  🍴
+                </div>
+              )}
+              <div className={styles.restaurantCardInfo}>
                 <h4 className={styles.restaurantCardTitle}>{restaurant.name}</h4>
                 <span className={styles.restaurantCardCategory}>{restaurant.category || "음식점"}</span>
               </div>
@@ -5681,11 +5792,13 @@ function AllServicesScreen({
   onOpenAlba,
   onOpenRealEstate,
   onOpenApartment,
+  onOpenGame,
 }: {
   onBack: () => void;
   onOpenAlba?: () => void;
   onOpenRealEstate?: () => void;
   onOpenApartment?: () => void;
+  onOpenGame?: () => void;
 }) {
   const serviceCategories = [
     {
@@ -5744,7 +5857,7 @@ function AllServicesScreen({
         { label: "선물가게", icon: CakeSlice, color: "#ff922b" },
         { label: "동네걷기", icon: Dumbbell, color: "#ff922b" },
         { label: "당근이네", icon: Sparkles, color: "#20b77a" },
-        { label: "게임", icon: Headphones, color: "#ff922b" },
+        { label: "게임", icon: Gamepad2, color: "#ff922b", onClick: onOpenGame },
         { label: "당근메이드", icon: House, color: "#ff922b" },
       ],
     },
