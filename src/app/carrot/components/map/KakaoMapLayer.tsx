@@ -277,7 +277,7 @@ export function KakaoMapLayer({
       });
       mapRef.current = map;
 
-      // 카카오 맵 MarkerClusterer 클러스터러 초기화
+      // 카카오 맵 MarkerClusterer 클러스터러 초기화 (일반 살구색 마커 대비 선명하고 진한 고채도 오렌지 적용)
       if (kakao.maps.MarkerClusterer) {
         clustererRef.current = new kakao.maps.MarkerClusterer({
           map: map,
@@ -286,31 +286,45 @@ export function KakaoMapLayer({
           disableClickZoom: false,
           styles: [
             {
-              width: "38px",
-              height: "38px",
-              background: "#FF6F0F",
+              width: "36px",
+              height: "36px",
+              background: "#FF4500",
               borderRadius: "50%",
               color: "#FFFFFF",
               textAlign: "center",
-              fontWeight: "800",
+              fontWeight: "900",
               fontSize: "14px",
-              lineHeight: "38px",
-              boxShadow: "0 3px 10px rgba(0, 0, 0, 0.35)",
+              lineHeight: "32px",
+              boxShadow: "0 4px 12px rgba(255, 69, 0, 0.45)",
               border: "2px solid #FFFFFF",
               cursor: "pointer",
             },
             {
-              width: "46px",
-              height: "46px",
-              background: "#E85B00",
+              width: "42px",
+              height: "42px",
+              background: "#E63900",
               borderRadius: "50%",
               color: "#FFFFFF",
               textAlign: "center",
-              fontWeight: "800",
+              fontWeight: "900",
               fontSize: "15px",
-              lineHeight: "46px",
-              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)",
-              border: "2px solid #FFFFFF",
+              lineHeight: "37px",
+              boxShadow: "0 5px 15px rgba(230, 57, 0, 0.55)",
+              border: "2.5px solid #FFFFFF",
+              cursor: "pointer",
+            },
+            {
+              width: "48px",
+              height: "48px",
+              background: "#C92A00",
+              borderRadius: "50%",
+              color: "#FFFFFF",
+              textAlign: "center",
+              fontWeight: "900",
+              fontSize: "16px",
+              lineHeight: "43px",
+              boxShadow: "0 6px 18px rgba(201, 42, 0, 0.65)",
+              border: "2.5px solid #FFFFFF",
               cursor: "pointer",
             },
           ],
