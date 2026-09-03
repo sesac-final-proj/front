@@ -32,6 +32,8 @@ export async function GET(request: Request) {
   const swLng = parseFloat(searchParams.get("swLng") ?? "0");
   const neLat = parseFloat(searchParams.get("neLat") ?? "0");
   const neLng = parseFloat(searchParams.get("neLng") ?? "0");
+  const requestedLimit = parseInt(searchParams.get("limit") ?? "45", 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 45) : 45;
 
   if (!swLat || !swLng || !neLat || !neLng) {
     return NextResponse.json({ error: "Missing coordinates bounds" }, { status: 400 });
@@ -51,8 +53,9 @@ export async function GET(request: Request) {
       const rect = `${minLng},${minLat},${maxLng},${maxLat}`;
       const allPlaces: KakaoPlaceDocument[] = [];
 
-      // 최대 3페이지(페이지당 15개, 최대 45개) 순차/병렬 조회
-      for (let page = 1; page <= 3; page++) {
+      // 최대 3페이지(페이지당 15개, 최대 45개) 조회
+      const maxPages = Math.min(3, Math.ceil(limit / 15));
+      for (let page = 1; page <= maxPages; page++) {
         const params = new URLSearchParams({
           category_group_code: "FD6", // 음식점 카테고리
           rect,
@@ -84,7 +87,7 @@ export async function GET(request: Request) {
       }
 
       if (allPlaces.length > 0) {
-        const normalizedRestaurants = allPlaces.map((place) => {
+        const normalizedRestaurants = allPlaces.slice(0, limit).map((place) => {
           // "음식점 > 한식 > 육류,고기" -> "한식" 또는 서브 카테고리 추출
           const categoryParts = place.category_name.split(" > ");
           const simplifiedCategory = categoryParts.length > 1 ? categoryParts.slice(1).join(" · ") : place.category_name;
@@ -100,6 +103,7 @@ export async function GET(request: Request) {
             lng: parseFloat(place.x),
             placeUrl: place.place_url,
             naverUrl: `https://map.naver.com/v5/search/${encodeURIComponent(place.place_name)}`,
+            source: "kakao_local_api",
           };
         });
 
@@ -115,7 +119,7 @@ export async function GET(request: Request) {
   }
 
   // 2. 키가 아직 없거나 API 실패 시: 부드러운 테스트 및 시연을 위한 Fallback 데이터 반환
-  const fallbackList = getFallbackRestaurants({ minLat, maxLat, minLng, maxLng });
+  const fallbackList = getFallbackRestaurants({ minLat, maxLat, minLng, maxLng, limit });
 
   return NextResponse.json({
     source: kakaoApiKey ? "fallback_after_error" : "fallback_no_api_key",
