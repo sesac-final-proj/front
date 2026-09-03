@@ -434,6 +434,14 @@
   border-bottom: 1px solid var(--color-line);
 }
 
+.loadMoreSentinel {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
 .productTapArea {
   width: 100%;
   min-height: 146px;
@@ -579,7 +587,9 @@
 .statusBadge,
 .soldBadge,
 .directBadge,
-.categoryBadge {
+.categoryBadge,
+.saleBadge,
+.freeBadge {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
@@ -597,6 +607,16 @@
 .soldBadge {
   background: #3a3b40;
   color: var(--color-muted);
+}
+
+.saleBadge {
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+}
+
+.freeBadge {
+  background: #ff8a3d;
+  color: #2b1400;
 }
 
 .directBadge {
@@ -855,6 +875,42 @@
   font-size: 16px;
   line-height: 1.6;
   color: var(--color-text);
+}
+
+.detailStats {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.tradePlaceBlock {
+  margin-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.tradePlaceLine {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.tradePlaceLine strong {
+  font-weight: 800;
+  margin-right: 6px;
+}
+
+.tradePlaceMap {
+  height: 160px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.tradePlaceError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-dim);
 }
 
 .statusPanel {
@@ -3207,6 +3263,24 @@
   font-weight: 700;
 }
 
+.toast {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(94px + env(safe-area-inset-bottom));
+  z-index: 90;
+  min-height: 48px;
+  border-radius: 14px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
 .sheetBackdrop {
   position: absolute;
   inset: 0;
@@ -3239,8 +3313,7 @@
   gap: 10px;
 }
 
-.sheetOptions button,
-.regionGrid button {
+.sheetOptions button {
   min-height: 70px;
   border: 0;
   border-radius: 16px;
@@ -3264,15 +3337,130 @@
   font-size: 14px;
 }
 
-.regionGrid {
+/* 내 동네 설정 — 최대 2개(primary/secondary) 라디오 리스트 */
+.myRegionList {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 4px;
 }
 
-.regionGrid .regionActive {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+.myRegionRow {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 12px;
+}
+
+.myRegionRadio {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--color-line);
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.myRegionRadio span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.myRegionRadio span.myRegionRadioOn {
+  background: var(--color-text);
+}
+
+.myRegionName {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.myRegionRemove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  display: grid;
+  place-items: center;
+}
+
+.myRegionAddBtn {
+  margin-top: 14px;
+  min-height: 48px;
+  width: 100%;
+  border: 1px dashed var(--color-line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 760;
+}
+
+/* 동네 검색 전체화면 */
+.regionSearchTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.regionSearchCloseBtn {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 760;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.regionSearchSection {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.regionSearchSection h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.regionRecentChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.regionRecentChip {
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.regionSearchList {
+  display: grid;
+}
+
+.regionSearchListItem {
+  min-height: 52px;
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  font-size: 15px;
 }
 
 .notificationList {

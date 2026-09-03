@@ -73,6 +73,8 @@ import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
 import { getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+import { AuthRequiredError, getProduct, listProducts, setFavorite } from "@/services/tradeService";
+import type { TradeProduct } from "@/types/trade";
 import {
   getRentTransactions,
   groupBuildingsByDong,
@@ -157,7 +159,8 @@ type SubPage =
   | { type: "favorites" }
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
-  | { type: "search" };
+  | { type: "search" }
+  | { type: "region-search" };
 
 type ProductListItem = {
   id: string;
@@ -173,9 +176,14 @@ type ProductListItem = {
   purchaseMode?: "NORMAL" | "DIRECT";
   chatCount: number;
   favoriteCount: number;
+  viewCount: number;
+  interestCount: number;
   isFavorite: boolean;
   mine: boolean;
   description: string;
+  tradePlace?: string;
+  sellerNickname?: string;
+  sellerMannerTemp?: number;
   category: string;
 };
 
@@ -264,7 +272,6 @@ const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부�
 const COMMUNITY_TABS = ["전체", "자유 주제", "같이해요", "질문", "동네 정보"];
 const COMMUNITY_FILTERS = ["추천", "인기", "취미/여가", "운동/스포츠", "맛집/음식", "동네친구", "일반"];
 const CHAT_FILTERS = ["전체", "판매", "구매", "안읽음", "모임", "알바"];
-const NEIGHBORHOODS = ["송파삼성래미안", "위례", "공릉", "당산 2동"];
 
 type MapSearchBounds = { south: number; north: number; west: number; east: number };
 
@@ -322,24 +329,47 @@ declare global {
     naver?: {
       maps: NaverMapsNamespace;
     };
+    // 카카오맵 SDK 타입은 이 파일 안 딱 한 컴포넌트(TradePlaceMap)에서만 쓰여서
+    // NaverMapsNamespace처럼 따로 안 만들고 느슨하게 any로 둔다.
+    kakao?: any;
   }
 }
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_KEY_ID = process.env.NEXT_PUBLIC_NAVER_MAP_NCP_KEY_ID ?? "";
+const KAKAO_MAP_SCRIPT_ID = "kakao-map-sdk";
+const KAKAO_MAP_JS_KEY = process.env.NEXT_PUBLIC_KAKAO_JS_KEY ?? "";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
   송파삼성래미안: { lat: 37.504744, lng: 127.118295 },
   위례: { lat: 37.4772, lng: 127.1437 },
   공릉: { lat: 37.6257, lng: 127.0731 },
   "당산 2동": { lat: 37.5351, lng: 126.9028 },
+  문래동: { lat: 37.5177, lng: 126.8945 },
 };
 const NEIGHBORHOOD_DISTRICTS: Record<string, string> = {
   송파삼성래미안: "송파구",
   위례: "송파구",
   공릉: "노원구",
   "당산 2동": "영등포구",
+  문래동: "영등포구",
 };
+
+type Region = { id: number; dongName: string; guName: string };
+
+// "당산 2동"(목업 동네 이름) ↔ "당산제2동"(실제 크롤링 지역명) 처럼 띄어쓰기/"제" 표기가
+// 달라서 그냥 문자열 비교로는 절대 안 맞음 — 둘 다 같은 형태로 접어서 비교.
+function normalizeDongName(name: string) {
+  return name.replace(/\s+/g, "").replace(/제(\d)/g, "$1");
+}
+
+// 목업 동네 4개 중 실제 시드 데이터(영등포구)와 겹치는 건 "당산 2동"뿐 — 나머지(위례/공릉/
+// 송파삼성래미안)는 매칭되는 region이 아예 없어서 undefined를 반환하고, 호출 쪽에서
+// region 필터 없이 전체 목록을 보여주는 걸로 폴백한다.
+function matchRegionId(regions: Region[], neighborhoodName: string): number | undefined {
+  const target = normalizeDongName(neighborhoodName);
+  return regions.find((r) => normalizeDongName(r.dongName) === target)?.id;
+}
 
 const DANGER_VISUALS: Record<DangerTone, DangerVisual> = {
   fire: { label: "화재", emoji: "🔥", tone: "fire" },
@@ -384,6 +414,52 @@ function loadNaverMapScript(keyId: string) {
   });
 
   return naverMapScriptPromise;
+}
+
+let kakaoMapScriptPromise: Promise<void> | null = null;
+
+// autoload=false + kakao.maps.load(cb) — 카카오 권장 패턴. 스크립트 로드 완료 시점과
+// maps 네임스페이스 초기화 완료 시점이 달라서, autoload 기본값(true)에 기대면
+// 드물게 window.kakao.maps가 아직 비어있는 채로 쓰다가 에러난다.
+function loadKakaoMapScript(jsKey: string) {
+  if (typeof window === "undefined") {
+    return Promise.resolve();
+  }
+  if (window.kakao?.maps?.Map) {
+    return Promise.resolve();
+  }
+  if (kakaoMapScriptPromise) {
+    return kakaoMapScriptPromise;
+  }
+
+  kakaoMapScriptPromise = new Promise<void>((resolve, reject) => {
+    const onScriptLoaded = () => {
+      if (!window.kakao?.maps) {
+        reject(new Error("Kakao map SDK missing after script load"));
+        return;
+      }
+      window.kakao.maps.load(() => resolve());
+    };
+
+    const existingScript = document.getElementById(KAKAO_MAP_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existingScript) {
+      existingScript.addEventListener("load", onScriptLoaded, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Kakao map script failed to load")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = KAKAO_MAP_SCRIPT_ID;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(jsKey)}&autoload=false`;
+    script.async = true;
+    script.addEventListener("load", onScriptLoaded, { once: true });
+    script.addEventListener("error", () => reject(new Error("Kakao map script failed to load")), { once: true });
+    document.head.appendChild(script);
+  });
+
+  return kakaoMapScriptPromise;
 }
 
 function apiUrl(path: string) {
@@ -524,6 +600,42 @@ function matchesBusinessQuery(business: LocalBusiness, query: string) {
   );
 }
 
+function formatRelativeTime(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "방금 전";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  return new Date(iso).toLocaleDateString("ko-KR");
+}
+
+function toProductListItem(item: TradeProduct): ProductListItem {
+  return {
+    id: String(item.id),
+    title: item.title,
+    thumbnailLabel: item.title.slice(0, 2),
+    thumbnailTone: "",
+    neighborhoodName: item.neighborhoodName,
+    createdAt: formatRelativeTime(item.createdAt),
+    price: item.price,
+    tradeStatus: item.tradeStatus,
+    tradeType: item.tradeType,
+    chatCount: item.chatCount,
+    favoriteCount: item.favoriteCount,
+    viewCount: item.viewCount,
+    interestCount: item.interestCount,
+    isFavorite: false,
+    mine: false,
+    // ponytail: 백엔드 상세 카테고리(예: "청소기")는 검색어로만 노출 — 목록 상단 탭 필터는
+    // "중고거래"(이 API가 다루는 섹션 자체) 기준으로 매칭시킴
+    description: item.description ?? (item.searchKeyword ? `연관 검색어: ${item.searchKeyword}` : ""),
+    category: "중고거래",
+  };
+}
+
 const initialProducts: ProductListItem[] = [
   {
     id: "p1",
@@ -539,6 +651,8 @@ const initialProducts: ProductListItem[] = [
     purchaseMode: "NORMAL",
     chatCount: 1,
     favoriteCount: 9,
+    viewCount: 214,
+    interestCount: 0,
     isFavorite: true,
     mine: false,
     category: "중고거래",
@@ -558,6 +672,8 @@ const initialProducts: ProductListItem[] = [
     purchaseMode: "DIRECT",
     chatCount: 4,
     favoriteCount: 4,
+    viewCount: 96,
+    interestCount: 0,
     isFavorite: false,
     mine: false,
     category: "중고거래",
@@ -576,6 +692,8 @@ const initialProducts: ProductListItem[] = [
     tradeType: "FREE",
     chatCount: 5,
     favoriteCount: 0,
+    viewCount: 58,
+    interestCount: 0,
     isFavorite: false,
     mine: true,
     category: "기타 서비스",
@@ -593,6 +711,8 @@ const initialProducts: ProductListItem[] = [
     tradeType: "FREE",
     chatCount: 0,
     favoriteCount: 9,
+    viewCount: 131,
+    interestCount: 0,
     isFavorite: false,
     mine: false,
     category: "중고차",
@@ -611,6 +731,8 @@ const initialProducts: ProductListItem[] = [
     tradeType: "SALE",
     chatCount: 0,
     favoriteCount: 2,
+    viewCount: 19,
+    interestCount: 0,
     isFavorite: false,
     mine: true,
     category: "중고거래",
@@ -1168,8 +1290,33 @@ export default function GajiMarketApp() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
-  const [activeNeighborhood, setActiveNeighborhood] = useState("송파삼성래미안");
+  const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
   const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
+  // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
+  // 채워져 있어야(빈 문자열이면 곳곳에서 쓰는 NEIGHBORHOOD_COORDS[secondaryNeighborhood] 등이
+  // 깨짐) X는 "빈 슬롯"이 아니라 "검색해서 바로 교체"로 이어진다.
+  const [regionSearchTarget, setRegionSearchTarget] = useState<"primary" | "secondary">("secondary");
+  const [recentNeighborhoods, setRecentNeighborhoods] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
+
+  function pickNeighborhood(dongName: string, target: "primary" | "secondary") {
+    if (target === "primary") {
+      setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
+      setActiveNeighborhood(dongName);
+    } else {
+      setSecondaryNeighborhood(dongName);
+    }
+    setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
+    setToastMessage(`동네를 '${dongName}'으로 변경했어요.`);
+    setSheet(null);
+    setSubPage(null);
+  }
   const [productFilter, setProductFilter] = useState("전체");
   const [communityTab, setCommunityTab] = useState("동네생활");
   const [communityFilter, setCommunityFilter] = useState("추천");
@@ -1180,16 +1327,23 @@ export default function GajiMarketApp() {
   const [mapSearchArea, setMapSearchArea] = useState<{ neighborhood: string; bounds: MapSearchBounds } | null>(null);
   const [locationAllowed, setLocationAllowed] = useState(true);
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts);
+  const [productsTotal, setProductsTotal] = useState(initialProducts.length);
+  const [isLoadingMoreProducts, setIsLoadingMoreProducts] = useState(false);
+  const productPageRef = useRef(1);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>(initialChats);
   const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
   const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
   const [extraMessages, setExtraMessages] = useState<Record<string, typeof baseMessages>>({});
   const [isBooting, setIsBooting] = useState(true);
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  // 찜 API가 401(로그인 필요)을 돌려줬을 때만 true — isGuestMode 스위치와 별개로,
+  // 지금은 실제 로그인 세션이 없어서 찜을 시도하면 항상 여기로 떨어진다.
+  const [authRequired, setAuthRequired] = useState(false);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
 
   const openApartmentFlow = useCallback(() => {
@@ -1242,6 +1396,98 @@ export default function GajiMarketApp() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(apiUrl("/api/v1/local/regions"), { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("regions failed");
+        return response.json() as Promise<{ items: { id: number; dong_name: string; gu_name: string }[] }>;
+      })
+      .then((payload) => {
+        setRegions(payload.items.map((r) => ({ id: r.id, dongName: r.dong_name, guName: r.gu_name })));
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // 실패하면 동네 필터 없이(전체 목록) 동작 — 아래 regionId가 계속 undefined로 남음
+      });
+    return () => controller.abort();
+  }, []);
+
+  // 지금 시드 데이터(영등포구)와 실제로 겹치는 목업 동네는 "당산 2동"뿐 — matchRegionId 주석 참고.
+  const regionId = useMemo(() => matchRegionId(regions, activeNeighborhood), [regions, activeNeighborhood]);
+  const regionsLoaded = regions.length > 0;
+  // regions는 로딩됐는데 이 동네만 매칭이 안 되는 경우(위례/공릉/송파삼성래미안 등) —
+  // 그 동네엔 실제로 상품이 하나도 없다는 뜻이라 전체 목록으로 대충 채우지 않고 빈 목록으로 둔다.
+  const noRegionMatch = regionsLoaded && regionId === undefined;
+
+  useEffect(() => {
+    if (!regionsLoaded) return; // region 목록 오기 전엔 아직 필터를 확정할 수 없어 대기(부팅 스켈레톤이 가려줌)
+    productPageRef.current = 1;
+    if (noRegionMatch) {
+      setProducts([]);
+      setProductsTotal(0);
+      return;
+    }
+    const controller = new AbortController();
+    listProducts({ page: 1, size: 60, regionId }, controller.signal)
+      .then((page) => {
+        setProducts(page.items.map(toProductListItem));
+        setProductsTotal(page.total);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // 실패하면 mock 목록을 그대로 둔다 (화면이 빈 채로 남지 않도록)
+        console.error("상품 목록을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [regionsLoaded, noRegionMatch, regionId]);
+
+  // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
+  const loadMoreProducts = useCallback(() => {
+    if (isLoadingMoreProducts || products.length >= productsTotal) return;
+    setIsLoadingMoreProducts(true);
+    const nextPage = productPageRef.current + 1;
+    listProducts({ page: nextPage, size: 60, regionId })
+      .then((page) => {
+        productPageRef.current = nextPage;
+        setProducts((prev) => [...prev, ...page.items.map(toProductListItem)]);
+        setProductsTotal(page.total);
+      })
+      .catch((error: unknown) => {
+        console.error("추가 상품을 불러오지 못했습니다.", error);
+      })
+      .finally(() => setIsLoadingMoreProducts(false));
+  }, [isLoadingMoreProducts, products.length, productsTotal, regionId]);
+
+  // 목록 API는 description/tradePlace/판매자 정보가 없어서 상세보기 진입 시 상세 API로 채워 넣음.
+  useEffect(() => {
+    if (subPage?.type !== "product-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    const controller = new AbortController();
+    getProduct(id, controller.signal)
+      .then((detail) => {
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === subPage.id
+              ? {
+                  ...p,
+                  description: detail.description ?? p.description,
+                  tradePlace: detail.tradePlace,
+                  sellerNickname: detail.sellerNickname,
+                  sellerMannerTemp: detail.sellerMannerTemp,
+                }
+              : p,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("상품 상세를 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [subPage]);
+
   const totalUnread = useMemo(
     () => chats.reduce((sum, chat) => sum + chat.unreadCount, 0),
     [chats],
@@ -1253,13 +1499,12 @@ export default function GajiMarketApp() {
     }
     return products.filter((product) => {
       const matchesFilter = productFilter === "전체" || product.category === productFilter;
-      const matchesNeighborhood =
-        product.neighborhoodName === activeNeighborhood ||
-        product.neighborhoodName === secondaryNeighborhood ||
-        product.mine;
-      return matchesFilter && matchesNeighborhood && product.tradeStatus !== "SOLD";
+      // ponytail: 실거래 API엔 동네 검색/지역ID 조회 엔드포인트가 아직 없어서
+      // activeNeighborhood로 실서버 데이터를 거를 방법이 없음 — 백엔드에 지역 조회가
+      // 생기면 여기서 region_id로 서버 필터링하도록 바꾸기
+      return matchesFilter && product.tradeStatus !== "SOLD";
     });
-  }, [activeNeighborhood, hasNetworkError, productFilter, products, secondaryNeighborhood]);
+  }, [hasNetworkError, productFilter, products]);
 
   const favoriteProducts = products.filter((product) => product.isFavorite);
   const myProducts = products.filter((product) => product.mine);
@@ -1400,17 +1645,44 @@ export default function GajiMarketApp() {
       setSheet("status");
       return;
     }
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const nextFavorited = !product.isFavorite;
+
+    // 즉각 반응하도록 먼저 로컬로 반영 — 실서버 응답 오면 그 값으로 덮어쓰고,
+    // 실패하면 되돌린다.
     setProducts((current) =>
-      current.map((product) =>
-        product.id === productId
-          ? {
-              ...product,
-              isFavorite: !product.isFavorite,
-              favoriteCount: product.favoriteCount + (product.isFavorite ? -1 : 1),
-            }
-          : product,
+      current.map((p) =>
+        p.id === productId
+          ? { ...p, isFavorite: nextFavorited, favoriteCount: p.favoriteCount + (nextFavorited ? 1 : -1) }
+          : p,
       ),
     );
+
+    const numericId = Number(productId);
+    if (!Number.isFinite(numericId)) return; // mock 상품("p1" 등)은 서버에 없어서 로컬 토글로 끝
+
+    setFavorite(numericId, nextFavorited)
+      .then(({ favorited, favoriteCount }) => {
+        setProducts((current) =>
+          current.map((p) => (p.id === productId ? { ...p, isFavorite: favorited, favoriteCount } : p)),
+        );
+      })
+      .catch((error: unknown) => {
+        setProducts((current) =>
+          current.map((p) =>
+            p.id === productId
+              ? { ...p, isFavorite: !nextFavorited, favoriteCount: p.favoriteCount + (nextFavorited ? -1 : 1) }
+              : p,
+          ),
+        );
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("찜 상태를 바꾸지 못했습니다.", error);
+        }
+      });
   }
 
   function updateProductStatus(productId: string, tradeStatus: TradeStatus) {
@@ -1474,6 +1746,8 @@ export default function GajiMarketApp() {
       purchaseMode: "NORMAL",
       chatCount: 0,
       favoriteCount: 0,
+      viewCount: 0,
+      interestCount: 0,
       isFavorite: false,
       mine: true,
       category,
@@ -1730,6 +2004,16 @@ export default function GajiMarketApp() {
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onPostClick={(id) => setSubPage({ type: "community-detail", id })}
             />
+          ) : subPage?.type === "region-search" ? (
+            <RegionSearchScreen
+              regions={regions}
+              recentNeighborhoods={recentNeighborhoods}
+              onBack={() => {
+                setSubPage(null);
+                setSheet("region");
+              }}
+              onPick={(dongName) => pickNeighborhood(dongName, regionSearchTarget)}
+            />
           ) : activeTab === "home" ? (
             <HomeScreen
               isLoading={isBooting}
@@ -1738,6 +2022,9 @@ export default function GajiMarketApp() {
               secondaryNeighborhood={secondaryNeighborhood}
               productFilter={productFilter}
               products={filteredProducts}
+              onLoadMore={loadMoreProducts}
+              hasMore={products.length < productsTotal}
+              isLoadingMore={isLoadingMoreProducts}
               onOpenRegion={() => setSheet("region")}
               onOpenSearch={() => setSubPage({ type: "search" })}
               onOpenNotifications={() => setSheet("notifications")}
@@ -1853,10 +2140,23 @@ export default function GajiMarketApp() {
           activeNeighborhood={activeNeighborhood}
           secondaryNeighborhood={secondaryNeighborhood}
           onClose={() => setSheet(null)}
-          onNeighborhoodChange={(primary, secondary) => {
-            setActiveNeighborhood(primary);
-            setSecondaryNeighborhood(secondary);
+          onSelectPrimary={(dongName) => {
+            setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
+            setActiveNeighborhood(dongName);
             setSheet(null);
+          }}
+          onRemoveNeighborhood={(target) => {
+            setRegionSearchTarget(target);
+            setSheet(null);
+            setSubPage({ type: "region-search" });
+          }}
+          onOpenRegionSearch={() => {
+            // 새로 검색해서 추가하는 동네는 방금 둘러보려는 곳이니 바로 대표(primary)로 —
+            // secondary로 넣으면 홈 상품 목록 필터(activeNeighborhood 기준)엔 반영이 안 돼서
+            // "검색해서 골랐는데 왜 안 뜨지" 버그가 됨.
+            setRegionSearchTarget("primary");
+            setSheet(null);
+            setSubPage({ type: "region-search" });
           }}
           onProductWrite={() => {
             setSheet(null);
@@ -1873,15 +2173,18 @@ export default function GajiMarketApp() {
           totalUnread={totalUnread}
           hasNetworkError={hasNetworkError}
           isGuestMode={isGuestMode}
+          authRequired={authRequired}
           onRetry={() => {
             setHasNetworkError(false);
             setSheet(null);
           }}
           onGuestOff={() => {
             setIsGuestMode(false);
+            setAuthRequired(false);
             setSheet(null);
           }}
         />
+        {toastMessage && <div className={styles.toast}>{toastMessage}</div>}
       </div>
     </div>
   );
@@ -1956,6 +2259,9 @@ function HomeScreen({
   secondaryNeighborhood,
   productFilter,
   products,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
   onOpenRegion,
   onOpenSearch,
   onOpenNotifications,
@@ -1971,6 +2277,9 @@ function HomeScreen({
   secondaryNeighborhood: string;
   productFilter: string;
   products: ProductListItem[];
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
   onOpenRegion: () => void;
   onOpenSearch: () => void;
   onOpenNotifications: () => void;
@@ -1980,6 +2289,27 @@ function HomeScreen({
   onFavorite: (id: string) => void;
   onRetry: () => void;
 }) {
+  // ref(useRef)로 재는 대신 state로 들고 있어야, 스켈레톤(isBooting)이 걷히고
+  // sentinel이 뒤늦게 처음 마운트되는 순간에도 effect가 그 변화를 감지해 재실행된다
+  // — hasMore useRef만 의존성으로 쓰면 sentinel이 아직 없을 때 딱 한 번 실행되고
+  // 끝나버려서(effect는 hasMore가 바뀔 때만 재실행) 이후 관찰이 영영 안 붙는 버그가 있었음.
+  const [sentinelNode, setSentinelNode] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!sentinelNode || !hasMore) return;
+    // 스크롤 컨테이너가 <main data-app-scroll>이라 root를 명시해야 함(null이면
+    // 브라우저 뷰포트 기준이라 폰 셸 안쪽 스크롤 위치와 안 맞음).
+    const scrollRoot = sentinelNode.closest<HTMLElement>("[data-app-scroll]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onLoadMore();
+      },
+      { root: scrollRoot, rootMargin: "400px" },
+    );
+    observer.observe(sentinelNode);
+    return () => observer.disconnect();
+  }, [sentinelNode, hasMore, onLoadMore]);
+
   return (
     <section className={styles.screen}>
       <ScreenHeader
@@ -2033,6 +2363,11 @@ function HomeScreen({
               onFavorite={() => onFavorite(product.id)}
             />
           ))}
+          {hasMore && (
+            <div ref={setSentinelNode} className={styles.loadMoreSentinel}>
+              {isLoadingMore && <span>불러오는 중...</span>}
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -2089,6 +2424,9 @@ function ProductRow({
             {product.createdAt}
           </p>
           <div className={styles.priceLine}>
+            {product.tradeStatus === "SALE" && product.tradeType === "FREE" && (
+              <span className={styles.freeBadge}>나눔</span>
+            )}
             {product.tradeStatus === "RESERVED" && <span className={styles.statusBadge}>예약중</span>}
             {product.tradeStatus === "SOLD" && <span className={styles.soldBadge}>거래완료</span>}
             <strong>{formatPrice(product)}</strong>
@@ -2100,9 +2438,15 @@ function ProductRow({
                 <MessageCircle size={14} /> {product.chatCount}
               </span>
             )}
-            {product.favoriteCount > 0 && (
+            {product.favoriteCount + product.interestCount > 0 && (
               <span>
-                <Heart size={14} fill={product.isFavorite ? "currentColor" : "none"} /> {product.favoriteCount}
+                <Heart size={14} fill={product.isFavorite ? "currentColor" : "none"} />{" "}
+                {product.favoriteCount + product.interestCount}
+              </span>
+            )}
+            {product.viewCount > 0 && (
+              <span>
+                <Eye size={14} /> {product.viewCount}
               </span>
             )}
           </div>
@@ -2166,6 +2510,74 @@ function StateBlock({
   );
 }
 
+// 상품 상세의 "거래 희망 장소" — 좌표 검색은 카카오 Local 키워드검색(/api/geocode,
+// 서버사이드 프록시), 지도 렌더링도 카카오맵 JS SDK로 통일(이전엔 네이버 지도였음).
+function TradePlaceMap({ query, neighborhoodName }: { query: string; neighborhoodName: string }) {
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [usedFallback, setUsedFallback] = useState(false);
+
+  useEffect(() => {
+    if (!KAKAO_MAP_JS_KEY) {
+      setStatus("error");
+      return;
+    }
+    let cancelled = false;
+    setStatus("loading");
+    setUsedFallback(false);
+
+    const params = new URLSearchParams({ query });
+    if (neighborhoodName) params.set("fallback", neighborhoodName);
+
+    Promise.all([
+      fetch(`/api/geocode?${params}`).then((res) => (res.ok ? res.json() : null)),
+      loadKakaoMapScript(KAKAO_MAP_JS_KEY),
+    ])
+      .then(([geo]) => {
+        const kakaoMaps = window.kakao?.maps;
+        if (cancelled || !geo || !kakaoMaps || !mapElementRef.current) {
+          if (!cancelled) setStatus("error");
+          return;
+        }
+        const center = new kakaoMaps.LatLng(geo.lat, geo.lng);
+        const map = new kakaoMaps.Map(mapElementRef.current, {
+          center,
+          // 카카오 level은 네이버 zoom과 반대(작을수록 확대) — matched는 딱 맞춘 위치라 가깝게,
+          // fallback(동네 중심)은 조금 멀리서 보여준다.
+          level: geo.matched === "fallback" ? 6 : 3,
+        });
+        new kakaoMaps.Marker({ position: center, map });
+        setUsedFallback(geo.matched === "fallback");
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [query, neighborhoodName]);
+
+  return (
+    <div className={styles.tradePlaceBlock}>
+      <p className={styles.tradePlaceLine}>
+        <strong>거래 희망 장소</strong> {query}
+      </p>
+      {status === "error" ? (
+        <p className={styles.tradePlaceError}>지도를 불러오지 못했습니다.</p>
+      ) : (
+        <>
+          <div ref={mapElementRef} className={styles.tradePlaceMap} />
+          {usedFallback && (
+            <p className={styles.tradePlaceError}>정확한 위치를 찾지 못해 동네 중심으로 표시했어요.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function ProductDetailScreen({
   product,
   onBack,
@@ -2210,18 +2622,32 @@ function ProductDetailScreen({
         <div className={styles.sellerCard}>
           <div className={styles.avatar}>가</div>
           <div>
-            <strong>주황가지님</strong>
+            <strong>{product.sellerNickname || "주황가지님"}</strong>
             <span>{product.neighborhoodName}</span>
           </div>
           <button type="button" className={styles.trustPill}>
-            신뢰온도 40.1°C
+            매너온도 {(product.sellerMannerTemp ?? 36.5).toFixed(1)}°C
           </button>
+        </div>
+        <div className={styles.priceLine}>
+          {product.tradeStatus === "SALE" && product.tradeType === "FREE" && (
+            <span className={styles.freeBadge}>나눔</span>
+          )}
+          {product.tradeStatus === "RESERVED" && <span className={styles.statusBadge}>예약중</span>}
+          {product.tradeStatus === "SOLD" && <span className={styles.soldBadge}>거래완료</span>}
         </div>
         <h1>{product.title}</h1>
         <p className={styles.metaLine}>
           {product.category} · {product.createdAt}
         </p>
         <p className={styles.detailDescription}>{product.description}</p>
+        <p className={styles.detailStats}>
+          채팅 {product.chatCount} · 관심 {product.favoriteCount + product.interestCount} · 조회 {product.viewCount}
+        </p>
+
+        {product.tradePlace && (
+          <TradePlaceMap query={product.tradePlace} neighborhoodName={product.neighborhoodName} />
+        )}
 
         {product.mine && (
           <div className={styles.statusPanel}>
@@ -5890,6 +6316,76 @@ function SearchScreen({
   );
 }
 
+// "내 동네 설정"에서 "동네 추가"/삭제-교체로 진입하는 전체화면 검색 — 실제 당근 UX처럼
+// 검색어 없을 땐 최근 설정한 동네 칩 + 전체 지역 목록("서울 {구} {동}"), 검색어 있으면 필터링.
+function RegionSearchScreen({
+  regions,
+  recentNeighborhoods,
+  onBack,
+  onPick,
+}: {
+  regions: Region[];
+  recentNeighborhoods: string[];
+  onBack: () => void;
+  onPick: (dongName: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const normalized = query.trim();
+  const matched = normalized
+    ? regions.filter((r) => r.dongName.includes(normalized) || r.guName.includes(normalized))
+    : regions;
+
+  return (
+    <section className={styles.screen}>
+      <div className={styles.regionSearchTop}>
+        <label className={styles.searchField}>
+          <Search size={18} />
+          <input
+            autoFocus
+            type="text"
+            placeholder="동, 읍, 면으로 검색"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <button type="button" className={styles.regionSearchCloseBtn} onClick={onBack}>
+          닫기
+        </button>
+      </div>
+
+      {!normalized && recentNeighborhoods.length > 0 && (
+        <section className={styles.regionSearchSection}>
+          <h2>최근 설정한 동네</h2>
+          <div className={styles.regionRecentChips}>
+            {recentNeighborhoods.map((name) => (
+              <button type="button" key={name} className={styles.regionRecentChip} onClick={() => onPick(name)}>
+                {name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className={styles.regionSearchSection}>
+        <h2>{normalized ? "검색 결과" : "지금 있는 동네"}</h2>
+        <div className={styles.regionSearchList}>
+          {matched.map((r) => (
+            <button
+              type="button"
+              key={r.id}
+              className={styles.regionSearchListItem}
+              onClick={() => onPick(r.dongName)}
+            >
+              서울 {r.guName} {r.dongName}
+            </button>
+          ))}
+          {matched.length === 0 && <p className={styles.sheetCopy}>검색 결과가 없어요.</p>}
+        </div>
+      </section>
+    </section>
+  );
+}
+
 function EggplantPinIcon({
   size = 31,
   active = false,
@@ -6024,13 +6520,16 @@ function BottomSheet({
   activeNeighborhood,
   secondaryNeighborhood,
   onClose,
-  onNeighborhoodChange,
+  onSelectPrimary,
+  onRemoveNeighborhood,
+  onOpenRegionSearch,
   onProductWrite,
   onCommunityWrite,
   onTogetherWrite,
   totalUnread,
   hasNetworkError,
   isGuestMode,
+  authRequired,
   onRetry,
   onGuestOff,
 }: {
@@ -6038,13 +6537,16 @@ function BottomSheet({
   activeNeighborhood: string;
   secondaryNeighborhood: string;
   onClose: () => void;
-  onNeighborhoodChange: (primary: string, secondary: string) => void;
+  onSelectPrimary: (dongName: string) => void;
+  onRemoveNeighborhood: (target: "primary" | "secondary") => void;
+  onOpenRegionSearch: () => void;
   onProductWrite: () => void;
   onCommunityWrite: () => void;
   onTogetherWrite?: () => void;
   totalUnread: number;
   hasNetworkError: boolean;
   isGuestMode: boolean;
+  authRequired: boolean;
   onRetry: () => void;
   onGuestOff: () => void;
 }) {
@@ -6077,20 +6579,37 @@ function BottomSheet({
         )}
         {sheet === "region" && (
           <>
-            <h2>활동지역 설정</h2>
-            <p className={styles.sheetCopy}>지역을 바꾸면 홈 상품, 커뮤니티 글, 지도 업체가 같은 기준으로 갱신됩니다.</p>
-            <div className={styles.regionGrid}>
-              {NEIGHBORHOODS.map((region) => (
-                <button
-                  type="button"
-                  key={region}
-                  className={activeNeighborhood === region ? styles.regionActive : ""}
-                  onClick={() => onNeighborhoodChange(region, secondaryNeighborhood === region ? activeNeighborhood : secondaryNeighborhood)}
-                >
-                  {region}
-                </button>
+            <h2>내 동네 설정</h2>
+            <p className={styles.sheetCopy}>최대 2개의 동네를 선택할 수 있어요.</p>
+            <div className={styles.myRegionList}>
+              {[
+                { name: activeNeighborhood, target: "primary" as const },
+                { name: secondaryNeighborhood, target: "secondary" as const },
+              ].map(({ name, target }) => (
+                <div className={styles.myRegionRow} key={target}>
+                  <button
+                    type="button"
+                    className={styles.myRegionRadio}
+                    aria-label={`${name}을 대표 동네로 설정`}
+                    onClick={() => onSelectPrimary(name)}
+                  >
+                    <span className={target === "primary" ? styles.myRegionRadioOn : ""} />
+                  </button>
+                  <span className={styles.myRegionName}>{name}</span>
+                  <button
+                    type="button"
+                    className={styles.myRegionRemove}
+                    aria-label={`${name} 삭제`}
+                    onClick={() => onRemoveNeighborhood(target)}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               ))}
             </div>
+            <button type="button" className={styles.myRegionAddBtn} onClick={onOpenRegionSearch}>
+              <Plus size={18} /> 동네 추가
+            </button>
           </>
         )}
         {sheet === "notifications" && (
@@ -6108,7 +6627,7 @@ function BottomSheet({
         {sheet === "status" && (
           <>
             <h2>상태 안내</h2>
-            {isGuestMode ? (
+            {isGuestMode || authRequired ? (
               <StateBlock
                 title="로그인이 필요해요"
                 body="비로그인 사용자는 탐색만 가능하고 관심, 채팅, 글쓰기는 제한됩니다."
