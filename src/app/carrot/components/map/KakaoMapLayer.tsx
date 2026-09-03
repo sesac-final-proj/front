@@ -446,10 +446,18 @@ export function KakaoMapLayer({
           overlay.setMap(map);
           newOverlays.push(overlay);
 
-          // 클러스터러용 마커 등록
+          // 클러스터러용 마커 등록 (기본 파란색 핀이 커스텀 오버레이 위에 중복 노출되지 않도록 투명 1x1 아이콘 적용)
           if (kakao.maps.Marker) {
+            const transparentIcon = kakao.maps.MarkerImage && kakao.maps.Size
+              ? new kakao.maps.MarkerImage(
+                  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+                  new kakao.maps.Size(1, 1),
+                )
+              : undefined;
+
             const marker = new kakao.maps.Marker({
               position: pos,
+              image: transparentIcon,
             });
             kakao.maps.event.addListener(marker, "click", () => {
               onSelectRestaurantsRef.current([restaurant], restaurant.id);
