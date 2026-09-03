@@ -1,19 +1,19 @@
 # 🍆 가지마켓(Gaji Market) 컬러보드 & 디자인 시스템
 
-가지마켓의 시그니처 컬러인 **가지 보라색(Eggplant Purple)**을 주축으로 한 디자인 시스템 팔레트입니다.
+가지마켓의 시그니처 컬러인 **가지 주황색(Gaji Orange)**을 주축으로 한 디자인 시스템 팔레트입니다.
 
 ![가지마켓 컬러보드](gaji_market_color_board_1788161776802.jpg)
 
 ---
 
-## 1. 🔮 Brand & Primary Colors (메인 브랜드 컬러)
+## 1. 🟧 Brand & Primary Colors (메인 브랜드 컬러)
 
 | 구분 | Dark Mode Hex | Light Mode Hex | 활용처 및 설명 |
 | --- | --- | --- | --- |
-| **Primary (브랜드 메인)** | `#A970FF` | `#7537C5` | 핵심 액션 버튼, 강조 텍스트, 활성 탭 아이콘 |
-| **Primary Pressed** | `#8B4FE0` | `#59259C` | Primary 버튼 터치/클릭 state |
-| **Primary Container** | `#32134D` | `#F0E6FF` | 브랜드 하이라이트 카드의 배경, 배지 배경 |
-| **On Primary** | `#16001F` | `#FFFFFF` | Primary 버튼 내부 텍스트 및 아이콘 |
+| **Primary (브랜드 메인)** | `#FF922B` | `#FF6F0F` | 핵심 액션 버튼, 강조 텍스트, 활성 탭 아이콘 |
+| **Primary Pressed** | `#FF6F0F` | `#E85D04` | Primary 버튼 터치/클릭 state |
+| **Primary Container** | `#3A1F0A` | `#FFF0E6` | 브랜드 하이라이트 카드의 배경, 배지 배경 |
+| **On Primary** | `#1F0E00` | `#FFFFFF` | Primary 버튼 내부 텍스트 및 아이콘 |
 
 ---
 
@@ -52,14 +52,14 @@
 ## 5. 🎨 Gradient Accent Palettes (시그니처 그래디언트)
 
 ```css
-/* 🍆 Gaji Hero Gradient (가지 시그니처 썸네일/카드) */
-background: linear-gradient(135deg, #6748A4, #A970FF 52%, #263B60);
+/* 🟧 Gaji Hero Gradient (가지 시그니처 썸네일/카드) */
+background: linear-gradient(135deg, #9A4F16, #FF922B 52%, #5F2F0C);
 
-/* 🌌 Dark Stage Glow Background (앱 상단 퍼플 조명) */
-background: radial-gradient(circle at 50% -12%, rgba(169, 112, 255, 0.16), transparent 34%), #111114;
+/* 🌌 Dark Stage Glow Background (앱 상단 오렌지 조명) */
+background: radial-gradient(circle at 50% -12%, rgba(255, 146, 43, 0.16), transparent 34%), #111114;
 
 /* 💳 Banner Card Gradient (꿈가지/프로모션 카드) */
-background: linear-gradient(135deg, #3A2A69, #1A1730);
+background: linear-gradient(135deg, #7A3513, #2C170C);
 
 /* 🪙 Gold / Coupon Accent (쿠폰/포인트 강조) */
 background: linear-gradient(135deg, #FAF2D8, #D7A94C); /* text: #3A2200 */

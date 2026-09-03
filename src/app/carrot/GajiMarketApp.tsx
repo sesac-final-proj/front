@@ -223,6 +223,7 @@ type LocalBusiness = {
   dangerTone?: DangerTone;
   observedAt?: string | null;
   sourceUrl?: string | null;
+  source?: string;
 };
 
 type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
@@ -479,6 +480,50 @@ function matchesNeighborhood(business: LocalBusiness, neighborhood: string) {
   return business.neighborhoodName === neighborhood || Boolean(district && business.districtName === district);
 }
 
+function formatRestaurantDistance(distance?: string) {
+  const meters = Number(distance);
+  if (!Number.isFinite(meters) || meters <= 0) return "현 지도";
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)}km`;
+  return `${Math.round(meters)}m`;
+}
+
+function restaurantToLocalBusiness(
+  restaurant: Restaurant,
+  neighborhoodName: string,
+  index: number,
+): LocalBusiness {
+  const address = restaurant.roadAddress || restaurant.address || "카카오 지도 음식점";
+  const districtName = address.split(/\s+/)[1] || NEIGHBORHOOD_DISTRICTS[neighborhoodName] || neighborhoodName;
+
+  return {
+    id: restaurant.id || `restaurant-${index}`,
+    name: restaurant.name,
+    category: "food",
+    neighborhoodName,
+    districtName,
+    distance: restaurant.category || formatRestaurantDistance(restaurant.distance),
+    openNow: true,
+    liked: false,
+    summary: address,
+    lat: restaurant.lat,
+    lng: restaurant.lng,
+    sourceUrl: restaurant.placeUrl || restaurant.naverUrl,
+    source: restaurant.source,
+  };
+}
+
+function matchesBusinessQuery(business: LocalBusiness, query: string) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) return true;
+  return (
+    business.name.includes(trimmedQuery) ||
+    business.summary.includes(trimmedQuery) ||
+    business.neighborhoodName.includes(trimmedQuery) ||
+    (business.districtName?.includes(trimmedQuery) ?? false) ||
+    (business.riskType?.includes(trimmedQuery) ?? false)
+  );
+}
+
 const initialProducts: ProductListItem[] = [
   {
     id: "p1",
@@ -710,12 +755,12 @@ const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
   { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
   { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
-  { id: "sale", name: "할인중", icon: BadgePercent, tone: "violet" },
+  { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
   { id: "food", name: "음식점", icon: Utensils, tone: "orange" },
   { id: "delivery", name: "용달", icon: Truck, tone: "blue" },
   { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
   { id: "cafe", name: "카페", icon: Coffee, tone: "yellow" },
-  { id: "class", name: "클래스", icon: CakeSlice, tone: "indigo" },
+  { id: "class", name: "클래스", icon: CakeSlice, tone: "amber" },
   { id: "academy", name: "학원", icon: GraduationCap, tone: "sky" },
   { id: "clean", name: "청소", icon: SprayCan, tone: "green" },
 ];
@@ -1888,8 +1933,18 @@ function IconButton({
 function BrandWordmark() {
   return (
     <span className={styles.brandMark} aria-label="가지페이">
-      <span className={styles.brandDot}>g</span>
-      <span>pay</span>
+      <svg className={styles.brandSymbol} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+        <path
+          className={styles.brandLeaf}
+          d="M15.4 11.6c-4.7 0-7.8-2.5-7.8-5.6 0-2.9 2.6-5 5.9-4.4C15.2-.8 19.2-.3 20.6 2.8c1.9-1 5.1.2 5.7 2.9.7 3.1-2.2 5.9-6.8 5.9h-4.1Z"
+        />
+        <path
+          className={styles.brandCore}
+          fillRule="evenodd"
+          d="M22 12.5c9.1 0 16.3 6.8 16.3 15.2 0 7.5-5.4 11.9-16.3 16.1C11.1 39.6 5.7 35.2 5.7 27.7 5.7 19.3 12.9 12.5 22 12.5Zm0 10.3a5.8 5.8 0 1 0 0 11.6 5.8 5.8 0 0 0 0-11.6Z"
+        />
+      </svg>
+      <span className={styles.brandWord}>pay</span>
     </span>
   );
 }
@@ -2155,7 +2210,7 @@ function ProductDetailScreen({
         <div className={styles.sellerCard}>
           <div className={styles.avatar}>가</div>
           <div>
-            <strong>보라가지님</strong>
+            <strong>주황가지님</strong>
             <span>{product.neighborhoodName}</span>
           </div>
           <button type="button" className={styles.trustPill}>
@@ -3334,9 +3389,21 @@ function MapScreen({
 
   const [selectedRestaurants, setSelectedRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [restaurantResults, setRestaurantResults] = useState<Restaurant[]>([]);
 
   useEffect(() => () => { locationRequestRef.current += 1; }, []);
   const visibleSelectedDanger = selectedDanger;
+  const restaurantBusinesses = useMemo(
+    () => restaurantResults.map((restaurant, index) => restaurantToLocalBusiness(restaurant, activeNeighborhood, index)),
+    [activeNeighborhood, restaurantResults],
+  );
+  const displayedBusinesses = useMemo(
+    () =>
+      selectedCategory === "food"
+        ? restaurantBusinesses.filter((business) => matchesBusinessQuery(business, query))
+        : businesses,
+    [businesses, query, restaurantBusinesses, selectedCategory],
+  );
 
   const selectDanger = useCallback((business: LocalBusiness) => {
     if (business.category !== "danger") return;
@@ -3350,6 +3417,9 @@ function MapScreen({
     setSelectedDanger(null);
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
+    if (id !== "food") {
+      setRestaurantResults([]);
+    }
     onCategoryChange(id);
   }
 
@@ -3421,6 +3491,7 @@ function MapScreen({
             setSelectedRestaurants(list);
             setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
           }}
+          onRestaurantsLoaded={setRestaurantResults}
           onClearRestaurants={() => {
             setSelectedRestaurants([]);
             setSelectedRestaurantId(null);
@@ -3520,9 +3591,11 @@ function MapScreen({
             </div>
             <section className={styles.localResults}>
               <h2 aria-live="polite">
-                {hasSearchedArea ? `현 지도 검색 결과 ${businesses.length}곳` : "이런 동네 가게 알고 있었나요?"}
+                {hasSearchedArea || selectedCategory === "food"
+                  ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
+                  : "이런 동네 가게 알고 있었나요?"}
               </h2>
-              {businesses.length === 0 ? (
+              {displayedBusinesses.length === 0 ? (
                 <StateBlock
                   title="검색 결과가 없어요"
                   body="다른 카테고리나 검색어로 다시 찾아보세요."
@@ -3531,7 +3604,7 @@ function MapScreen({
                 />
               ) : (
                 <div className={styles.businessGrid}>
-                  {businesses.map((business) => {
+                  {displayedBusinesses.map((business) => {
                     const dangerVisual = getDangerVisual(business);
                     return (
                       <article key={business.id} className={styles.businessCard}>
@@ -3559,7 +3632,9 @@ function MapScreen({
                         <small>
                           {dangerVisual
                             ? `${business.distance}${business.neighborhoodName ? ` · ${business.neighborhoodName}` : ""}`
-                            : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
+                            : business.category === "food"
+                              ? `${business.distance} · ${business.source === "kakao_local_api" ? "카카오 지도" : "임시 데이터"}`
+                              : `${business.distance} · ${business.openNow ? "영업중" : "준비중"}`}
                         </small>
                       </article>
                     );
@@ -3578,7 +3653,7 @@ function createRestaurantMarkerIcon(isSelected: boolean) {
   const size = isSelected ? 16 : 10;
   const borderWidth = isSelected ? 3 : 2;
   const shadow = isSelected
-    ? "0 2px 10px rgba(75, 0, 144, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.5)"
+    ? "0 2px 10px rgba(255, 111, 15, 0.65), 0 0 0 2px rgba(255, 255, 255, 0.5)"
     : "0 1px 4px rgba(0, 0, 0, 0.25)";
 
   return {
@@ -3587,7 +3662,7 @@ function createRestaurantMarkerIcon(isSelected: boolean) {
         width: ${size}px;
         height: ${size}px;
         border-radius: 50%;
-        background: #4B0090;
+        background: #ff6f0f;
         border: ${borderWidth}px solid #FFFFFF;
         box-shadow: ${shadow};
         cursor: pointer;
@@ -3609,6 +3684,7 @@ function NaverMapLayer({
   selectedRestaurantId,
   onSelectBusiness,
   onSelectRestaurants,
+  onRestaurantsLoaded,
   onClearRestaurants,
   onSearchBounds,
 }: {
@@ -3620,6 +3696,7 @@ function NaverMapLayer({
   selectedRestaurantId?: string | null;
   onSelectBusiness: (business: LocalBusiness) => void;
   onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
+  onRestaurantsLoaded: (restaurants: Restaurant[]) => void;
   onClearRestaurants: () => void;
   onSearchBounds: (bounds: MapSearchBounds) => void;
 }) {
@@ -3750,6 +3827,7 @@ function NaverMapLayer({
       const zoom = map.getZoom();
       if (zoom < RESTAURANT_MIN_ZOOM) {
         setIsZoomTooLow(true);
+        onRestaurantsLoaded([]);
         if (restaurantClusterRef.current) {
           restaurantClusterRef.current.clear();
         }
@@ -3787,6 +3865,7 @@ function NaverMapLayer({
 
       getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 300 }).then((restaurants) => {
         if (requestId !== restaurantRequestIdRef.current) return;
+        onRestaurantsLoaded(restaurants);
 
         // 기존 마커 및 클러스터 정리
         if (restaurantClusterRef.current) {
@@ -3873,7 +3952,7 @@ function NaverMapLayer({
       restaurantMarkersRef.current = [];
       restaurantMarkerMapRef.current.clear();
     };
-  }, [isRestaurantMode, canUseNaverMap, onSelectRestaurants, onClearRestaurants]);
+  }, [isRestaurantMode, canUseNaverMap, onSelectRestaurants, onRestaurantsLoaded, onClearRestaurants]);
 
   // 선택된 마커 시각적 강조 변경 (selectedRestaurantId 변경 시)
   useEffect(() => {
@@ -4244,8 +4323,8 @@ function MyScreen({
 }) {
   const services: IconItem[] = [
     { label: "중고거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
-    { label: "모임", icon: UsersRound, tone: "violet" },
-    { label: "내 아파트", icon: Building2, tone: "violet", onClick: onOpenApartment },
+    { label: "모임", icon: UsersRound, tone: "primary" },
+    { label: "내 아파트", icon: Building2, tone: "primary", onClick: onOpenApartment },
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
@@ -4285,7 +4364,7 @@ function MyScreen({
           <UserRound size={42} fill="currentColor" />
         </div>
         <div>
-          <strong>보라가지님</strong>
+          <strong>주황가지님</strong>
           <span>{activeNeighborhood} · 신뢰온도</span>
         </div>
         <span className={styles.temperature}>40.1°C</span>
@@ -5642,7 +5721,7 @@ function AllServicesScreen({
         { label: "모임", icon: UsersRound, color: "#ff922b" },
         { label: "온라인 카페", icon: Coffee, color: "#fab005" },
         { label: "내 아파트", icon: Building2, color: "var(--color-primary)", onClick: onOpenApartment },
-        { label: "아파트 오픈게시판", icon: Building2, color: "#7950f2" },
+        { label: "아파트 오픈게시판", icon: Building2, color: "#ff922b" },
         { label: "동네생활", icon: MessageCircle, color: "#22b8cf" },
         { label: "스토리", icon: Sparkles, color: "#ff6b6b" },
         { label: "한 입 뉴스", icon: NotebookTabs, color: "#ff922b" },
@@ -5655,7 +5734,7 @@ function AllServicesScreen({
         { label: "광고", icon: Bell, color: "#ff922b" },
         { label: "월세 카드결제", icon: House, color: "#ff922b" },
         { label: "ATM 출금", icon: WalletCards, color: "#20b77a" },
-        { label: "당근 교환권", icon: QrCode, color: "#a970ff" },
+        { label: "당근 교환권", icon: QrCode, color: "#ff6f0f" },
       ],
     },
     {
@@ -5665,7 +5744,7 @@ function AllServicesScreen({
         { label: "선물가게", icon: CakeSlice, color: "#ff922b" },
         { label: "동네걷기", icon: Dumbbell, color: "#ff922b" },
         { label: "당근이네", icon: Sparkles, color: "#20b77a" },
-        { label: "게임", icon: Headphones, color: "#845ef7" },
+        { label: "게임", icon: Headphones, color: "#ff922b" },
         { label: "당근메이드", icon: House, color: "#ff922b" },
       ],
     },
@@ -5680,8 +5759,8 @@ function AllServicesScreen({
         { label: "수리", icon: Settings, color: "#868e96" },
         { label: "운동", icon: Dumbbell, color: "#339af0" },
         { label: "학원", icon: GraduationCap, color: "#339af0" },
-        { label: "미용실", icon: Sparkles, color: "#a970ff" },
-        { label: "뷰티", icon: Heart, color: "#a970ff" },
+        { label: "미용실", icon: Sparkles, color: "#ff922b" },
+        { label: "뷰티", icon: Heart, color: "#ff922b" },
         { label: "병원", icon: Heart, color: "#20b77a" },
         { label: "반려동물", icon: Sparkles, color: "#fab005" },
       ],
@@ -5830,8 +5909,8 @@ function EggplantPinIcon({
         <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--eggplant-pin-top, #078452)" />
           <stop offset="30%" stopColor="var(--eggplant-pin-top, #078452)" />
-          <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
-          <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+          <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #ff6f0f)" />
+          <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #ff6f0f)" />
         </linearGradient>
       </defs>
       <path
@@ -5858,7 +5937,7 @@ function BottomNav({
   const tabs: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
     { id: "home", label: "홈", icon: Home },
     { id: "community", label: "커뮤니티", icon: UsersRound },
-    { id: "map", label: "갖가지", icon: MapPin },
+    { id: "map", label: "동네지도", icon: MapPin },
     { id: "chats", label: "채팅", icon: MessageCircle },
     { id: "my", label: "나의 가지", icon: UserRound },
   ];
@@ -5870,8 +5949,8 @@ function BottomNav({
           <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--eggplant-pin-top, #078452)" />
             <stop offset="30%" stopColor="var(--eggplant-pin-top, #078452)" />
-            <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
-            <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #7537c5)" />
+            <stop offset="30%" stopColor="var(--eggplant-pin-bottom, #ff6f0f)" />
+            <stop offset="100%" stopColor="var(--eggplant-pin-bottom, #ff6f0f)" />
           </linearGradient>
         </defs>
       </svg>
@@ -6633,7 +6712,7 @@ function AlbaFormScreen({
       badges: ["모범구인"],
       thumbnailTone: "custom",
       thumbnailEmoji: "💼",
-      bgGradient: "linear-gradient(135deg, #7537c5 0%, #a970ff 100%)",
+      bgGradient: "linear-gradient(135deg, #ff6f0f 0%, #ffb057 100%)",
       descriptionBullets: ["1. 상세 업무 협의 가능", "2. 친절하고 성실한 분 환영"],
       details: details || "함께 즐겁게 일할 이웃을 모집합니다.",
       phoneContact,

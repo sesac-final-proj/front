@@ -129,6 +129,7 @@ export async function getRestaurantsByBounds({
   swLng,
   neLat,
   neLng,
+  limit = 45,
 }: BoundsQueryParams): Promise<Restaurant[]> {
   const minLat = Math.min(swLat, neLat);
   const maxLat = Math.max(swLat, neLat);
@@ -136,7 +137,7 @@ export async function getRestaurantsByBounds({
   const maxLng = Math.max(swLng, neLng);
 
   try {
-    const url = `/api/restaurants?swLat=${minLat}&swLng=${minLng}&neLat=${maxLat}&neLng=${maxLng}`;
+    const url = `/api/restaurants?swLat=${minLat}&swLng=${minLng}&neLat=${maxLat}&neLng=${maxLng}&limit=${limit}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
@@ -147,14 +148,20 @@ export async function getRestaurantsByBounds({
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await response.json() as { source?: string; restaurants?: Restaurant[] };
       if (Array.isArray(data.restaurants) && data.restaurants.length > 0) {
-        return data.restaurants;
+        return data.restaurants.map((restaurant) => ({
+          ...restaurant,
+          source: restaurant.source ?? data.source,
+        }));
       }
     }
   } catch (error) {
     console.warn("Client fallback triggered:", error);
   }
 
-  return getFallbackRestaurants({ minLat, maxLat, minLng, maxLng });
+  return getFallbackRestaurants({ minLat, maxLat, minLng, maxLng, limit }).map((restaurant) => ({
+    ...restaurant,
+    source: restaurant.source ?? "fallback_client",
+  }));
 }
