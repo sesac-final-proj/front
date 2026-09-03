@@ -2246,6 +2246,242 @@
   letter-spacing: 0;
 }
 
+.congestionSection {
+  display: grid;
+  gap: 14px;
+}
+
+.congestionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.congestionHeader h2 {
+  margin-bottom: 5px;
+}
+
+.congestionHeader p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.congestionLiveBadge {
+  flex: 0 0 auto;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(66, 199, 238, 0.14);
+  color: #42c7ee;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.congestionSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.congestionSummaryCard {
+  min-height: 92px;
+  border-radius: 8px;
+  background: #222831;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  display: grid;
+  align-content: space-between;
+}
+
+.congestionSummaryCard span,
+.congestionZoneFooter {
+  color: var(--color-dim);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.congestionSummaryCard strong {
+  color: var(--color-text);
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.congestionSummaryCard strong small {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.congestionSummaryCard em {
+  color: #42c7ee;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.congestionZoneList {
+  display: grid;
+  gap: 10px;
+}
+
+.congestionZoneCard {
+  border-radius: 8px;
+  background: #24262c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 13px;
+  display: grid;
+  gap: 11px;
+}
+
+.congestionZoneTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.congestionZoneTop strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.congestionZoneTop span {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.congestionZoneTop em {
+  min-width: 52px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text);
+  padding: 5px 8px;
+  text-align: center;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.congestionMeter {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.congestionMeter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #42c7ee;
+}
+
+.congestionZoneFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.congestionCard_low .congestionMeter span {
+  background: #4cd883;
+}
+
+.congestionCard_moderate .congestionMeter span {
+  background: #ffc45f;
+}
+
+.congestionCard_high .congestionMeter span {
+  background: #ff922b;
+}
+
+.congestionCard_severe .congestionMeter span {
+  background: #ff4d4f;
+}
+
+.congestionMapMarker {
+  position: relative;
+  min-width: 74px;
+  border-radius: 8px;
+  background: rgba(20, 22, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  padding: 7px 9px 8px;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.congestionMapMarker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: inherit;
+  border-right: inherit;
+  border-bottom: inherit;
+}
+
+.congestionMapMarker strong {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.congestionMapMarker span {
+  position: relative;
+  z-index: 1;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.congestionMapMarker em {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-style: normal;
+  font-weight: 750;
+}
+
+.congestionMapMarker_low {
+  background: rgba(27, 128, 82, 0.94);
+}
+
+.congestionMapMarker_moderate {
+  background: rgba(160, 103, 22, 0.94);
+}
+
+.congestionMapMarker_high {
+  background: rgba(199, 84, 16, 0.95);
+}
+
+.congestionMapMarker_severe {
+  background: rgba(202, 45, 50, 0.96);
+}
+
 .businessGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6942,4 +7178,153 @@
   color: var(--color-dim);
   font-size: 13px;
   margin-top: 4px;
+}
+
+
+/* ==========================================================================
+   SEED Design (seed-design.io) %당 파스텔 혼잡도 히트맵 & 컬러보드
+   ========================================================================== */
+
+@keyframes seedHeatmapPulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.80;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 1.0;
+  }
+}
+
+.seedColorBoardLegend {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seedColorBoardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 750;
+  color: var(--color-text);
+}
+
+.seedColorBoardHeader small {
+  font-size: 10px;
+  color: var(--color-muted);
+}
+
+.seedColorBoardPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.seedColorBoardPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.seedPillDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.seedZoneBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.seedHourlyChart {
+  margin: 10px 0 6px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+
+.stage:not([data-theme="light"]) .seedHourlyChart {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.seedHourlyLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: 6px;
+}
+
+.seedHourlyBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 48px;
+  padding-top: 4px;
+}
+
+.seedHourlyBarItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.seedHourlyBarTrack {
+  flex: 1;
+  width: 100%;
+  max-width: 16px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.stage:not([data-theme="light"]) .seedHourlyBarTrack {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.seedHourlyBarFill {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.seedHourlyBarTime {
+  font-size: 9.5px;
+  color: var(--color-muted);
+  margin-top: 3px;
+}
+
+.seedRecommendationBox {
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 11.5px;
+  line-height: 1.4;
+  font-weight: 600;
 }

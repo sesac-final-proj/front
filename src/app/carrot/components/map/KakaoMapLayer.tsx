@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { getCongestionLevelLabel, type CongestionZone } from "@/services/congestionService";
+import {
+  getCongestionLevelLabel,
+  getSeedPastelTheme,
+  type CongestionZone,
+} from "@/services/congestionService";
 import type { Restaurant } from "@/services/restaurantService";
 import { getRestaurantsByBounds } from "@/services/restaurantService";
 import styles from "../../GajiMarketApp.module.css";
@@ -172,23 +176,104 @@ export function createRestaurantOverlayElement(
   return container;
 }
 
-function createCongestionOverlayElement(zone: CongestionZone): HTMLDivElement {
-  const toneClass = styles[`congestionMapMarker_${zone.level}` as keyof typeof styles] ?? "";
+// SEED Design System (seed-design.io) 기반 %당 파스텔 히트맵 오버레이 엘리먼트
+export function createSeedPastelHeatmapElement(
+  zone: CongestionZone,
+  isDark: boolean,
+  onClick?: () => void,
+): HTMLDivElement {
+  const theme = getSeedPastelTheme(zone.currentScore);
   const container = document.createElement("div");
-  container.className = `${styles.congestionMapMarker} ${toneClass}`;
-  container.setAttribute("role", "img");
-  container.setAttribute("aria-label", `${zone.name} 혼잡도 ${zone.currentScore}%, ${getCongestionLevelLabel(zone.level)}`);
+  container.style.position = "relative";
+  container.style.display = "flex";
+  container.style.alignItems = "center";
+  container.style.justifyContent = "center";
+  container.style.cursor = "pointer";
+  container.style.userSelect = "none";
 
-  const score = document.createElement("strong");
-  score.textContent = `${zone.currentScore}%`;
+  // 혼잡도 점수에 비례한 부드러운 히트맵 반경 계산 (160px ~ 240px)
+  const diameter = Math.round(160 + (zone.currentScore / 100) * 80);
+  const radius = diameter / 2;
+  const gradId = `seed-heat-${zone.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
-  const label = document.createElement("span");
-  label.textContent = zone.name;
+  container.style.width = `${diameter}px`;
+  container.style.height = `${diameter}px`;
 
-  const level = document.createElement("em");
-  level.textContent = getCongestionLevelLabel(zone.level);
+  container.innerHTML = `
+    <!-- 1. SEED Pastel Multi-layer Radial Heatmap Disk (부드러운 파스텔 방사형 열지도) -->
+    <svg width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}" style="
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      filter: blur(8px);
+      transform-origin: center;
+      animation: seedHeatmapPulse 3.2s ease-in-out infinite alternate;
+    ">
+      <defs>
+        <radialGradient id="${gradId}" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${theme.heatmapInner}" />
+          <stop offset="40%" stop-color="${theme.heatmapMid}" />
+          <stop offset="80%" stop-color="${theme.heatmapOuter}" />
+          <stop offset="100%" stop-color="transparent" />
+        </radialGradient>
+      </defs>
+      <circle cx="${radius}" cy="${radius}" r="${radius - 6}" fill="url(#${gradId})" />
+    </svg>
 
-  container.append(score, label, level);
+    <!-- 2. SEED Design 파스텔 중앙 플로팅 뱃지 마커 -->
+    <div style="
+      position: relative;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: ${isDark ? "#1C2027" : "#FFFFFF"};
+      border: 1.5px solid ${theme.badgeBorder};
+      box-shadow: 0 4px 16px rgba(0, 0, 0, ${isDark ? "0.45" : "0.12"}), ${theme.glowShadow};
+      transform: translateY(0);
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+    ">
+      <span style="
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: ${theme.tagColor};
+        box-shadow: 0 0 6px ${theme.tagColor};
+        flex-shrink: 0;
+      "></span>
+      <span style="
+        font-size: 12px;
+        font-weight: 750;
+        color: ${isDark ? "#FFFFFF" : "#191F28"};
+        white-space: nowrap;
+        letter-spacing: -0.3px;
+      ">
+        ${zone.name}
+      </span>
+      <span style="
+        font-size: 11.5px;
+        font-weight: 850;
+        color: ${theme.badgeText};
+        background: ${theme.badgeBg};
+        padding: 1.5px 7px;
+        border-radius: 999px;
+        border: 1px solid ${theme.badgeBorder};
+        white-space: nowrap;
+      ">
+        ${zone.currentScore}% · ${theme.label}
+      </span>
+    </div>
+  `;
+
+  if (onClick) {
+    container.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+  }
+
   return container;
 }
 
@@ -552,7 +637,7 @@ export function KakaoMapLayer({
     restaurantOverlaysRef.current = newOverlays;
   }, [selectedRestaurantId, isRestaurantMode, canUseKakaoMap, isDark]);
 
-  // 6. Congestion Layer: 카카오 지도 위 혼잡도 분석 오버레이
+  // 6. Congestion Layer: 카카오 지도 위 SEED Design 파스텔 히트맵 오버레이
   useEffect(() => {
     const kakao = (window as any).kakao;
     const map = mapRef.current;
@@ -566,10 +651,15 @@ export function KakaoMapLayer({
     congestionOverlaysRef.current = [];
 
     const newOverlays = congestionZones.map((zone) => {
+      const el = createSeedPastelHeatmapElement(zone, isDark, () => {
+        map.panTo(new kakao.maps.LatLng(zone.lat, zone.lng));
+      });
+
       const overlay = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(zone.lat, zone.lng),
-        content: createCongestionOverlayElement(zone),
-        yAnchor: 1,
+        content: el,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
         zIndex: 120,
       });
       overlay.setMap(map);
@@ -582,7 +672,7 @@ export function KakaoMapLayer({
       congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
       congestionOverlaysRef.current = [];
     };
-  }, [canUseKakaoMap, congestionZones, isCongestionMode]);
+  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark]);
 
   return (
     <>

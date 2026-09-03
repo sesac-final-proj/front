@@ -77,6 +77,8 @@ import {
   getCongestionDelta,
   getCongestionLevelLabel,
   getCongestionZonesForNeighborhood,
+  getSeedPastelTheme,
+  SEED_PASTEL_COLOR_BOARD,
   summarizeCongestion,
   type CongestionZone,
 } from "@/services/congestionService";
@@ -3768,16 +3770,45 @@ function CongestionAnalysisSection({
 }) {
   const summary = summarizeCongestion(zones);
   const peakZone = summary.peakZone;
+  const avgTheme = summary.averageTheme;
 
   return (
     <section className={`${styles.localResults} ${styles.congestionSection}`}>
       <div className={styles.congestionHeader}>
         <div>
           <h2 aria-live="polite">{hasSearchedArea ? "현 지도 혼잡도 분석" : "동네 혼잡도 분석"}</h2>
-          <p>가게 방문 전 붐비는 구간을 먼저 확인해요.</p>
+          <p>SEED 디자인 기반 %당 파스텔 히트맵으로 실시간 인파를 분석해요.</p>
         </div>
-        <span className={styles.congestionLiveBadge}>지도 연동</span>
+        <span className={styles.congestionLiveBadge} style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>
+          평균 {summary.averageScore}% · {avgTheme.label}
+        </span>
       </div>
+
+      {/* SEED Design 파스텔 컬러보드 범례 (%당 색상표) */}
+      <div className={styles.seedColorBoardLegend}>
+        <div className={styles.seedColorBoardHeader}>
+          <span>🎨 SEED 파스텔 혼잡도 컬러보드</span>
+          <small>seed-design.io scale</small>
+        </div>
+        <div className={styles.seedColorBoardPills}>
+          {SEED_PASTEL_COLOR_BOARD.map((item) => (
+            <div
+              key={item.rangeLabel}
+              className={styles.seedColorBoardPill}
+              style={{
+                background: item.badgeBg,
+                borderColor: item.badgeBorder,
+                color: item.badgeText,
+              }}
+            >
+              <span className={styles.seedPillDot} style={{ background: item.tagColor }} />
+              <strong>{item.rangeLabel}</strong>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {zones.length === 0 ? (
         <StateBlock
           title="혼잡도 결과가 없어요"
@@ -3788,36 +3819,96 @@ function CongestionAnalysisSection({
       ) : (
         <>
           <div className={styles.congestionSummaryGrid}>
-            <article className={styles.congestionSummaryCard}>
-              <span>현재 평균</span>
-              <strong>{summary.averageScore}<small>%</small></strong>
-              <em>{getCongestionLevelLabel(summary.averageLevel)}</em>
+            <article className={styles.congestionSummaryCard} style={{ background: avgTheme.cardBg, borderColor: avgTheme.badgeBorder }}>
+              <span>현재 동네 평균</span>
+              <strong style={{ color: avgTheme.badgeText }}>{summary.averageScore}<small>%</small></strong>
+              <em style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>{avgTheme.label}</em>
             </article>
             <article className={styles.congestionSummaryCard}>
-              <span>붐비는 장소</span>
+              <span>가장 붐비는 장소</span>
               <strong>{peakZone?.name ?? "확인 중"}</strong>
-              <em>{summary.crowdedCount}곳 주의</em>
+              <em style={{ background: "#FFF1F2", color: "#E11D48", borderColor: "#FECDD3" }}>{summary.crowdedCount}곳 주의</em>
             </article>
           </div>
+
           <div className={styles.congestionZoneList}>
             {zones.map((zone) => {
               const delta = getCongestionDelta(zone);
-              const toneClass = styles[`congestionCard_${zone.level}` as keyof typeof styles] ?? "";
+              const theme = getSeedPastelTheme(zone.currentScore);
               return (
-                <article key={zone.id} className={`${styles.congestionZoneCard} ${toneClass}`}>
+                <article
+                  key={zone.id}
+                  className={styles.congestionZoneCard}
+                  style={{
+                    borderLeft: `4px solid ${theme.tagColor}`,
+                    background: "var(--color-bg-elevated)",
+                  }}
+                >
                   <div className={styles.congestionZoneTop}>
                     <div>
-                      <strong>{zone.name}</strong>
-                      <span>{zone.summary}</span>
+                      <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
+                      <span className={styles.congestionZoneSummary}>{zone.summary}</span>
                     </div>
-                    <em>{getCongestionLevelLabel(zone.level)}</em>
+                    <span
+                      className={styles.seedZoneBadge}
+                      style={{
+                        background: theme.badgeBg,
+                        color: theme.badgeText,
+                        borderColor: theme.badgeBorder,
+                      }}
+                    >
+                      <span className={styles.seedPillDot} style={{ background: theme.tagColor }} />
+                      {zone.currentScore}% · {theme.label}
+                    </span>
                   </div>
-                  <div className={styles.congestionMeter} role="progressbar" aria-label={`${zone.name} 혼잡도`} aria-valuenow={zone.currentScore} aria-valuemin={0} aria-valuemax={100}>
-                    <span style={{ width: `${zone.currentScore}%` }} />
+
+                  {/* SEED Pastel Meter Track */}
+                  <div className={styles.congestionMeter} role="progressbar" aria-label={`${zone.name} 혼잡도 ${zone.currentScore}%`} aria-valuenow={zone.currentScore} aria-valuemin={0} aria-valuemax={100}>
+                    <span style={{ width: `${zone.currentScore}%`, background: theme.meterGradient }} />
                   </div>
+
+                  {/* 24시간 시간대별 트렌드 미니 차트 (있는 경우) */}
+                  {zone.hourlyTrends && zone.hourlyTrends.length > 0 && (
+                    <div className={styles.seedHourlyChart}>
+                      <span className={styles.seedHourlyLabel}>시간대별 혼잡 추이</span>
+                      <div className={styles.seedHourlyBars}>
+                        {zone.hourlyTrends.map((val, idx) => {
+                          const barTheme = getSeedPastelTheme(val);
+                          const isCurrent = idx === 6; // current hour representation
+                          return (
+                            <div key={idx} className={styles.seedHourlyBarItem} title={`${idx + 12}시: ${val}% (${barTheme.label})`}>
+                              <div className={styles.seedHourlyBarTrack}>
+                                <div
+                                  className={styles.seedHourlyBarFill}
+                                  style={{
+                                    height: `${val}%`,
+                                    background: barTheme.tagColor,
+                                    opacity: isCurrent ? 1 : 0.6,
+                                  }}
+                                />
+                              </div>
+                              <span className={styles.seedHourlyBarTime} style={{ fontWeight: isCurrent ? 800 : 500 }}>
+                                {idx + 12}시
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 추천 방문 팁 */}
+                  {zone.recommendation && (
+                    <div className={styles.seedRecommendationBox} style={{ background: theme.badgeBg, borderColor: theme.badgeBorder }}>
+                      <span style={{ color: theme.badgeText }}>💡 {zone.recommendation}</span>
+                    </div>
+                  )}
+
                   <footer className={styles.congestionZoneFooter}>
                     <span>{zone.distance} · {zone.updatedAt}</span>
-                    <span>{delta >= 0 ? `평소보다 +${delta}%` : `평소보다 ${delta}%`}</span>
+                    <span style={{ color: delta > 0 ? "#E11D48" : "#027A48", fontWeight: 700 }}>
+                      {delta >= 0 ? `평소보다 +${delta}% 혼잡` : `평소보다 ${Math.abs(delta)}% 여유`}
+                    </span>
                   </footer>
                 </article>
               );
