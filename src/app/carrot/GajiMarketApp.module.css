@@ -1619,6 +1619,502 @@
   color: var(--color-primary);
 }
 
+.restaurantZoomAlert {
+  position: absolute;
+  z-index: 3;
+  top: 98px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(27, 29, 34, 0.94);
+  color: #ff922b;
+  border: 1px solid rgba(255, 146, 43, 0.35);
+  backdrop-filter: blur(12px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.restaurantPreviewBar {
+  position: absolute;
+  z-index: 6;
+  left: 14px;
+  right: 14px;
+  bottom: 200px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 4px 10px;
+  scrollbar-width: none;
+  pointer-events: auto;
+  align-items: flex-end;
+}
+
+.restaurantPreviewBar::-webkit-scrollbar {
+  display: none;
+}
+
+.restaurantPreviewCloseBtn {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(40, 42, 48, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  margin-bottom: 8px;
+}
+
+.restaurantCard {
+  flex: 0 0 280px;
+  background: rgba(27, 29, 34, 0.96);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  user-select: none;
+}
+
+.restaurantCard:hover {
+  transform: translateY(-2px);
+}
+
+.restaurantCardSelected {
+  border-color: #ff6f0f;
+  box-shadow: 0 0 0 2px #ff6f0f, 0 14px 36px rgba(255, 111, 15, 0.3);
+  transform: translateY(-3px);
+}
+
+.restaurantCardHeader {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.restaurantCardThumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #202227;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.restaurantCardThumbFallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3a1f0a, #ff6f0f);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.restaurantCardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.restaurantCardInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.restaurantCardTitle {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantCardCategory {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff922b;
+}
+
+.restaurantCardAddress {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.restaurantCardRating {
+  font-size: 12px;
+  color: #ffc45f;
+  font-weight: 600;
+}
+
+.restaurantCardDetailLink {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff922b;
+  text-decoration: none;
+}
+
+.restaurantCardDetailLink:hover {
+  text-decoration: underline;
+}
+
+/* Kakao Map Frame & Dark Mode Tiles */
+.kakaoMapFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kakaoMapLayer {
+  width: 100%;
+  height: 100%;
+  background: #181d24;
+}
+
+.stage:not([data-theme="light"]) .kakaoMapLayer img[src*="daumcdn"],
+.stage:not([data-theme="light"]) .kakaoMapLayer img[src*="kakaocdn"],
+.stage:not([data-theme="light"]) .kakaoMapLayer img[src*="kakao"] {
+  filter: invert(90%) hue-rotate(185deg) brightness(85%) contrast(90%) saturate(75%);
+}
+
+.stage[data-theme="light"] .kakaoMapLayer img {
+  filter: none;
+}
+
+.stage[data-theme="light"] .kakaoMapLayer {
+  background: #eef1f4;
+}
+
+/* Restaurant Detail Sheet (사진 3번) */
+.restaurantDetailSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 18px 24px;
+  color: var(--color-text);
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.restaurantDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.restaurantDetailTitleBox {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.restaurantDetailTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: -0.4px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantDetailCategory {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.restaurantDetailActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.restaurantDetailHeartBtn,
+.restaurantDetailCloseBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.stage[data-theme="light"] :is(.restaurantDetailHeartBtn, .restaurantDetailCloseBtn) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.restaurantDetailRatingRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.restaurantDetailStar {
+  color: #ff8a00;
+  font-size: 15px;
+}
+
+.restaurantDetailRatingNum {
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.restaurantDetailDot {
+  color: var(--color-dim);
+}
+
+.restaurantDetailSubText {
+  color: var(--color-muted);
+}
+
+.restaurantDetailTagBadge {
+  margin-left: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.stage[data-theme="light"] .restaurantDetailTagBadge {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.restaurantDetailLocationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.restaurantDetailDistance {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.restaurantDetailNaviBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.stage[data-theme="light"] .restaurantDetailNaviBtn {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.restaurantDetailGallery {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 6px;
+  scrollbar-width: none;
+}
+
+.restaurantDetailGallery::-webkit-scrollbar {
+  display: none;
+}
+
+.restaurantDetailPhotoCard {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.restaurantDetailPhotoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.restaurantDetailBenefitBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #24262c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.stage[data-theme="light"] .restaurantDetailBenefitBox {
+  background: #f4f4f6;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.restaurantDetailBenefitLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ff6f0f;
+  flex-shrink: 0;
+}
+
+.restaurantDetailBenefitText {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restaurantDetailTabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+}
+
+.stage[data-theme="light"] .restaurantDetailTabs {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.restaurantDetailTabBtn {
+  background: transparent;
+  border: 0;
+  padding: 8px 2px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  position: relative;
+}
+
+.restaurantDetailTabActive {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.restaurantDetailTabActive::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-text);
+  border-radius: 2px;
+}
+
+.restaurantDetailContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.restaurantDetailContentTitle {
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 850;
+  color: var(--color-text);
+}
+
+.restaurantDetailContentText {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.restaurantDetailMetaList {
+  display: grid;
+  gap: 7px;
+}
+
+.restaurantDetailMetaItem {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.restaurantDetailMetaLabel {
+  flex: 0 0 34px;
+  color: var(--color-dim);
+  font-weight: 750;
+}
+
+.restaurantDetailKakaoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  border-radius: 8px;
+  background: #ff6f0f;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(255, 111, 15, 0.24);
+}
+
 .localSheet {
   position: absolute;
   z-index: 5;
@@ -1817,6 +2313,11 @@
   color: var(--color-text);
 }
 
+.businessCardSelected {
+  outline: 2px solid #ff6f0f;
+  box-shadow: 0 0 0 3px rgba(255, 111, 15, 0.25);
+}
+
 .businessImage {
   height: 94px;
   border-radius: 13px;
@@ -1826,6 +2327,32 @@
   color: var(--color-text);
   font-weight: 900;
   margin-bottom: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.businessThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dangerBusinessImage {
+  background: var(--danger-thumb-bg);
+  color: var(--danger-thumb-fg);
+  align-content: center;
+  gap: 6px;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.34);
+}
+
+.dangerBusinessImage span {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.dangerBusinessImage .dangerEmoji {
+  font-size: 30px;
 }
 
 .dangerBusinessImage {
@@ -3539,6 +4066,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mergeGameViewport {
+  padding-bottom: 0;
 }
 
 /* Real estate */

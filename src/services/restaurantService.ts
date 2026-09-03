@@ -13,6 +13,12 @@ export interface Restaurant {
   distance?: string;
   rating?: number;
   reviewCount?: number;
+  regularCount?: number;
+  benefit?: string;
+  tags?: string[];
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  images?: string[];
 }
 
 export interface BoundsQueryParams {
@@ -56,6 +62,42 @@ const SAMPLE_RESTAURANTS: Omit<Restaurant, "id">[] = [
   { name: "당산2동 브런치카페", category: "카페/디저트", roadAddress: "서울 영등포구 당산로 180", lat: 37.5358, lng: 126.9039 },
 ];
 
+export const CATEGORY_FOOD_IMAGES: Record<string, string> = {
+  한식: "https://images.unsplash.com/photo-1590301157890-4810ed352733?w=300&q=80",
+  일식: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300&q=80",
+  중식: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300&q=80",
+  양식: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&q=80",
+  "카페/디저트": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80",
+  카페: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80",
+  분식: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&q=80",
+  "고기/구이": "https://images.unsplash.com/photo-1544025162-d76694265947?w=300&q=80",
+  기타: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300&q=80",
+};
+
+const KAKAO_PLACE_URL_RE = /^https?:\/\/(?:place\.map|map)\.kakao\.com\//i;
+
+export function getKakaoPlaceUrl(restaurant: Pick<Restaurant, "id" | "name" | "placeUrl">): string {
+  const placeUrl = restaurant.placeUrl?.trim();
+  if (placeUrl && KAKAO_PLACE_URL_RE.test(placeUrl)) {
+    return placeUrl;
+  }
+
+  const kakaoPlaceId = restaurant.id.startsWith("kakao-") ? restaurant.id.slice("kakao-".length) : restaurant.id;
+  if (/^\d+$/.test(kakaoPlaceId)) {
+    return `https://place.map.kakao.com/${kakaoPlaceId}`;
+  }
+
+  return `https://map.kakao.com/link/search/${encodeURIComponent(restaurant.name)}`;
+}
+
+export function getCategoryFallbackImage(category?: string): string {
+  if (!category) return CATEGORY_FOOD_IMAGES.기타;
+  for (const [key, url] of Object.entries(CATEGORY_FOOD_IMAGES)) {
+    if (category.includes(key)) return url;
+  }
+  return CATEGORY_FOOD_IMAGES.기타;
+}
+
 export function getFallbackRestaurants({
   minLat,
   maxLat,
@@ -73,10 +115,13 @@ export function getFallbackRestaurants({
 
   SAMPLE_RESTAURANTS.forEach((item, index) => {
     if (item.lat >= minLat && item.lat <= maxLat && item.lng >= minLng && item.lng <= maxLng) {
+      const fallbackImg = getCategoryFallbackImage(item.category);
       results.push({
         id: `sample-rest-${index}`,
         ...item,
-        placeUrl: `https://map.naver.com/v5/search/${encodeURIComponent(item.name)}`,
+        placeUrl: getKakaoPlaceUrl({ id: `sample-rest-${index}`, name: item.name }),
+        imageUrl: fallbackImg,
+        thumbnailUrl: fallbackImg,
       });
     }
   });
@@ -103,15 +148,19 @@ export function getFallbackRestaurants({
     if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
       const name = `${names[i % names.length]} ${i + 1}호점`;
       const category = categories[i % categories.length];
+      const fallbackImg = getCategoryFallbackImage(category);
+      const id = `dynamic-rest-${i}-${Math.round(lat * 10000)}`;
       results.push({
-        id: `dynamic-rest-${i}-${Math.round(lat * 10000)}`,
+        id,
         name,
         category,
         roadAddress: `서울 주변 골목길 ${i + 12}번길`,
         lat,
         lng,
         naverUrl: `https://map.naver.com/v5/search/${encodeURIComponent(name)}`,
-        placeUrl: `https://map.naver.com/v5/search/${encodeURIComponent(name)}`,
+        placeUrl: getKakaoPlaceUrl({ id, name }),
+        imageUrl: fallbackImg,
+        thumbnailUrl: fallbackImg,
         rating: 4.2 + ((i % 8) * 0.1),
         reviewCount: 12 + (i * 7),
       });
