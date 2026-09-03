@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Heart, X, Navigation } from "lucide-react";
+import { Heart, X, Navigation, ExternalLink } from "lucide-react";
 import type { Restaurant } from "@/services/restaurantService";
 import styles from "../../GajiMarketApp.module.css";
 
@@ -19,10 +19,13 @@ export function RestaurantDetailSheet({
   const [activeTab, setActiveTab] = useState("홈");
   const [isLiked, setIsLiked] = useState(false);
 
-  const detailUrl =
+  // 카카오맵 길찾기 & 카카오맵 플레이스 직접 연동 URL
+  const kakaoNaviUrl = `https://map.kakao.com/link/to/${encodeURIComponent(restaurant.name)},${restaurant.lat},${restaurant.lng}`;
+  const kakaoPlaceUrl =
     restaurant.placeUrl ||
-    restaurant.naverUrl ||
-    `https://map.kakao.com/link/search/${encodeURIComponent(restaurant.name)}`;
+    (restaurant.id && !restaurant.id.startsWith("restaurant-")
+      ? `https://place.map.kakao.com/${restaurant.id}`
+      : `https://map.kakao.com/link/search/${encodeURIComponent(restaurant.name)}`);
 
   const images =
     restaurant.images && restaurant.images.length > 0
@@ -30,19 +33,28 @@ export function RestaurantDetailSheet({
       : [restaurant.imageUrl || restaurant.thumbnailUrl || ""].filter(Boolean);
 
   const rating = restaurant.rating ? restaurant.rating.toFixed(1) : "4.2";
-  const reviewCount = restaurant.reviewCount || 17;
+  const reviewCount = restaurant.reviewCount || 19;
   const regularCount = restaurant.regularCount || 2;
   const distance = restaurant.distance || "88m";
   const addressParts = (restaurant.roadAddress || restaurant.address || "").split(" ");
-  const neighborhoodName = addressParts[1] || addressParts[0] || "동네";
+  const neighborhoodName = addressParts[1] || addressParts[0] || "문래동6가";
 
   return (
     <div className={styles.restaurantDetailSheet}>
       {/* 1. 상단 타이틀 & 닫기/찜 (사진 3번) */}
       <div className={styles.restaurantDetailHeader}>
         <div className={styles.restaurantDetailTitleBox}>
-          <h2 className={styles.restaurantDetailTitle}>{restaurant.name}</h2>
-          <span className={styles.restaurantDetailCategory}>{restaurant.category || "음식점"}</span>
+          <a
+            href={kakaoPlaceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.restaurantDetailTitleLink}
+            title="카카오맵에서 상세 보기"
+          >
+            <h2 className={styles.restaurantDetailTitle}>{restaurant.name}</h2>
+            <ExternalLink size={15} className={styles.restaurantDetailTitleIcon} />
+          </a>
+          <span className={styles.restaurantDetailCategory}>{restaurant.category || "돼지고기"}</span>
         </div>
         <div className={styles.restaurantDetailActions}>
           <button
@@ -75,16 +87,17 @@ export function RestaurantDetailSheet({
         <span className={styles.restaurantDetailTagBadge}>지역화폐</span>
       </div>
 
-      {/* 3. 거리 및 길찾기 버튼 (사진 3번) */}
+      {/* 3. 거리 및 카카오맵 길찾기 버튼 (사진 3번) */}
       <div className={styles.restaurantDetailLocationRow}>
         <span className={styles.restaurantDetailDistance}>
           {distance} · {neighborhoodName} ⌵
         </span>
         <a
-          href={detailUrl}
+          href={kakaoNaviUrl}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.restaurantDetailNaviBtn}
+          title="카카오맵 길찾기로 이동"
         >
           <Navigation size={13} />
           <span>길찾기</span>
@@ -110,7 +123,7 @@ export function RestaurantDetailSheet({
         </div>
       )}
 
-      {/* 5. 단골 혜택 Box (사진 3번) */}
+      {/* 5. 단골 혜택 Box (사용자 업로드 이미지 모작) */}
       <div className={styles.restaurantDetailBenefitBox}>
         <span className={styles.restaurantDetailBenefitLabel}>단골 혜택</span>
         <span className={styles.restaurantDetailBenefitText}>
@@ -118,21 +131,43 @@ export function RestaurantDetailSheet({
         </span>
       </div>
 
-      {/* 6. 상세 탭 (사진 3번: 홈, 소식, 후기, 가격, 사진) */}
+      {/* 6. 상세 탭 (사용자 업로드 이미지 모작: 홈, 소식, 후기 19, 가격, 사진) */}
       <div className={styles.restaurantDetailTabs}>
-        {["홈", "소식", `후기 ${reviewCount}`, "가격", "사진"].map((tab) => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              type="button"
-              className={`${styles.restaurantDetailTabBtn} ${isActive ? styles.restaurantDetailTabActive : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          );
-        })}
+        <button
+          type="button"
+          className={`${styles.restaurantDetailTabBtn} ${activeTab === "홈" ? styles.restaurantDetailTabActive : ""}`}
+          onClick={() => setActiveTab("홈")}
+        >
+          홈
+        </button>
+        <button
+          type="button"
+          className={`${styles.restaurantDetailTabBtn} ${activeTab === "소식" ? styles.restaurantDetailTabActive : ""}`}
+          onClick={() => setActiveTab("소식")}
+        >
+          소식
+        </button>
+        <button
+          type="button"
+          className={`${styles.restaurantDetailTabBtn} ${activeTab === "후기" ? styles.restaurantDetailTabActive : ""}`}
+          onClick={() => setActiveTab("후기")}
+        >
+          후기 <span className={styles.restaurantDetailBadgeNum}>{reviewCount}</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.restaurantDetailTabBtn} ${activeTab === "가격" ? styles.restaurantDetailTabActive : ""}`}
+          onClick={() => setActiveTab("가격")}
+        >
+          가격
+        </button>
+        <button
+          type="button"
+          className={`${styles.restaurantDetailTabBtn} ${activeTab === "사진" ? styles.restaurantDetailTabActive : ""}`}
+          onClick={() => setActiveTab("사진")}
+        >
+          사진
+        </button>
       </div>
     </div>
   );

@@ -200,6 +200,7 @@ export function KakaoMapLayer({
 }: KakaoMapLayerProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
+  const clustererRef = useRef<any>(null);
   const [isKakaoMapReady, setIsKakaoMapReady] = useState(false);
   const [hasScriptError, setHasScriptError] = useState(false);
   const [isZoomTooLow, setIsZoomTooLow] = useState(false);
@@ -260,7 +261,7 @@ export function KakaoMapLayer({
     });
   }, [isRestaurantMode, activeNeighborhood, currentLocation, coordsMap]);
 
-  // 2. Map creation and center movement
+  // 2. Map creation and MarkerClusterer setup
   useEffect(() => {
     const kakao = (window as any).kakao;
     const container = mapElementRef.current;
@@ -270,13 +271,54 @@ export function KakaoMapLayer({
     const centerLatLng = new kakao.maps.LatLng(centerCoord.lat, centerCoord.lng);
 
     if (!mapRef.current) {
-      mapRef.current = new kakao.maps.Map(container, {
+      const map = new kakao.maps.Map(container, {
         center: centerLatLng,
         level: 4,
       });
+      mapRef.current = map;
+
+      // 카카오 맵 MarkerClusterer 클러스터러 초기화
+      if (kakao.maps.MarkerClusterer) {
+        clustererRef.current = new kakao.maps.MarkerClusterer({
+          map: map,
+          averageCenter: true,
+          minLevel: 5,
+          disableClickZoom: false,
+          styles: [
+            {
+              width: "38px",
+              height: "38px",
+              background: "#FF6F0F",
+              borderRadius: "50%",
+              color: "#FFFFFF",
+              textAlign: "center",
+              fontWeight: "800",
+              fontSize: "14px",
+              lineHeight: "38px",
+              boxShadow: "0 3px 10px rgba(0, 0, 0, 0.35)",
+              border: "2px solid #FFFFFF",
+              cursor: "pointer",
+            },
+            {
+              width: "46px",
+              height: "46px",
+              background: "#E85B00",
+              borderRadius: "50%",
+              color: "#FFFFFF",
+              textAlign: "center",
+              fontWeight: "800",
+              fontSize: "15px",
+              lineHeight: "46px",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)",
+              border: "2px solid #FFFFFF",
+              cursor: "pointer",
+            },
+          ],
+        });
+      }
 
       // 지도 빈 공간 클릭 시 음식점 선택 해제 (자연스럽게 원래로 복귀)
-      kakao.maps.event.addListener(mapRef.current, "click", () => {
+      kakao.maps.event.addListener(map, "click", () => {
         onClearRestaurantsRef.current();
       });
     } else {
@@ -309,13 +351,14 @@ export function KakaoMapLayer({
     };
   }, [activeNeighborhood, currentLocation, centerRequest, canUseKakaoMap, isDark, coordsMap]);
 
-  // 4. Restaurant Layer: bounds fetch and custom overlays
+  // 4. Restaurant Layer: bounds fetch, clusterer, and custom overlays
   useEffect(() => {
     const kakao = (window as any).kakao;
     const map = mapRef.current;
     if (!map || !kakao?.maps || !canUseKakaoMap || !isRestaurantMode) {
       restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
       restaurantOverlaysRef.current = [];
+      if (clustererRef.current) clustererRef.current.clear();
       previousBoundsRef.current = null;
       setIsZoomTooLow(false);
       return;
@@ -329,6 +372,7 @@ export function KakaoMapLayer({
         onRestaurantsLoadedRef.current([]);
         restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
         restaurantOverlaysRef.current = [];
+        if (clustererRef.current) clustererRef.current.clear();
         return;
       }
       setIsZoomTooLow(false);
@@ -363,28 +407,47 @@ export function KakaoMapLayer({
         allLoadedRestaurantsRef.current = restaurants;
         onRestaurantsLoadedRef.current(restaurants);
 
-        // 기존 오버레이 정리
+        // 기존 오버레이 및 클러스터 마커 정리
         restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
         restaurantOverlaysRef.current = [];
+        if (clustererRef.current) clustererRef.current.clear();
 
         const newOverlays: any[] = [];
+        const clusterMarkers: any[] = [];
+
         restaurants.forEach((restaurant) => {
           const isSelected = selectedRestaurantId === restaurant.id;
+          const pos = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+
           const el = createRestaurantOverlayElement(restaurant, isSelected, isDark, () => {
             onSelectRestaurantsRef.current([restaurant], restaurant.id);
           });
 
           const overlay = new kakao.maps.CustomOverlay({
-            position: new kakao.maps.LatLng(restaurant.lat, restaurant.lng),
+            position: pos,
             content: el,
             yAnchor: isSelected ? 0.95 : 0.5,
             zIndex: isSelected ? 1000 : 50,
           });
           overlay.setMap(map);
           newOverlays.push(overlay);
+
+          // 클러스터러용 마커 등록
+          if (kakao.maps.Marker) {
+            const marker = new kakao.maps.Marker({
+              position: pos,
+            });
+            kakao.maps.event.addListener(marker, "click", () => {
+              onSelectRestaurantsRef.current([restaurant], restaurant.id);
+            });
+            clusterMarkers.push(marker);
+          }
         });
 
         restaurantOverlaysRef.current = newOverlays;
+        if (clustererRef.current && clusterMarkers.length > 0) {
+          clustererRef.current.addMarkers(clusterMarkers);
+        }
       });
     };
 
@@ -405,6 +468,7 @@ export function KakaoMapLayer({
       kakao.maps.event.removeListener(map, "idle", onIdle);
       restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
       restaurantOverlaysRef.current = [];
+      if (clustererRef.current) clustererRef.current.clear();
       previousBoundsRef.current = null;
     };
   }, [isRestaurantMode, canUseKakaoMap, isDark]);
