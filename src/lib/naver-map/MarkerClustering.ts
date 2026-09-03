@@ -273,7 +273,7 @@ export class MarkerClustering {
       return this._icons[index];
     }
 
-    // 기본 보라색(#4B0090) 원형 클러스터 아이콘 생성
+    // 기본 주황색(#ff6f0f) 원형 클러스터 아이콘 생성
     const size = count >= 50 ? 42 : count >= 10 ? 36 : 30;
     const fontSize = count >= 50 ? 15 : count >= 10 ? 14 : 13;
 
@@ -282,7 +282,7 @@ export class MarkerClustering {
         <div style="
           width: ${size}px;
           height: ${size}px;
-          background: #4B0090;
+          background: #ff6f0f;
           color: #FFFFFF;
           border: 2px solid rgba(255, 255, 255, 0.95);
           border-radius: 50%;
