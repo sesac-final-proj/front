@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-  getCongestionLevelLabel,
   getSeedPastelTheme,
+  getCongestionPopulationLabel,
   getRestaurantsByBounds,
   type CongestionZone,
   type Restaurant,
@@ -74,7 +74,7 @@ export function createCurrentLocationOverlayHtml(isDark: boolean): string {
     <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; pointer-events: auto; user-select: none;">
       <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
         <!-- Outer pulsating halo -->
-        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(49, 130, 246, 0.22); border: 1.5px solid rgba(49, 130, 246, 0.45); box-shadow: 0 0 14px rgba(49, 130, 246, 0.35);"></div>
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(49, 130, 246, 0.22); border: 1.5px solid rgba(49, 130, 246, 0.45); box-shadow: none;"></div>
         <!-- Inner white circle with blue center -->
         <div style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; border: 3px solid #3182F6; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; z-index: 1;">
           <div style="width: 8px; height: 8px; border-radius: 50%; background: #3182F6;"></div>
@@ -113,22 +113,22 @@ export function createRestaurantOverlayElement(
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; transform: translateY(-16px); transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);">
-        <div style="filter: drop-shadow(0 4px 10px rgba(255, 111, 15, 0.55));">
+        <div style="filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.22));">
           <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M17 0C7.611 0 0 7.611 0 17C0 29.75 17 44 17 44C17 44 34 29.75 34 17C34 7.611 26.389 0 17 0Z" fill="#FF6F0F"/>
             <circle cx="17" cy="17" r="8" fill="#1C1D21"/>
             <path d="M14.5 12.5V15.5A1.5 1.5 0 0 1 13 17V21M13 14H16M19.5 12.5V21" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round"/>
           </svg>
         </div>
-        <span style="margin-top: 2px; font-size: 13px; font-weight: 850; color: ${textColor}; text-shadow: ${textShadow}; white-space: nowrap; letter-spacing: -0.3px;">
+        <span style="margin-top: 2px; font-size: 13px; font-weight: 600; color: ${textColor}; text-shadow: ${textShadow}; white-space: nowrap; letter-spacing: -0.3px;">
           ${restaurant.name}
         </span>
       </div>
     `;
   } else {
     // 사진 2번: 살구색 원형 배지(🍴) + 우측 상호명 라벨
-    const badgeBg = isDark ? "#F8C7A3" : "#FFDEC4";
-    const iconColor = "#1F2128";
+    const badgeBg = "var(--color-primary-container)";
+    const iconColor = "var(--color-primary)";
     const textShadow = isDark
       ? "0 1px 4px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.9)"
       : "0 0 3px #FFFFFF, 0 1px 2px #FFFFFF";
@@ -156,7 +156,10 @@ export function createRestaurantOverlayElement(
         </div>
         <span style="
           font-size: 11.5px;
-          font-weight: 750;
+          font-weight: 600;
+          max-width: 160px;
+          overflow: hidden;
+          text-overflow: ellipsis;
           color: ${textColor};
           text-shadow: ${textShadow};
           white-space: nowrap;
@@ -183,42 +186,17 @@ export function createClusterOverlayElement(
   onClick: () => void,
 ): HTMLDivElement {
   const container = document.createElement("div");
-  container.style.cursor = "pointer";
-  container.style.userSelect = "none";
-  container.style.display = "flex";
-  container.style.alignItems = "center";
-  container.style.justifyContent = "center";
-
-  const size = count >= 50 ? 42 : count >= 10 ? 36 : 30;
-  const fontSize = count >= 50 ? 15 : count >= 10 ? 14 : 13;
-
-  container.innerHTML = `
-    <div style="
-      position: relative;
-      width: ${size}px;
-      height: ${size}px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #FF7E26 0%, #FF5500 100%);
-      color: #FFFFFF;
-      border: 2px solid #FFFFFF;
-      box-shadow: 0 3px 10px rgba(255, 85, 0, 0.45), 0 0 0 2px rgba(255, 111, 15, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 850;
-      font-size: ${fontSize}px;
-      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
-      transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
-    " onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'">
-      <span>${count}</span>
-    </div>
-  `;
-
-  container.addEventListener("click", (e) => {
-    e.stopPropagation();
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = styles.restaurantClusterMarker;
+  button.dataset.theme = isDark ? "dark" : "light";
+  button.setAttribute("aria-label", `이 위치의 음식점 ${count}곳 보기`);
+  button.textContent = String(count);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
     onClick();
   });
-
+  container.append(button);
   return container;
 }
 
@@ -334,130 +312,41 @@ export function createSeedPastelHeatmapElement(
   isDark: boolean,
   onClick?: () => void,
 ): HTMLDivElement {
-  if (isDark) {
-    const theme = getSeedPastelTheme(zone.currentScore, "dark");
-    const container = document.createElement("div");
-    container.className = styles.congestionMapAnchor;
-
-    // Only the label is interactive: empty space remains available for map dragging.
-    const label = document.createElement(onClick ? "button" : "div");
-    label.className = styles.congestionMapLabel;
-    if (label instanceof HTMLButtonElement) label.type = "button";
-    label.style.setProperty("--congestion-accent", theme.badgeText);
-    label.setAttribute("aria-label", `${zone.name}, 혼잡도 ${zone.currentScore}%, ${theme.label}`);
-
-    const title = document.createElement("span");
-    title.className = styles.congestionMapTitle;
-    title.textContent = zone.name;
-    const status = document.createElement("span");
-    status.className = styles.congestionMapStatus;
-    status.textContent = `${zone.currentScore}% · ${theme.label}`;
-    label.append(title, status);
-    container.append(label);
-
-    if (onClick) {
-      label.addEventListener("click", (event) => {
-        event.stopPropagation();
-        onClick();
-      });
-    }
-    return container;
-  }
-
-  const theme = getSeedPastelTheme(zone.currentScore);
+  const score = Math.max(0, Math.min(100, zone.currentScore));
+  const theme = getSeedPastelTheme(score, isDark ? "dark" : "light");
   const container = document.createElement("div");
-  container.style.position = "relative";
-  container.style.display = "flex";
-  container.style.alignItems = "center";
-  container.style.justifyContent = "center";
-  container.style.cursor = "pointer";
-  container.style.userSelect = "none";
+  container.className = styles.congestionHeatmap;
+  const diameter = Math.round(220 + score * 0.7);
+  container.style.setProperty("--heat-size", `${diameter}px`);
+  // Transparent edges and bounded opacity: source-over, never additive light.
+  const rgb = theme.tagColor.match(/[a-f0-9]{2}/gi)!.map((hex) => parseInt(hex, 16)).join(", ");
+  const opacity = isDark ? 0.20 : 0.30;
+  const field = document.createElement("div");
+  field.className = styles.congestionHeatmapField;
+  field.style.filter = isDark ? "saturate(1.625) brightness(0.9)" : "none";
+  field.setAttribute("aria-hidden", "true");
+  field.style.background = `radial-gradient(circle, rgba(${rgb}, ${opacity}) 0%, rgba(${rgb}, ${opacity * 0.75}) 26%, rgba(${rgb}, ${opacity * 0.3}) 52%, rgba(${rgb}, 0) 74%)`;
 
-  // 사용자가 제공한 레퍼런스처럼 넓고 대기처럼 퍼지는 부드러운 히트맵 영역 (210px ~ 330px)
-  const diameter = Math.round(210 + (zone.currentScore / 100) * 120);
-  const radius = diameter / 2;
-  const gradId = `seed-heat-${zone.id.replace(/[^a-zA-Z0-9_-]/g, "")}-${isDark ? "dark" : "light"}`;
-
-  container.style.width = `${diameter}px`;
-  container.style.height = `${diameter}px`;
-
-  const heatmapInner = isDark ? theme.heatmapInnerDark : theme.heatmapInnerLight;
-  const heatmapMid = isDark ? theme.heatmapMidDark : theme.heatmapMidLight;
-  const heatmapOuter = isDark ? theme.heatmapOuterDark : theme.heatmapOuterLight;
-
-
-  container.innerHTML = `
-    <!-- 1. SEED Pastel Atmospheric Heatmap Cloud (지도에 넓고 자연스럽게 스며드는 파스텔 열지도 구름) -->
-    <svg width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}" style="
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      filter: blur(${isDark ? "14px" : "18px"});
-      mix-blend-mode: ${isDark ? "screen" : "multiply"};
-      opacity: ${isDark ? "0.88" : "0.78"};
-      transform-origin: center;
-      animation: seedHeatmapPulse 4s ease-in-out infinite alternate;
-    ">
-      <defs>
-        <radialGradient id="${gradId}" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="${heatmapInner}" />
-          <stop offset="35%" stop-color="${heatmapMid}" />
-          <stop offset="70%" stop-color="${heatmapOuter}" />
-          <stop offset="100%" stop-color="transparent" />
-        </radialGradient>
-      </defs>
-      <circle cx="${radius}" cy="${radius}" r="${radius - 10}" fill="url(#${gradId})" />
-    </svg>
-
-    <!-- 2. 점과 글씨 테두리 없이 히트맵 안에 순수하게 녹아드는 타이포그래피 -->
-    <div style="
-      position: relative;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      pointer-events: auto;
-      transform: translateY(0);
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    ">
-      <!-- 구역 상호/명칭 (은은하고 약한 흰색 글씨 테두리 적용) -->
-      <span style="
-        font-family: 'Pretendard', sans-serif;
-        font-size: 14px;
-        font-weight: 850;
-        color: ${isDark ? "#FFFFFF" : "#111827"};
-        letter-spacing: -0.4px;
-        line-height: 1.2;
-        white-space: nowrap;
-        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
-      ">
-        ${zone.name}
-      </span>
-
-      <!-- 혼잡도 퍼센트 및 상태 텍스트 (은은하고 약한 흰색 글씨 테두리 적용) -->
-      <span style="
-        margin-top: 2px;
-        font-family: 'Pretendard', sans-serif;
-        font-size: 11.5px;
-        font-weight: 750;
-        color: ${isDark ? theme.badgeBorder : theme.badgeText};
-        letter-spacing: -0.2px;
-        white-space: nowrap;
-        text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(255, 255, 255, 0.75);
-      ">
-        ${zone.currentScore}% · ${theme.label}
-      </span>
-    </div>
-  `;
-
-  if (onClick) {
-    container.addEventListener("click", (e) => {
-      e.stopPropagation();
-      onClick();
-    });
-  }
-
+  const label = document.createElement(onClick ? "button" : "div");
+  label.className = styles.congestionMapLabel;
+  if (label instanceof HTMLButtonElement) label.type = "button";
+  label.style.setProperty("--congestion-accent", theme.badgeText);
+  label.style.setProperty("--heat-label-color", isDark ? "#E5E5E8" : "#202124");
+  label.style.setProperty("--heat-label-halo", isDark ? "#202124" : "#FFFFFF");
+  const statusText = [zone.levelLabel ?? theme.label, getCongestionPopulationLabel(zone)].filter(Boolean).join(" · ");
+  label.setAttribute("aria-label", `${zone.name}, ${statusText}`);
+  const title = document.createElement("span");
+  title.className = styles.congestionMapTitle;
+  title.textContent = zone.name;
+  const status = document.createElement("span");
+  status.className = styles.congestionMapStatus;
+  status.textContent = statusText;
+  label.append(title, status);
+  container.append(field, label);
+  if (onClick) label.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
   return container;
 }
 
@@ -468,6 +357,7 @@ export interface KakaoMapLayerProps {
   selectedCategory?: string;
   selectedRestaurantId?: string | null;
   congestionZones?: CongestionZone[];
+  onCongestionBoundsChange: (bounds: { south: number; north: number; west: number; east: number }) => void;
   theme: "dark" | "light";
   onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
   onRestaurantsLoaded: (restaurants: Restaurant[]) => void;
@@ -483,6 +373,7 @@ export function KakaoMapLayer({
   selectedCategory,
   selectedRestaurantId,
   congestionZones = [],
+  onCongestionBoundsChange,
   theme,
   onSelectRestaurants,
   onRestaurantsLoaded,
@@ -587,9 +478,9 @@ export function KakaoMapLayer({
   useEffect(() => {
     const kakao = (window as any).kakao;
     const map = mapRef.current;
-    if (!map || !kakao?.maps || !canUseKakaoMap) return;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !currentLocation) return;
 
-    const centerCoord = currentLocation ?? coordsMap[activeNeighborhood] ?? coordsMap["송파삼성래미안"] ?? { lat: 37.5029, lng: 127.1194 };
+    const centerCoord = currentLocation;
     const centerLatLng = new kakao.maps.LatLng(centerCoord.lat, centerCoord.lng);
 
     const wrapper = document.createElement("div");
@@ -750,6 +641,7 @@ export function KakaoMapLayer({
     fetchRestaurantsForCurrentBounds();
 
     return () => {
+      ++restaurantRequestIdRef.current;
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       kakao.maps.event.removeListener(map, "idle", onIdle);
       kakao.maps.event.removeListener(map, "zoom_changed", onZoomChanged);
@@ -772,10 +664,27 @@ export function KakaoMapLayer({
     congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
     congestionOverlaysRef.current = [];
 
-    const newOverlays = congestionZones.map((zone) => {
+    const placedLabels: { left: number; right: number; top: number; bottom: number }[] = [];
+    const projection = map.getProjection();
+    const mapWidth = mapElementRef.current?.clientWidth ?? 390;
+    const newOverlays = [...congestionZones].sort((a, b) => b.currentScore - a.currentScore).map((zone) => {
       const el = createSeedPastelHeatmapElement(zone, isDark, () => {
         map.panTo(new kakao.maps.LatLng(zone.lat, zone.lng));
       });
+      const point = projection.containerPointFromCoords(new kakao.maps.LatLng(zone.lat, zone.lng));
+      const label = el.querySelector<HTMLElement>(`.${styles.congestionMapLabel}`)!;
+      const labelWidth = Math.min(208, mapWidth * 0.56);
+      const x = Math.max(labelWidth / 2 + 8, Math.min(mapWidth - labelWidth / 2 - 8, point.x));
+      const box = { left: x - labelWidth / 2, right: x + labelWidth / 2, top: point.y - 22, bottom: point.y + 22 };
+      // Nearby areas can share a coordinate (for example, a station and a tourism district).
+      // Keep all heat fields and list entries, but avoid drawing unreadable labels on top of each other.
+      if (placedLabels.some((other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top)) {
+        label.hidden = true;
+        label.style.display = "none";
+      } else {
+        label.style.transform = `translateX(${x - point.x}px)`;
+        placedLabels.push(box);
+      }
 
       const overlay = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(zone.lat, zone.lng),
@@ -790,50 +699,30 @@ export function KakaoMapLayer({
 
     congestionOverlaysRef.current = newOverlays;
 
-    // 만약 현재 지도 뷰포트 내에 혼잡도 구역이 하나도 보이지 않는다면 첫 번째 구역으로 부드럽게 이동
-    if (congestionZones.length > 0) {
-      try {
-        const bounds = map.getBounds();
-        if (bounds) {
-          const anyVisible = congestionZones.some((z) =>
-            bounds.contain(new kakao.maps.LatLng(z.lat, z.lng)),
-          );
-          if (!anyVisible) {
-            map.panTo(new kakao.maps.LatLng(congestionZones[0].lat, congestionZones[0].lng));
-          }
-        }
-      } catch {
-        // silent
-      }
-    }
-
-    // 지도 이동 시 현재 화면 바운드 업데이트
-    const onCongestionIdle = () => {
-      try {
-        const bounds = map.getBounds();
-        if (bounds) {
-          const sw = bounds.getSouthWest();
-          const ne = bounds.getNorthEast();
-          onSearchBounds({
-            south: sw.getLat(),
-            north: ne.getLat(),
-            west: sw.getLng(),
-            east: ne.getLng(),
-          });
-        }
-      } catch {
-        // silent
-      }
-    };
-
-    kakao.maps.event.addListener(map, "idle", onCongestionIdle);
-
     return () => {
-      kakao.maps.event.removeListener(map, "idle", onCongestionIdle);
       congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
       congestionOverlaysRef.current = [];
     };
-  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark, onSearchBounds]);
+  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark]);
+
+  // Viewport queries never change the map center or the bottom sheet state.
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isCongestionMode) return;
+    // Area-level population data needs a wider view than individual restaurant pins.
+    // Keep the user's center; entering this mode only widens a street-level zoom.
+    if (map.getLevel() < 6) map.setLevel(6);
+    const publishBounds = () => {
+      const bounds = map.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      onCongestionBoundsChange({ south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() });
+    };
+    publishBounds();
+    kakao.maps.event.addListener(map, "idle", publishBounds);
+    return () => kakao.maps.event.removeListener(map, "idle", publishBounds);
+  }, [canUseKakaoMap, isCongestionMode, onCongestionBoundsChange, activeNeighborhood, currentLocation, centerRequest]);
 
   return (
     <>
