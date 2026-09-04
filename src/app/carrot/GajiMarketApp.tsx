@@ -5,125 +5,81 @@ import type { FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Moon,
-  Sun,
-  Calendar,
-  EllipsisVertical,
-  FileText,
-  Footprints,
-  Package,
-  Share2,
-  BadgePercent,
-  Bell,
-  BookOpen,
-  BriefcaseBusiness,
-  Building,
-  Building2,
-  CakeSlice,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Coffee,
-  Crosshair,
-  Dumbbell,
-  Eye,
-  Gem,
-  Gamepad2,
-  GraduationCap,
-  Headphones,
-  Heart,
-  Home,
-  House,
-  Lock,
-  LogOut,
-  Mail,
-  MapPin,
-  MapPinned,
-  Menu,
-  MessageCircle,
-  MoreVertical,
-  NotebookTabs,
-  Plus,
-  QrCode,
-  ReceiptText,
-  RefreshCw,
-  Search,
-  Send,
-  Settings,
-  ShieldAlert,
-  ShieldCheck,
-  Shirt,
-  ShoppingBag,
-  ShoppingBasket,
-  SlidersHorizontal,
-  Sparkles,
-  SprayCan,
-  Store,
-  Tag,
-  Truck,
-  EyeOff,
-  UserRound,
-  Users,
-  UsersRound,
-  Utensils,
-  WalletCards,
-  X,
+  BadgePercent, Bell, BookOpen, BriefcaseBusiness, Building, Building2,
+  CakeSlice, Calendar, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
+  Clock3, Coffee, Crosshair, Dumbbell, EllipsisVertical, Eye, EyeOff,
+  FileText, Footprints, Gamepad2, Gem, GraduationCap, Headphones, Heart,
+  Home, House, Lock, LogOut, Mail, MapPin, MapPinned, Menu, MessageCircle,
+  Moon, MoreVertical, NotebookTabs, Package, Plus, QrCode, ReceiptText,
+  RefreshCw, Search, Send, Settings, Share2, ShieldAlert, ShieldCheck,
+  Shirt, ShoppingBag, ShoppingBasket, SlidersHorizontal, Sparkles, SprayCan,
+  Store, Sun, Tag, Truck, UserRound, Users, UsersRound, Utensils,
+  WalletCards, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+
+// Components (Barrel Export)
 import {
+  KakaoMapLayer,
+  KAKAO_MAP_KEY,
+  loadKakaoMapScript,
+  RestaurantDetailSheet,
+  RestaurantClusterListSheet,
+  TogetherIntroView,
+  TogetherCategoryView,
+  TogetherFormView,
+  TogetherFeedCard,
+  TogetherDetailView,
+  GajiMergeGameScreen,
+} from "./components";
+
+// Services (Barrel Export)
+import {
+  getMe,
+  updateRegion,
+  listProducts,
+  getProduct,
+  createProduct,
+  setFavorite,
+  logout as logoutRequest,
+  AuthRequiredError,
+  getRentTransactions,
+  groupBuildingsByDong,
+  groupTransactionsByBuilding,
+  getKakaoPlaceUrl,
+  getRestaurantsByBounds,
+  getTogetherPosts,
+  createTogetherPost,
+  toggleTogetherJoin,
   getCongestionDelta,
   getCongestionLevelLabel,
+  summarizeCongestion,
   getCongestionZonesForNeighborhood,
   getCongestionZonesForBounds,
   getCongestionZonesNearCenter,
   getSeedPastelTheme,
   SEED_PASTEL_COLOR_BOARD,
-  summarizeCongestion,
-  type CongestionZone,
-} from "@/services/congestionService";
-import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
-import { getMe, updateRegion, type Me } from "@/services/authService";
-import {
-  AuthRequiredError,
-  createProduct,
   getMyFavorites,
   getMyProducts,
-  getProduct,
-  listProducts,
-  logout as logoutRequest,
-  setFavorite,
-} from "@/services/tradeService";
-import type { TradeProduct } from "@/types/trade";
-import {
-  getRentTransactions,
-  groupBuildingsByDong,
-  groupTransactionsByBuilding,
-} from "@/services/realEstateService";
+} from "@/services";
+
+// Types (Barrel Export)
 import type {
+  TradeProduct,
+  TogetherCategory,
+  TogetherPost,
+  CreateTogetherPostInput,
   HouseTypeFilter,
   PropertyBuilding,
   RealEstateBounds,
   RentTransaction,
   RentTypeFilter,
-} from "@/types/realEstate";
-import { TogetherIntroView } from "./components/together/TogetherIntroView";
-import { TogetherCategoryView } from "./components/together/TogetherCategoryView";
-import { TogetherFormView } from "./components/together/TogetherFormView";
-import { TogetherFeedCard } from "./components/together/TogetherFeedCard";
-import { TogetherDetailView } from "./components/together/TogetherDetailView";
-import type { TogetherCategory, TogetherPost, CreateTogetherPostInput } from "@/types/together";
-import {
-  getTogetherPosts,
-  createTogetherPost,
-  toggleTogetherJoin,
-} from "@/services/togetherService";
-import { KakaoMapLayer, KAKAO_MAP_KEY, loadKakaoMapScript } from "./components/map/KakaoMapLayer";
-import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
-import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
+  Me,
+  Restaurant,
+  CongestionZone,
+} from "@/types";
 
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
@@ -3899,7 +3855,7 @@ function MapScreen({
 
   const handleSelectRestaurants = useCallback((list: Restaurant[], singleId: string | null) => {
     setSelectedRestaurants(list);
-    setSelectedRestaurantId(singleId ?? list[0]?.id ?? null);
+    setSelectedRestaurantId(singleId);
     onSheetStateChange("half");
   }, [onSheetStateChange]);
 
@@ -3909,7 +3865,12 @@ function MapScreen({
   }, []);
 
   const selectedRestaurant = useMemo(
-    () => restaurantResults.find((r) => r.id === selectedRestaurantId) ?? selectedRestaurants[0] ?? null,
+    () =>
+      selectedRestaurantId
+        ? restaurantResults.find((r) => r.id === selectedRestaurantId) ??
+          selectedRestaurants.find((r) => r.id === selectedRestaurantId) ??
+          null
+        : null,
     [restaurantResults, selectedRestaurantId, selectedRestaurants],
   );
 
@@ -4122,11 +4083,26 @@ function MapScreen({
             actionLabel="권한 허용"
             onAction={requestCurrentLocation}
           />
+        ) : selectedCategory === "food" && selectedRestaurants.length > 1 && !selectedRestaurantId ? (
+          <RestaurantClusterListSheet
+            restaurants={selectedRestaurants}
+            theme={theme}
+            onSelectRestaurant={(restaurant) => {
+              setSelectedRestaurantId(restaurant.id);
+            }}
+            onClose={handleClearRestaurants}
+          />
         ) : selectedCategory === "food" && selectedRestaurant ? (
           <RestaurantDetailSheet
             restaurant={selectedRestaurant}
             theme={theme}
-            onClose={handleClearRestaurants}
+            onClose={() => {
+              if (selectedRestaurants.length > 1) {
+                setSelectedRestaurantId(null);
+              } else {
+                handleClearRestaurants();
+              }
+            }}
           />
         ) : (
           <>
@@ -4154,6 +4130,7 @@ function MapScreen({
             </div>
             {isCongestionMode ? (
               <CongestionAnalysisSection
+                colorScheme={theme}
                 zones={congestionZones}
                 hasSearchedArea={hasSearchedArea}
                 onClearQuery={() => changeQuery("")}
@@ -4245,23 +4222,26 @@ function MapScreen({
 
 function CongestionAnalysisSection({
   zones,
+  colorScheme,
   hasSearchedArea,
   onClearQuery,
 }: {
   zones: CongestionZone[];
+  colorScheme: "dark" | "light";
   hasSearchedArea: boolean;
   onClearQuery: () => void;
 }) {
   const summary = summarizeCongestion(zones);
   const peakZone = summary.peakZone;
-  const avgTheme = summary.averageTheme;
+  const avgTheme = getSeedPastelTheme(summary.averageScore, colorScheme);
+  const cautionTheme = getSeedPastelTheme(90, colorScheme);
 
   return (
     <section className={`${styles.localResults} ${styles.congestionSection}`}>
       <div className={styles.congestionHeader}>
         <div>
           <h2 aria-live="polite">{hasSearchedArea ? "현 지도 혼잡도 분석" : "동네 혼잡도 분석"}</h2>
-          <p>SEED 디자인 기반 %당 파스텔 히트맵으로 실시간 인파를 분석해요.</p>
+          <p>장소별 혼잡도와 시간대별 추이를 확인해 보세요.</p>
         </div>
         <span className={styles.congestionLiveBadge} style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>
           평균 {summary.averageScore}% · {avgTheme.label}
@@ -4271,11 +4251,13 @@ function CongestionAnalysisSection({
       {/* SEED Design 파스텔 컬러보드 범례 (%당 색상표) */}
       <div className={styles.seedColorBoardLegend}>
         <div className={styles.seedColorBoardHeader}>
-          <span>🎨 SEED 파스텔 혼잡도 컬러보드</span>
-          <small>seed-design.io scale</small>
+          <span>혼잡도 기준</span>
+          <small>여유부터 혼잡까지</small>
         </div>
         <div className={styles.seedColorBoardPills}>
-          {SEED_PASTEL_COLOR_BOARD.map((item) => (
+          {SEED_PASTEL_COLOR_BOARD.map((entry) => {
+            const item = getSeedPastelTheme(entry.minScore, colorScheme);
+            return (
             <div
               key={item.rangeLabel}
               className={styles.seedColorBoardPill}
@@ -4289,7 +4271,8 @@ function CongestionAnalysisSection({
               <strong>{item.rangeLabel}</strong>
               <span>{item.label}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -4311,21 +4294,21 @@ function CongestionAnalysisSection({
             <article className={styles.congestionSummaryCard}>
               <span>가장 붐비는 장소</span>
               <strong>{peakZone?.name ?? "확인 중"}</strong>
-              <em style={{ background: "#FFF1F2", color: "#E11D48", borderColor: "#FECDD3" }}>{summary.crowdedCount}곳 주의</em>
+              <em style={{ background: cautionTheme.badgeBg, color: cautionTheme.badgeText, borderColor: cautionTheme.badgeBorder }}>{summary.crowdedCount}곳 주의</em>
             </article>
           </div>
 
           <div className={styles.congestionZoneList}>
             {zones.map((zone) => {
               const delta = getCongestionDelta(zone);
-              const theme = getSeedPastelTheme(zone.currentScore);
+              const theme = getSeedPastelTheme(zone.currentScore, colorScheme);
               return (
                 <article
                   key={zone.id}
                   className={styles.congestionZoneCard}
                   style={{
                     borderLeft: `4px solid ${theme.tagColor}`,
-                    background: "var(--color-bg-elevated)",
+                    background: "var(--color-surface)",
                   }}
                 >
                   <div className={styles.congestionZoneTop}>
@@ -4357,7 +4340,7 @@ function CongestionAnalysisSection({
                       <span className={styles.seedHourlyLabel}>시간대별 혼잡 추이</span>
                       <div className={styles.seedHourlyBars}>
                         {zone.hourlyTrends.map((val, idx) => {
-                          const barTheme = getSeedPastelTheme(val);
+                          const barTheme = getSeedPastelTheme(val, colorScheme);
                           const isCurrent = idx === 6; // current hour representation
                           return (
                             <div key={idx} className={styles.seedHourlyBarItem} title={`${idx + 12}시: ${val}% (${barTheme.label})`}>
@@ -4390,7 +4373,7 @@ function CongestionAnalysisSection({
 
                   <footer className={styles.congestionZoneFooter}>
                     <span>{zone.distance} · {zone.updatedAt}</span>
-                    <span style={{ color: delta > 0 ? "#E11D48" : "#027A48", fontWeight: 700 }}>
+                    <span style={{ color: getSeedPastelTheme(delta > 0 ? 90 : 0, colorScheme).badgeText, fontWeight: 700 }}>
                       {delta >= 0 ? `평소보다 +${delta}% 혼잡` : `평소보다 ${Math.abs(delta)}% 여유`}
                     </span>
                   </footer>
