@@ -20,6 +20,8 @@ interface ApiProductListItem {
   trade_place?: string | null;
   seller_nickname?: string | null;
   seller_manner_temp?: number | null;
+  is_mine?: boolean;
+  thumbnail_url?: string | null;
 }
 
 interface ApiProductPage {
@@ -93,6 +95,8 @@ function toTradeProduct(item: ApiProductListItem): TradeProduct {
     tradePlace: item.trade_place ?? undefined,
     sellerNickname: item.seller_nickname ?? undefined,
     sellerMannerTemp: item.seller_manner_temp ?? undefined,
+    isMine: item.is_mine ?? false,
+    thumbnailUrl: item.thumbnail_url ?? undefined,
   };
 }
 
@@ -220,6 +224,85 @@ export async function createProduct(input: {
 
   const payload: ApiProductCreated = await response.json();
   return { id: payload.id };
+}
+
+// 글 수정. title/category/description/desiredPrice 등 값이 있는 필드만 부분 갱신된다.
+export async function updateProduct(
+  productId: number,
+  input: {
+    title?: string;
+    category?: string;
+    description?: string;
+    desiredPrice?: number | null;
+    tradePlace?: string;
+  },
+): Promise<TradeProduct> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const response = await fetch(apiUrl(`/api/v1/trades/products/${productId}`), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      title: input.title,
+      category: input.category,
+      description: input.description,
+      desired_price: input.desiredPrice,
+      trade_place: input.tradePlace,
+    }),
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("글을 수정하지 못했습니다.");
+
+  const payload: ApiProductListItem = await response.json();
+  return toTradeProduct(payload);
+}
+
+// 상품 이미지는 1장만 유지(재업로드하면 덮어씀). NCP Object Storage에 서버를 거치지
+// 않고 직접 PUT — presign → 브라우저에서 NCP로 PUT → object_key 등록, 3단계.
+export async function uploadProductImage(productId: number, file: File): Promise<string> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const presignResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images/presign`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ filename: file.name, content_type: file.type }),
+  });
+  if (presignResponse.status === 401) throw new AuthRequiredError();
+  if (!presignResponse.ok) throw new Error("이미지 업로드 URL을 받지 못했습니다.");
+  const { upload_url, object_key }: { upload_url: string; object_key: string; image_url: string } =
+    await presignResponse.json();
+
+  const putResponse = await fetch(upload_url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
+
+  const registerResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ object_key }),
+  });
+  if (registerResponse.status === 401) throw new AuthRequiredError();
+  if (!registerResponse.ok) throw new Error("이미지 등록에 실패했습니다.");
+
+  const payload: { image_url: string } = await registerResponse.json();
+  return payload.image_url;
 }
 
 interface ApiFavoriteToggleResponse {
