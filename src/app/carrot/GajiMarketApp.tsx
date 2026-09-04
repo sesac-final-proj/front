@@ -61,33 +61,11 @@ import {
   getCongestionZonesNearCenter,
   getSeedPastelTheme,
   SEED_PASTEL_COLOR_BOARD,
-<<<<<<< HEAD
+  getMyFavorites,
+  getMyProducts,
 } from "@/services";
 
 // Types (Barrel Export)
-=======
-  summarizeCongestion,
-  type CongestionZone,
-} from "@/services/congestionService";
-import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
-import { getMe, updateRegion, type Me } from "@/services/authService";
-import {
-  AuthRequiredError,
-  createProduct,
-  getMyFavorites,
-  getMyProducts,
-  getProduct,
-  listProducts,
-  logout as logoutRequest,
-  setFavorite,
-} from "@/services/tradeService";
-import type { TradeProduct } from "@/types/trade";
-import {
-  getRentTransactions,
-  groupBuildingsByDong,
-  groupTransactionsByBuilding,
-} from "@/services/realEstateService";
->>>>>>> origin/staging
 import type {
   TradeProduct,
   TogetherCategory,
