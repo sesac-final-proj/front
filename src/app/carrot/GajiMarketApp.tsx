@@ -53,14 +53,9 @@ import {
   getTogetherPosts,
   createTogetherPost,
   toggleTogetherJoin,
-  getCongestionDelta,
-  getCongestionLevelLabel,
-  summarizeCongestion,
-  getCongestionZonesForNeighborhood,
-  getCongestionZonesForBounds,
-  getCongestionZonesNearCenter,
+  fetchCongestionZones,
+  getCongestionPopulationLabel,
   getSeedPastelTheme,
-  SEED_PASTEL_COLOR_BOARD,
   getMyFavorites,
   getMyProducts,
 } from "@/services";
@@ -4020,6 +4015,7 @@ function MapScreen({
   const handleSelectRestaurants = useCallback((list: Restaurant[], singleId: string | null) => {
     setSelectedRestaurants(list);
     setSelectedRestaurantId(singleId);
+    sheetRef.current?.scrollTo({ top: 0, behavior: "instant" });
     onSheetStateChange("half");
   }, [onSheetStateChange]);
 
@@ -4052,8 +4048,6 @@ function MapScreen({
       if (matched) {
         setSelectedRestaurants([matched]);
         setSelectedRestaurantId(matched.id);
-        setCurrentLocation({ lat: matched.lat, lng: matched.lng });
-        setCenterRequest((v) => v + 1);
         onSheetStateChange("half");
       }
     } else if (business.category === "danger") {
@@ -4067,24 +4061,40 @@ function MapScreen({
     () => restaurantResults.map((restaurant, index) => restaurantToLocalBusiness(restaurant, activeNeighborhood, index)),
     [activeNeighborhood, restaurantResults],
   );
-  const congestionZones = useMemo(() => {
-    let list: CongestionZone[] = [];
-    if (searchBounds) {
-      list = getCongestionZonesForBounds(searchBounds);
-    }
-    if (list.length === 0) {
-      list = getCongestionZonesForNeighborhood(activeNeighborhood, secondaryNeighborhood);
-    }
-    if (list.length === 0) {
-      const centerCoord =
-        currentLocation ??
-        NEIGHBORHOOD_COORDS[activeNeighborhood] ??
-        NEIGHBORHOOD_COORDS["송파삼성래미안"] ??
-        { lat: 37.5133, lng: 127.1001 };
-      list = getCongestionZonesNearCenter(centerCoord.lat, centerCoord.lng);
-    }
-    return list.filter((zone) => matchesCongestionQuery(zone, query));
-  }, [activeNeighborhood, currentLocation, query, searchBounds, secondaryNeighborhood]);
+  const [congestionBounds, setCongestionBounds] = useState<MapSearchBounds | null>(null);
+  const [congestionData, setCongestionData] = useState<CongestionZone[]>([]);
+  const [congestionLoading, setCongestionLoading] = useState(false);
+  const [congestionError, setCongestionError] = useState("");
+  const [congestionRefresh, setCongestionRefresh] = useState(0);
+  const handleCongestionBounds = useCallback((bounds: MapSearchBounds) => {
+    setCongestionBounds((previous) => previous &&
+      (Object.keys(bounds) as (keyof MapSearchBounds)[]).every((key) =>
+        Math.abs(previous[key] - bounds[key]) < 0.000001) ? previous : bounds);
+  }, []);
+  useEffect(() => {
+    if (!isCongestionMode || !congestionBounds) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      setCongestionLoading(true);
+      setCongestionError("");
+      setCongestionData([]);
+      try {
+        const zones = await fetchCongestionZones(congestionBounds, controller.signal);
+        if (!controller.signal.aborted) setCongestionData(zones);
+      } catch (error) {
+        if (!controller.signal.aborted) setCongestionError(error instanceof Error ? error.message : "혼잡도를 불러오지 못했어요.");
+      } finally {
+        if (!controller.signal.aborted) setCongestionLoading(false);
+      }
+    };
+    const timer = window.setTimeout(refresh, 250);
+    const interval = window.setInterval(refresh, 300_000);
+    return () => { controller.abort(); window.clearTimeout(timer); window.clearInterval(interval); };
+  }, [isCongestionMode, congestionBounds, congestionRefresh]);
+  const congestionZones = useMemo(() => congestionData.filter((zone) =>
+    congestionBounds && zone.lat >= congestionBounds.south && zone.lat <= congestionBounds.north &&
+    zone.lng >= congestionBounds.west && zone.lng <= congestionBounds.east &&
+    matchesCongestionQuery(zone, query)), [congestionData, congestionBounds, query]);
   const displayedBusinesses = useMemo(
     () =>
       selectedCategory === "food"
@@ -4171,6 +4181,7 @@ function MapScreen({
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
           congestionZones={isCongestionMode ? congestionZones : []}
+          onCongestionBoundsChange={handleCongestionBounds}
           theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
@@ -4219,20 +4230,10 @@ function MapScreen({
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
-        {selectedCategory === "food" && selectedRestaurants.length > 0 && (
-          <RestaurantPreviewBar
-            restaurants={selectedRestaurants}
-            selectedRestaurantId={selectedRestaurantId}
-            onSelectRestaurant={(restaurant) => setSelectedRestaurantId(restaurant.id)}
-            onClose={() => {
-              setSelectedRestaurants([]);
-              setSelectedRestaurantId(null);
-            }}
-          />
-        )}
+
       </div>
 
-      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
+      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
         <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "업체 패널 접기" : "업체 패널 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
           const panel = event.currentTarget.parentElement;
           onSheetStateChange(nextState);
@@ -4253,6 +4254,7 @@ function MapScreen({
             theme={theme}
             onSelectRestaurant={(restaurant) => {
               setSelectedRestaurantId(restaurant.id);
+              sheetRef.current?.scrollTo({ top: 0, behavior: "instant" });
             }}
             onClose={handleClearRestaurants}
           />
@@ -4296,8 +4298,10 @@ function MapScreen({
               <CongestionAnalysisSection
                 colorScheme={theme}
                 zones={congestionZones}
-                hasSearchedArea={hasSearchedArea}
-                onClearQuery={() => changeQuery("")}
+                loading={congestionLoading || !congestionBounds}
+                error={congestionError}
+                onRetry={() => setCongestionRefresh((value) => value + 1)}
+                onClearQuery={query ? () => changeQuery("") : undefined}
               />
             ) : (
               <section className={styles.localResults}>
@@ -4385,168 +4389,51 @@ function MapScreen({
 }
 
 function CongestionAnalysisSection({
-  zones,
-  colorScheme,
-  hasSearchedArea,
-  onClearQuery,
+  zones, colorScheme, loading, error, onRetry, onClearQuery,
 }: {
   zones: CongestionZone[];
   colorScheme: "dark" | "light";
-  hasSearchedArea: boolean;
-  onClearQuery: () => void;
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
+  onClearQuery?: () => void;
 }) {
-  const summary = summarizeCongestion(zones);
-  const peakZone = summary.peakZone;
-  const avgTheme = getSeedPastelTheme(summary.averageScore, colorScheme);
-  const cautionTheme = getSeedPastelTheme(90, colorScheme);
-
   return (
-    <section className={`${styles.localResults} ${styles.congestionSection}`}>
+    <section className={`${styles.localResults} ${styles.congestionSection}`} aria-busy={loading}>
       <div className={styles.congestionHeader}>
         <div>
-          <h2 aria-live="polite">{hasSearchedArea ? "현 지도 혼잡도 분석" : "동네 혼잡도 분석"}</h2>
-          <p>장소별 혼잡도와 시간대별 추이를 확인해 보세요.</p>
+          <h2 aria-live="polite">현 지도 혼잡도 {zones.length > 0 ? `${zones.length}곳` : ""}</h2>
+          <p>서울시 제공 장소의 인구 혼잡 단계예요. 색상은 단계별로 표시해요.</p>
         </div>
-        <span className={styles.congestionLiveBadge} style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>
-          평균 {summary.averageScore}% · {avgTheme.label}
-        </span>
       </div>
-
-      {/* SEED Design 파스텔 컬러보드 범례 (%당 색상표) */}
-      <div className={styles.seedColorBoardLegend}>
-        <div className={styles.seedColorBoardHeader}>
-          <span>혼잡도 기준</span>
-          <small>여유부터 혼잡까지</small>
-        </div>
-        <div className={styles.seedColorBoardPills}>
-          {SEED_PASTEL_COLOR_BOARD.map((entry) => {
-            const item = getSeedPastelTheme(entry.minScore, colorScheme);
-            return (
-            <div
-              key={item.rangeLabel}
-              className={styles.seedColorBoardPill}
-              style={{
-                background: item.badgeBg,
-                borderColor: item.badgeBorder,
-                color: item.badgeText,
-              }}
-            >
-              <span className={styles.seedPillDot} style={{ background: item.tagColor }} />
-              <strong>{item.rangeLabel}</strong>
-              <span>{item.label}</span>
+      <div className={styles.seedColorBoardPills} aria-label="혼잡 단계 범례">
+        {[{ score: 22, label: "여유" }, { score: 60, label: "보통" }, { score: 78, label: "약간 붐빔" }, { score: 92, label: "붐빔" }].map(({ score, label }) => {
+          const theme = getSeedPastelTheme(score, colorScheme);
+          return <span key={label} className={styles.seedColorBoardPill} style={{ background: theme.badgeBg, borderColor: theme.badgeBorder, color: theme.badgeText }}>
+            <span className={styles.seedPillDot} style={{ background: theme.tagColor }} />{label}
+          </span>;
+        })}
+      </div>
+      {loading ? <p role="status">현재 지도 범위의 혼잡도를 확인하고 있어요.</p> : error ? (
+        <StateBlock title="혼잡도를 불러오지 못했어요" body={error} actionLabel="다시 시도" onAction={onRetry} />
+      ) : zones.length === 0 ? (
+        <StateBlock title="이 지도 범위에는 제공되는 혼잡도 정보가 없어요" body="지도를 넓히거나 다른 지역을 확인해 주세요. 서울시 주요 장소만 제공돼요." actionLabel={onClearQuery ? "검색어 지우기" : "다시 확인"} onAction={onClearQuery ?? onRetry} />
+      ) : <div className={styles.congestionZoneList}>
+        {zones.map((zone) => {
+          const theme = getSeedPastelTheme(zone.currentScore, colorScheme);
+          return <article key={zone.id} className={styles.congestionZoneCard} style={{ borderLeft: `3px solid ${theme.tagColor}`, background: "var(--color-surface)" }}>
+            <div className={styles.congestionZoneTop}>
+              <div>
+                <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
+                <span className={styles.congestionZoneSummary}>{getCongestionPopulationLabel(zone)}</span>
+              </div>
+              <span className={styles.seedZoneBadge} style={{ background: theme.badgeBg, color: theme.badgeText, borderColor: theme.badgeBorder }}>{zone.levelLabel}</span>
             </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {zones.length === 0 ? (
-        <StateBlock
-          title="혼잡도 결과가 없어요"
-          body="다른 지역이나 검색어로 다시 확인해 보세요."
-          actionLabel="검색어 지우기"
-          onAction={onClearQuery}
-        />
-      ) : (
-        <>
-          <div className={styles.congestionSummaryGrid}>
-            <article className={styles.congestionSummaryCard} style={{ background: avgTheme.cardBg, borderColor: avgTheme.badgeBorder }}>
-              <span>현재 동네 평균</span>
-              <strong style={{ color: avgTheme.badgeText }}>{summary.averageScore}<small>%</small></strong>
-              <em style={{ background: avgTheme.badgeBg, color: avgTheme.badgeText, borderColor: avgTheme.badgeBorder }}>{avgTheme.label}</em>
-            </article>
-            <article className={styles.congestionSummaryCard}>
-              <span>가장 붐비는 장소</span>
-              <strong>{peakZone?.name ?? "확인 중"}</strong>
-              <em style={{ background: cautionTheme.badgeBg, color: cautionTheme.badgeText, borderColor: cautionTheme.badgeBorder }}>{summary.crowdedCount}곳 주의</em>
-            </article>
-          </div>
-
-          <div className={styles.congestionZoneList}>
-            {zones.map((zone) => {
-              const delta = getCongestionDelta(zone);
-              const theme = getSeedPastelTheme(zone.currentScore, colorScheme);
-              return (
-                <article
-                  key={zone.id}
-                  className={styles.congestionZoneCard}
-                  style={{
-                    borderLeft: `4px solid ${theme.tagColor}`,
-                    background: "var(--color-surface)",
-                  }}
-                >
-                  <div className={styles.congestionZoneTop}>
-                    <div>
-                      <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
-                      <span className={styles.congestionZoneSummary}>{zone.summary}</span>
-                    </div>
-                    <span
-                      className={styles.seedZoneBadge}
-                      style={{
-                        background: theme.badgeBg,
-                        color: theme.badgeText,
-                        borderColor: theme.badgeBorder,
-                      }}
-                    >
-                      <span className={styles.seedPillDot} style={{ background: theme.tagColor }} />
-                      {zone.currentScore}% · {theme.label}
-                    </span>
-                  </div>
-
-                  {/* SEED Pastel Meter Track */}
-                  <div className={styles.congestionMeter} role="progressbar" aria-label={`${zone.name} 혼잡도 ${zone.currentScore}%`} aria-valuenow={zone.currentScore} aria-valuemin={0} aria-valuemax={100}>
-                    <span style={{ width: `${zone.currentScore}%`, background: theme.meterGradient }} />
-                  </div>
-
-                  {/* 24시간 시간대별 트렌드 미니 차트 (있는 경우) */}
-                  {zone.hourlyTrends && zone.hourlyTrends.length > 0 && (
-                    <div className={styles.seedHourlyChart}>
-                      <span className={styles.seedHourlyLabel}>시간대별 혼잡 추이</span>
-                      <div className={styles.seedHourlyBars}>
-                        {zone.hourlyTrends.map((val, idx) => {
-                          const barTheme = getSeedPastelTheme(val, colorScheme);
-                          const isCurrent = idx === 6; // current hour representation
-                          return (
-                            <div key={idx} className={styles.seedHourlyBarItem} title={`${idx + 12}시: ${val}% (${barTheme.label})`}>
-                              <div className={styles.seedHourlyBarTrack}>
-                                <div
-                                  className={styles.seedHourlyBarFill}
-                                  style={{
-                                    height: `${val}%`,
-                                    background: barTheme.tagColor,
-                                    opacity: isCurrent ? 1 : 0.6,
-                                  }}
-                                />
-                              </div>
-                              <span className={styles.seedHourlyBarTime} style={{ fontWeight: isCurrent ? 800 : 500 }}>
-                                {idx + 12}시
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 추천 방문 팁 */}
-                  {zone.recommendation && (
-                    <div className={styles.seedRecommendationBox} style={{ background: theme.badgeBg, borderColor: theme.badgeBorder }}>
-                      <span style={{ color: theme.badgeText }}>💡 {zone.recommendation}</span>
-                    </div>
-                  )}
-
-                  <footer className={styles.congestionZoneFooter}>
-                    <span>{zone.distance} · {zone.updatedAt}</span>
-                    <span style={{ color: getSeedPastelTheme(delta > 0 ? 90 : 0, colorScheme).badgeText, fontWeight: 700 }}>
-                      {delta >= 0 ? `평소보다 +${delta}% 혼잡` : `평소보다 ${Math.abs(delta)}% 여유`}
-                    </span>
-                  </footer>
-                </article>
-              );
-            })}
-          </div>
-        </>
-      )}
+            <p className={styles.congestionZoneSummary}>{zone.summary}</p>
+            <footer className={styles.congestionZoneFooter}><span>서울시 · {zone.updatedAt}</span></footer>
+          </article>;
+        })}
+      </div>}
     </section>
   );
 }
@@ -4933,84 +4820,6 @@ function NaverMapLayer({
     </>
   );
 }
-
-function RestaurantPreviewBar({
-  restaurants,
-  selectedRestaurantId,
-  onSelectRestaurant,
-  onClose,
-}: {
-  restaurants: Restaurant[];
-  selectedRestaurantId: string | null;
-  onSelectRestaurant: (restaurant: Restaurant) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className={styles.restaurantPreviewBar} role="region" aria-label="음식점 목록">
-      <button
-        type="button"
-        className={styles.restaurantPreviewCloseBtn}
-        onClick={onClose}
-        aria-label="닫기"
-      >
-        ✕
-      </button>
-      {restaurants.map((restaurant) => {
-        const isSelected = restaurant.id === selectedRestaurantId;
-        const detailUrl = getKakaoPlaceUrl(restaurant);
-        const thumb = restaurant.imageUrl || restaurant.thumbnailUrl;
-
-        return (
-          <article
-            key={restaurant.id}
-            className={`${styles.restaurantCard} ${isSelected ? styles.restaurantCardSelected : ""}`}
-            onClick={() => onSelectRestaurant(restaurant)}
-          >
-            <div className={styles.restaurantCardHeader}>
-              {thumb ? (
-                <div className={styles.restaurantCardThumb}>
-                  <img
-                    src={thumb}
-                    alt={restaurant.name}
-                    className={styles.restaurantCardImg}
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className={styles.restaurantCardThumbFallback}>
-                  🍴
-                </div>
-              )}
-              <div className={styles.restaurantCardInfo}>
-                <h4 className={styles.restaurantCardTitle}>{restaurant.name}</h4>
-                <span className={styles.restaurantCardCategory}>{restaurant.category || "음식점"}</span>
-              </div>
-            </div>
-            <p className={styles.restaurantCardAddress}>{restaurant.roadAddress || restaurant.address || "주소 정보 없음"}</p>
-            <div className={styles.restaurantCardFooter}>
-              <span className={styles.restaurantCardRating}>
-                {restaurant.phone ? `${restaurant.phone}` : `★ ${restaurant.rating ? restaurant.rating.toFixed(1) : "4.5"}`}
-              </span>
-              <a
-                href={detailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.restaurantCardDetailLink}
-                onClick={(e) => e.stopPropagation()}
-              >
-                상세보기 ›
-              </a>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
 
 
 function createDangerMarkerContent(
