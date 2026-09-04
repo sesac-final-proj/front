@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Heart, X, Navigation, ExternalLink } from "lucide-react";
-import { getKakaoPlaceUrl, type Restaurant } from "@/services/restaurantService";
+import { getKakaoPlaceUrl, type Restaurant } from "@/services";
 import styles from "../../GajiMarketApp.module.css";
 
 export interface RestaurantDetailSheetProps {
