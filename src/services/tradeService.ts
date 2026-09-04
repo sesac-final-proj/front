@@ -121,6 +121,46 @@ export async function listProducts(
   return { items: payload.items.map(toTradeProduct), total: payload.total };
 }
 
+// 내 판매내역. "판매내역에 예전 글이 안 보임" 버그의 원인이 여기 있었다 —
+// 원래는 listProducts로 받은 전체 목록을 클라이언트에서 product.mine으로
+// 걸렀는데, 그 mine 값이 실서버 데이터에 대해 항상 false로 고정돼 있어서
+// 새로고침(새 세션)하면 항상 빈 목록이었다. 서버가 이미 created_by로
+// 걸러주는 전용 엔드포인트가 있어서 그걸 쓴다. Bearer 토큰이 필요.
+export async function getMyProducts(signal?: AbortSignal): Promise<TradeProductPage> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const params = new URLSearchParams({ page: "1", size: "60" });
+  const response = await fetch(apiUrl(`/api/v1/trades/products/mine?${params}`), {
+    signal,
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("판매내역을 불러오지 못했습니다.");
+
+  const payload: ApiProductPage = await response.json();
+  return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 내 찜 목록. myProducts와 같은 이유로 전용 엔드포인트를 쓴다 — 일반 목록의
+// isFavorite도 실서버 데이터에 대해 항상 false라 새로고침하면 찜한 상품이
+// 안 보였다.
+export async function getMyFavorites(signal?: AbortSignal): Promise<TradeProductPage> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const params = new URLSearchParams({ page: "1", size: "60" });
+  const response = await fetch(apiUrl(`/api/v1/trades/products/favorites?${params}`), {
+    signal,
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("찜 목록을 불러오지 못했습니다.");
+
+  const payload: ApiProductPage = await response.json();
+  return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
 // 목록 API는 description을 안 내려줘서(상세 API만 채워짐) 상세 화면 진입 시 따로 조회.
 export async function getProduct(id: number, signal?: AbortSignal): Promise<TradeProduct> {
   const response = await fetch(apiUrl(`/api/v1/trades/products/${id}`), {
