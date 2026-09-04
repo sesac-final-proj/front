@@ -31,9 +31,9 @@ function apiUrl(path: string) {
   return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
 }
 
-// 로그인 플로우가 아직 없어서(온보딩 화면만 있음) 지금은 이 키에 토큰이 없다 — 실제
-// 로그인이 붙으면 여기에 access_token만 저장해주면 찜 API가 바로 동작한다.
+// src/app/auth/callback/page.tsx의 소셜 로그인 콜백이 이 키들에 토큰을 저장한다.
 export const AUTH_TOKEN_STORAGE_KEY = "carrot_access_token";
+export const REFRESH_TOKEN_STORAGE_KEY = "carrot_refresh_token";
 
 export class AuthRequiredError extends Error {
   constructor() {
@@ -48,6 +48,27 @@ function getAuthToken(): string | null {
     return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
   } catch {
     return null;
+  }
+}
+
+// 설정 > 로그아웃에서 호출. 백엔드 세션(리프레시 토큰) 폐기 요청은 best-effort로만
+// 보내고, 실패하더라도 로컬 토큰은 항상 지워서 클라이언트는 확실히 로그아웃 상태가 되게 한다.
+export async function logout(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const refreshToken = window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+  try {
+    if (refreshToken) {
+      await fetch(apiUrl("/api/v1/auth/logout"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    }
+  } catch {
+    // ponytail: 네트워크 실패해도 로컬 로그아웃은 진행
+  } finally {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
   }
 }
 
@@ -112,6 +133,53 @@ export async function getProduct(id: number, signal?: AbortSignal): Promise<Trad
 
   const payload: ApiProductListItem = await response.json();
   return toTradeProduct(payload);
+}
+
+interface ApiProductCreateRequest {
+  title: string;
+  category: string;
+  description?: string | null;
+  desired_price?: number | null;
+  trade_type?: TradeProduct["tradeType"];
+}
+
+interface ApiProductCreated {
+  id: number;
+}
+
+// 중고거래 글쓰기. Bearer 토큰이 필요한 엔드포인트라 토큰이 없으면(로그인 전) AuthRequiredError.
+export async function createProduct(input: {
+  title: string;
+  category: string;
+  description: string;
+  desiredPrice: number | null;
+  tradeType: TradeProduct["tradeType"];
+}): Promise<{ id: number }> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const body: ApiProductCreateRequest = {
+    title: input.title,
+    category: input.category,
+    description: input.description,
+    desired_price: input.desiredPrice,
+    trade_type: input.tradeType,
+  };
+
+  const response = await fetch(apiUrl("/api/v1/trades/products"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("글을 등록하지 못했습니다.");
+
+  const payload: ApiProductCreated = await response.json();
+  return { id: payload.id };
 }
 
 interface ApiFavoriteToggleResponse {
