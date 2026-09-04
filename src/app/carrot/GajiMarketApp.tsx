@@ -64,6 +64,18 @@ import {
   getMyFavorites,
   getMyProducts,
 } from "@/services";
+import {
+  createOrGetChatRoom,
+  leaveChatRoom as leaveChatRoomRequest,
+  listChatRooms,
+  listMessages as listChatMessages,
+  sendMessage as sendChatMessage,
+  updateChatTradeStatus,
+  type ChatMessageDto,
+  type ChatRoomDto,
+  type ChatTradeStatus,
+} from "@/services/chatService";
+import { blockUser, reportUser } from "@/services/safetyService";
 
 // Types (Barrel Export)
 import type {
@@ -124,6 +136,7 @@ type SubPage =
   | { type: "community-detail"; id: string }
   | { type: "community-form" }
   | { type: "chat-room"; id: string }
+  | { type: "chat-room-list"; productId: string; productTitle: string }
   | { type: "my-menu" }
   | { type: "all-services" }
   | { type: "merge-game" }
@@ -587,6 +600,30 @@ function toProductListItem(item: TradeProduct): ProductListItem {
   };
 }
 
+function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
+  return {
+    id: String(dto.id),
+    type: dto.type,
+    tradeRole: dto.isSeller ? "SELLER" : "BUYER",
+    title: dto.title,
+    avatarTone: "product",
+    lastMessage: dto.lastMessage ?? "",
+    lastMessageAt: dto.lastMessageAt ? formatRelativeTime(dto.lastMessageAt) : "",
+    unreadCount: dto.unreadCount,
+    verified: dto.verified,
+    muted: false,
+    productId: dto.productId !== null ? String(dto.productId) : undefined,
+  };
+}
+
+function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): { mine: boolean; text: string; time: string } {
+  return {
+    mine: dto.senderId === myUserId,
+    text: dto.content,
+    time: formatRelativeTime(dto.createdAt),
+  };
+}
+
 const initialProducts: ProductListItem[] = [
   {
     id: "p1",
@@ -739,88 +776,6 @@ const initialPosts: CommunityPost[] = [
     viewCount: 54,
     commentCount: 4,
     reactionCount: 9,
-  },
-];
-
-const initialChats: ChatRoom[] = [
-  {
-    id: "chat1",
-    type: "GROUP",
-    title: "새싹 노카페인 전체방",
-    avatarTone: "coffee",
-    lastMessage: "쯔양양님이 들어왔어요.",
-    lastMessageAt: "2일 전",
-    unreadCount: 0,
-    verified: false,
-    muted: false,
-  },
-  {
-    id: "chat2",
-    type: "COMMUNITY",
-    title: "위례자이 입주민방",
-    avatarTone: "building",
-    lastMessage: "안녕하세요. 2026년 7월에 입주한 입주민입니다.",
-    lastMessageAt: "2일 전",
-    unreadCount: 0,
-    verified: false,
-    muted: false,
-  },
-  {
-    id: "chat3",
-    type: "SYSTEM",
-    title: "가지알바",
-    avatarTone: "job",
-    lastMessage: "24시간 뒤 알바공고가 등록될 예정이에요.",
-    lastMessageAt: "3일 전",
-    unreadCount: 0,
-    verified: true,
-    muted: false,
-  },
-  {
-    id: "chat4",
-    type: "SYSTEM",
-    title: "가지스토어",
-    avatarTone: "store",
-    lastMessage: "가지스토어 다시 둘러보세요. 앱 첫 화면 쿠폰을 준비했어요.",
-    lastMessageAt: "4일 전",
-    unreadCount: 1,
-    verified: true,
-    muted: false,
-  },
-  {
-    id: "chat5",
-    type: "GROUP",
-    title: "점심시간",
-    avatarTone: "calendar",
-    lastMessage: "일정 후기를 남겨주세요. 이웃들과 다음 약속을 잡아봐요.",
-    lastMessageAt: "4일 전",
-    unreadCount: 0,
-    verified: false,
-    muted: false,
-  },
-  {
-    id: "chat6",
-    type: "SYSTEM",
-    title: "가지페이",
-    avatarTone: "pay",
-    lastMessage: "내 계좌로 보냈어요. 계좌와 금액을 확인해주세요.",
-    lastMessageAt: "4일 전",
-    unreadCount: 1,
-    verified: true,
-    muted: false,
-  },
-  {
-    id: "chat7",
-    type: "TRADE",
-    tradeRole: "SELLER",
-    title: "원목 사이드 테이블",
-    avatarTone: "wood",
-    lastMessage: "오늘 저녁 7시에 거래 가능하실까요?",
-    lastMessageAt: "방금 전",
-    unreadCount: 15,
-    verified: false,
-    muted: false,
-    productId: "p5",
   },
 ];
 
@@ -1284,6 +1239,7 @@ export default function GajiMarketApp() {
       });
     return () => controller.abort();
   }, [me]);
+
   const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
   const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
   // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
@@ -1325,13 +1281,16 @@ export default function GajiMarketApp() {
   const [isLoadingMoreProducts, setIsLoadingMoreProducts] = useState(false);
   const productPageRef = useRef(1);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
-  const [chats, setChats] = useState<ChatRoom[]>(initialChats);
+  const [chats, setChats] = useState<ChatRoom[]>([]);
   const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
   const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [regions, setRegions] = useState<Region[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
-  const [extraMessages, setExtraMessages] = useState<Record<string, typeof baseMessages>>({});
+  const [roomMessages, setRoomMessages] = useState<Record<string, typeof baseMessages>>({});
+  // 차단/신고엔 상대방 user id가 필요한데 채팅방 응답엔 없어서, 메시지에 실려오는
+  // sender_id로부터 알아낸다 — 아직 메시지가 하나도 없으면 모르는 채로 남는다.
+  const [roomOtherUserId, setRoomOtherUserId] = useState<Record<string, number>>({});
   const [isBooting, setIsBooting] = useState(true);
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
@@ -1347,6 +1306,46 @@ export default function GajiMarketApp() {
       setSubPage({ type: "apartment-verification" });
     }
   }, [verifiedApartment]);
+
+  // 채팅방 목록. 로그인 전엔 서버가 401을 주므로 me가 로드된 뒤에만 시도한다.
+  useEffect(() => {
+    if (!me) return;
+    const controller = new AbortController();
+    listChatRooms(controller.signal)
+      .then((page) => setChats(page.items.map(toChatRoomUi)))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("채팅 목록을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [me]);
+
+  function recordOtherUserId(chatId: string, items: ChatMessageDto[]) {
+    const other = items.find((m) => m.senderId !== me?.id);
+    if (!other) return;
+    setRoomOtherUserId((current) => (current[chatId] ? current : { ...current, [chatId]: other.senderId }));
+  }
+
+  // 채팅방을 보고 있는 동안엔 몇 초마다 다시 불러와서 상대방 메시지를 반영한다
+  // (웹소켓 없이 폴링으로 처리 — ponytail: 트래픽 커지면 그때 웹소켓 도입 고려).
+  useEffect(() => {
+    if (subPage?.type !== "chat-room") return;
+    const chatId = subPage.id;
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    const interval = window.setInterval(() => {
+      listChatMessages(numericId)
+        .then((page) => {
+          setRoomMessages((current) => ({
+            ...current,
+            [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)),
+          }));
+          recordOtherUserId(chatId, page.items);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [subPage, me?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 520);
@@ -1470,19 +1469,21 @@ export default function GajiMarketApp() {
     const controller = new AbortController();
     getProduct(id, controller.signal)
       .then((detail) => {
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === subPage.id
-              ? {
-                  ...p,
-                  description: detail.description ?? p.description,
-                  tradePlace: detail.tradePlace,
-                  sellerNickname: detail.sellerNickname,
-                  sellerMannerTemp: detail.sellerMannerTemp,
-                }
-              : p,
-          ),
-        );
+        const fill = (p: ProductListItem) =>
+          p.id === subPage.id
+            ? {
+                ...p,
+                description: detail.description ?? p.description,
+                tradePlace: detail.tradePlace,
+                sellerNickname: detail.sellerNickname,
+                sellerMannerTemp: detail.sellerMannerTemp,
+              }
+            : p;
+        // selectedProduct는 products/myProducts/favoriteProducts 중 어디서 찾았는지에
+        // 따라 달라지므로(위 selectedProduct 주석 참고), 셋 다 같이 채워줘야 한다.
+        setProducts((prev) => prev.map(fill));
+        setMyProducts((prev) => prev.map(fill));
+        setFavoriteProducts((prev) => prev.map(fill));
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -1501,11 +1502,11 @@ export default function GajiMarketApp() {
       return [];
     }
     return products.filter((product) => {
-      const matchesFilter = productFilter === "전체" || product.category === productFilter;
       // ponytail: 실거래 API엔 동네 검색/지역ID 조회 엔드포인트가 아직 없어서
       // activeNeighborhood로 실서버 데이터를 거를 방법이 없음 — 백엔드에 지역 조회가
       // 생기면 여기서 region_id로 서버 필터링하도록 바꾸기
-      return matchesFilter && product.tradeStatus !== "SOLD";
+      // 판매중/예약중/거래완료 전부 홈 피드에 그대로 노출한다(상태로 숨기지 않음).
+      return productFilter === "전체" || product.category === productFilter;
     });
   }, [hasNetworkError, productFilter, products]);
 
@@ -1624,6 +1625,10 @@ export default function GajiMarketApp() {
       setSubPage(null);
       return;
     }
+    if (subPage?.type === "chat-room-list") {
+      setSubPage({ type: "product-detail", id: subPage.productId });
+      return;
+    }
     setSubPage(null);
   }
 
@@ -1706,22 +1711,130 @@ export default function GajiMarketApp() {
   function openChat(chatId: string) {
     markChatRead(chatId);
     setSubPage({ type: "chat-room", id: chatId });
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    listChatMessages(numericId)
+      .then((page) => {
+        setRoomMessages((current) => ({ ...current, [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)) }));
+        recordOtherUserId(chatId, page.items);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("메시지를 불러오지 못했습니다.", error);
+        }
+      });
   }
 
   function submitMessage(event: FormEvent<HTMLFormElement>, chatId: string) {
     event.preventDefault();
     const text = messageDraft.trim();
     if (!text) return;
-    setExtraMessages((current) => ({
-      ...current,
-      [chatId]: [...(current[chatId] ?? []), { mine: true, text, time: "방금 전" }],
-    }));
-    setChats((current) =>
-      current.map((chat) =>
-        chat.id === chatId ? { ...chat, lastMessage: text, lastMessageAt: "방금 전", unreadCount: 0 } : chat,
-      ),
-    );
     setMessageDraft("");
+
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    sendChatMessage(numericId, text)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId ? { ...chat, lastMessage: text, lastMessageAt: "방금 전" } : chat,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("메시지를 보내지 못했습니다.", error);
+        }
+      });
+  }
+
+  function leaveChat(chatId: string) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    leaveChatRoomRequest(numericId)
+      .then(() => {
+        setChats((current) => current.filter((chat) => chat.id !== chatId));
+        goBack();
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("채팅방을 나가지 못했습니다.", error);
+          alert("채팅방을 나가지 못했습니다.");
+        }
+      });
+  }
+
+  function updateChatStatus(chatId: string, tradeStatus: ChatTradeStatus) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    updateChatTradeStatus(numericId, tradeStatus)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId ? { ...chat, lastMessage: message.content, lastMessageAt: "방금 전" } : chat,
+          ),
+        );
+        // 채팅방에 걸린 상품 상태도 같이 반영 — 목록/판매내역/상세 화면 전부 동일 값을 보게.
+        const room = chats.find((chat) => chat.id === chatId);
+        if (room?.productId) {
+          setProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus } : p)));
+          setMyProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus } : p)));
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("거래상태를 변경하지 못했습니다.", error);
+          alert("거래상태를 변경하지 못했습니다.");
+        }
+      });
+  }
+
+  function blockChatPartner(userId: number) {
+    blockUser(userId)
+      .then(() => alert("차단했습니다. 이제 이 사람과는 채팅을 주고받을 수 없어요."))
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("차단하지 못했습니다.", error);
+          alert("차단하지 못했습니다.");
+        }
+      });
+  }
+
+  function reportChatPartner(userId: number, reason: string) {
+    reportUser({ targetType: "USER", targetId: userId, reason })
+      .then(() => alert(`신고가 접수되었습니다. (${reason})\n운영팀에서 확인 후 처리하겠습니다.`))
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("신고 접수에 실패했습니다.", error);
+          alert("신고 접수에 실패했습니다.");
+        }
+      });
   }
 
   function submitProduct(event: FormEvent<HTMLFormElement>) {
@@ -1847,8 +1960,15 @@ export default function GajiMarketApp() {
       ? togetherPosts.find((post) => post.id === subPage.id)
       : undefined;
 
+  // 일반 목록(products)은 mine을 항상 false로 내려주는 별개 API라서, 내 상품(판매내역/찜
+  // 목록 경유)을 그 목록에서만 찾으면 "본인 글인데 mine:false"가 되어 채팅하기가 잘못된
+  // (구매자용) 분기로 빠진다 — myProducts/favoriteProducts를 먼저 찾아야 mine이 정확하다.
   const selectedProduct =
-    subPage?.type === "product-detail" ? products.find((product) => product.id === subPage.id) : undefined;
+    subPage?.type === "product-detail"
+      ? (myProducts.find((product) => product.id === subPage.id) ??
+        favoriteProducts.find((product) => product.id === subPage.id) ??
+        products.find((product) => product.id === subPage.id))
+      : undefined;
   const selectedPost =
     subPage?.type === "community-detail" ? posts.find((post) => post.id === subPage.id) : undefined;
   const selectedChat =
@@ -1871,8 +1991,32 @@ export default function GajiMarketApp() {
               onFavorite={toggleFavorite}
               onStatusChange={updateProductStatus}
               onChat={() => {
-                const room = chats.find((chat) => chat.productId === selectedProduct.id) ?? chats[0];
-                openChat(room.id);
+                // 판매자 본인 글이면 "채팅하기"는 그 상품에 걸린 채팅방들 목록으로,
+                // 구매자면 그 판매자와의 채팅방 하나로 바로 들어간다(백엔드가 기존 방 재사용).
+                if (selectedProduct.mine) {
+                  setSubPage({
+                    type: "chat-room-list",
+                    productId: selectedProduct.id,
+                    productTitle: selectedProduct.title,
+                  });
+                  return;
+                }
+                const numericProductId = Number(selectedProduct.id);
+                if (!Number.isFinite(numericProductId)) return;
+                createOrGetChatRoom(numericProductId)
+                  .then((dto) => {
+                    const room = toChatRoomUi(dto);
+                    setChats((current) => (current.some((c) => c.id === room.id) ? current : [room, ...current]));
+                    openChat(room.id);
+                  })
+                  .catch((error: unknown) => {
+                    if (error instanceof AuthRequiredError) {
+                      setAuthRequired(true);
+                      setSheet("status");
+                    } else {
+                      console.error("채팅방을 열지 못했습니다.", error);
+                    }
+                  });
               }}
               onHideSeller={(id) => {
                 setProducts((prev) => prev.filter((p) => p.id !== id));
@@ -1918,10 +2062,28 @@ export default function GajiMarketApp() {
             <ChatRoomScreen
               room={selectedChat}
               product={selectedChat.productId ? products.find((product) => product.id === selectedChat.productId) : undefined}
-              messages={[...baseMessages, ...(extraMessages[selectedChat.id] ?? [])]}
+              messages={roomMessages[selectedChat.id] ?? []}
               draft={messageDraft}
               onDraftChange={setMessageDraft}
               onSubmit={(event) => submitMessage(event, selectedChat.id)}
+              onBack={goBack}
+              otherUserId={roomOtherUserId[selectedChat.id]}
+              onLeave={() => leaveChat(selectedChat.id)}
+              onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
+              onBlock={blockChatPartner}
+              onReport={reportChatPartner}
+            />
+          ) : subPage?.type === "chat-room-list" ? (
+            <ChatsScreen
+              rooms={chats.filter((chat) => chat.productId === subPage.productId)}
+              activeFilter={chatFilter}
+              isLoading={false}
+              unreadCount={totalUnread}
+              onFilterChange={setChatFilter}
+              onOpenNotifications={() => setSheet("notifications")}
+              onOpenSettings={() => setSubPage({ type: "settings" })}
+              onOpenChat={openChat}
+              title={`${subPage.productTitle} 채팅`}
               onBack={goBack}
             />
           ) : subPage?.type === "my-menu" ? (
@@ -2525,17 +2687,19 @@ function StateBlock({
 }: {
   title: string;
   body: string;
-  actionLabel: string;
-  onAction: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className={styles.stateBlock}>
       <Sparkles size={30} />
       <h2>{title}</h2>
       <p>{body}</p>
-      <button type="button" onClick={onAction}>
-        {actionLabel}
-      </button>
+      {actionLabel && onAction && (
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -4937,6 +5101,8 @@ function ChatsScreen({
   onOpenNotifications,
   onOpenSettings,
   onOpenChat,
+  title = "채팅",
+  onBack,
 }: {
   rooms: ChatRoom[];
   activeFilter: string;
@@ -4946,42 +5112,66 @@ function ChatsScreen({
   onOpenNotifications: () => void;
   onOpenSettings: () => void;
   onOpenChat: (id: string) => void;
+  title?: string;
+  onBack?: () => void;
 }) {
+  // onBack이 있으면 "내 상품에 걸린 채팅만" 보는 필터링된 화면 —
+  // 하단탭의 전체 채팅 목록과 헷갈리지 않게 뒤로가기와 전용 타이틀을 보여주고,
+  // 여기선 의미 없는 필터/프로모 배너는 생략한다.
+  const scoped = Boolean(onBack);
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="채팅"
+        title={title}
+        compact={scoped}
+        leading={
+          scoped ? (
+            <IconButton label="뒤로" onClick={onBack}>
+              <ChevronLeft size={27} />
+            </IconButton>
+          ) : undefined
+        }
         actions={
-          <>
-            <IconButton label="채팅 알림" onClick={onOpenNotifications}>
-              <Bell size={28} />
-              {unreadCount > 0 && <span className={styles.notificationDot} />}
-            </IconButton>
-            <IconButton label="설정" onClick={onOpenSettings}>
-              <Settings size={29} />
-            </IconButton>
-          </>
+          scoped ? undefined : (
+            <>
+              <IconButton label="채팅 알림" onClick={onOpenNotifications}>
+                <Bell size={28} />
+                {unreadCount > 0 && <span className={styles.notificationDot} />}
+              </IconButton>
+              <IconButton label="설정" onClick={onOpenSettings}>
+                <Settings size={29} />
+              </IconButton>
+            </>
+          )
         }
       />
-      <div className={styles.filterLine}>
-        <button type="button" className={styles.roundTool} aria-label="필터 설정">
-          <SlidersHorizontal size={23} />
-        </button>
-        <ChipScroller items={CHAT_FILTERS} value={activeFilter} onChange={onFilterChange} />
-      </div>
-      <div className={styles.chatPromo}>
-        <strong>가지마켓 동네 혜택</strong>
-        <span>위례에서 이번 주 사용할 수 있는 쿠폰을 확인하세요</span>
-      </div>
+      {!scoped && (
+        <>
+          <div className={styles.filterLine}>
+            <button type="button" className={styles.roundTool} aria-label="필터 설정">
+              <SlidersHorizontal size={23} />
+            </button>
+            <ChipScroller items={CHAT_FILTERS} value={activeFilter} onChange={onFilterChange} />
+          </div>
+          <div className={styles.chatPromo}>
+            <strong>가지마켓 동네 혜택</strong>
+            <span>위례에서 이번 주 사용할 수 있는 쿠폰을 확인하세요</span>
+          </div>
+        </>
+      )}
       {isLoading ? (
         <ChatSkeletonList />
       ) : rooms.length === 0 ? (
-        <StateBlock
-          title="해당 채팅이 없어요"
-          body="다른 필터를 선택하거나 새 거래를 시작해보세요."
-          actionLabel="전체 보기"
-          onAction={() => onFilterChange("전체")}
-        />
+        scoped ? (
+          <StateBlock title="아직 문의한 사람이 없어요" body="구매를 원하는 분이 채팅을 걸면 여기에 표시돼요." />
+        ) : (
+          <StateBlock
+            title="해당 채팅이 없어요"
+            body="다른 필터를 선택하거나 새 거래를 시작해보세요."
+            actionLabel="전체 보기"
+            onAction={() => onFilterChange("전체")}
+          />
+        )
       ) : (
         <div className={styles.chatList}>
           {rooms.map((room) => (
@@ -5018,6 +5208,8 @@ function ChatSkeletonList() {
   );
 }
 
+const chatReportReasons = ["사기 의심돼요", "비매너 및 욕설/비방", "거래 약속을 안 지켜요", "기타 사유"];
+
 function ChatRoomScreen({
   room,
   product,
@@ -5026,6 +5218,11 @@ function ChatRoomScreen({
   onDraftChange,
   onSubmit,
   onBack,
+  otherUserId,
+  onLeave,
+  onUpdateStatus,
+  onBlock,
+  onReport,
 }: {
   room: ChatRoom;
   product?: ProductListItem;
@@ -5034,7 +5231,16 @@ function ChatRoomScreen({
   onDraftChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onBack: () => void;
+  otherUserId?: number;
+  onLeave: () => void;
+  onUpdateStatus: (tradeStatus: ChatTradeStatus) => void;
+  onBlock: (userId: number) => void;
+  onReport: (userId: number, reason: string) => void;
 }) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState(chatReportReasons[0]);
+
   return (
     <section className={styles.chatRoomScreen}>
       <ScreenHeader
@@ -5046,11 +5252,118 @@ function ChatRoomScreen({
           </IconButton>
         }
         actions={
-          <IconButton label="채팅 메뉴">
+          <IconButton label="채팅 메뉴" onClick={() => setShowMenu(true)}>
             <Menu size={25} />
           </IconButton>
         }
       />
+      {showMenu && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowMenu(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            {room.tradeRole === "SELLER" && (
+              <div className={styles.segmented}>
+                {(["SALE", "RESERVED", "SOLD"] as const).map((status) => (
+                  <button
+                    type="button"
+                    key={status}
+                    className={product?.tradeStatus === status ? styles.segmentActive : ""}
+                    onClick={() => {
+                      setShowMenu(false);
+                      onUpdateStatus(status);
+                    }}
+                  >
+                    {status === "SALE" ? "판매중" : status === "RESERVED" ? "예약중" : "거래완료"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {otherUserId !== undefined && (
+              <div className={styles.productActionGroup}>
+                <button
+                  type="button"
+                  className={styles.productActionBtn}
+                  onClick={() => {
+                    setShowMenu(false);
+                    if (window.confirm("이 사람을 차단하시겠어요?")) onBlock(otherUserId);
+                  }}
+                >
+                  <ShieldAlert size={22} />
+                  <span>차단하기</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.productActionBtn}
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowReport(true);
+                  }}
+                >
+                  <MessageCircle size={22} />
+                  <span>신고하기</span>
+                </button>
+              </div>
+            )}
+            <div className={styles.productActionGroup}>
+              <button
+                type="button"
+                className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                onClick={() => {
+                  setShowMenu(false);
+                  if (window.confirm("채팅방을 나가시겠어요? 대화 내용을 더 이상 볼 수 없어요.")) onLeave();
+                }}
+              >
+                <LogOut size={22} />
+                <span>채팅방 나가기</span>
+              </button>
+            </div>
+            <button type="button" className={styles.productActionCloseBtn} onClick={() => setShowMenu(false)}>
+              닫기
+            </button>
+          </div>
+        </>
+      )}
+      {showReport && otherUserId !== undefined && (
+        <>
+          <div className={styles.productActionBackdrop} onClick={() => setShowReport(false)} />
+          <div className={styles.productActionSheet} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+            <h3 style={{ margin: "4px 0 0", fontSize: "1.125rem", fontWeight: 800 }}>신고 사유를 선택해주세요</h3>
+            <div className={styles.reportReasonList}>
+              {chatReportReasons.map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  className={`${styles.reportReasonItem} ${reportReason === reason ? styles.reportReasonItemSelected : ""}`}
+                  onClick={() => setReportReason(reason)}
+                >
+                  <span>{reason}</span>
+                  {reportReason === reason && <CheckCircle2 size={18} />}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.albaDetailApplyBtn}
+              style={{ width: "100%", height: "48px" }}
+              onClick={() => {
+                setShowReport(false);
+                onReport(otherUserId, reportReason);
+              }}
+            >
+              신고 제출하기
+            </button>
+            <button type="button" className={styles.productActionCloseBtn} onClick={() => setShowReport(false)}>
+              취소
+            </button>
+          </div>
+        </>
+      )}
       {product && (
         <div className={styles.chatProductCard}>
           <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} />
