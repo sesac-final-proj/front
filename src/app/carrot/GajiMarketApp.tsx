@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Moon,
   Sun,
@@ -85,7 +86,15 @@ import {
   type CongestionZone,
 } from "@/services/congestionService";
 import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
-import { AuthRequiredError, getProduct, listProducts, setFavorite } from "@/services/tradeService";
+import { getMe, updateRegion, type Me } from "@/services/authService";
+import {
+  AuthRequiredError,
+  createProduct,
+  getProduct,
+  listProducts,
+  logout as logoutRequest,
+  setFavorite,
+} from "@/services/tradeService";
 import type { TradeProduct } from "@/types/trade";
 import {
   getRentTransactions,
@@ -380,8 +389,8 @@ function normalizeDongName(name: string) {
   return name.replace(/\s+/g, "").replace(/제(\d)/g, "$1");
 }
 
-// 목업 동네 4개 중 실제 시드 데이터(영등포구)와 겹치는 건 "당산 2동"뿐 — 나머지(위례/공릉/
-// 송파삼성래미안)는 매칭되는 region이 아예 없어서 undefined를 반환하고, 호출 쪽에서
+// 목업 동네 4개 중 실제 시드 데이터(영등포구)와 겹치는 건 "문래동"·"당산 2동" 둘 —
+// 나머지(위례/공릉)는 매칭되는 region이 아예 없어서 undefined를 반환하고, 호출 쪽에서
 // region 필터 없이 전체 목록을 보여주는 걸로 폴백한다.
 function matchRegionId(regions: Region[], neighborhoodName: string): number | undefined {
   const target = normalizeDongName(neighborhoodName);
@@ -1260,7 +1269,12 @@ const ALBA_MOCK_DATA: AlbaItem[] = [
 ];
 
 export default function GajiMarketApp() {
+  const router = useRouter();
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ThemeMode);
+
+  function handleLogout() {
+    logoutRequest().finally(() => router.replace("/onboarding"));
+  }
 
   function changeTheme(value: ThemeMode) {
     sessionTheme = value;
@@ -1275,6 +1289,15 @@ export default function GajiMarketApp() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
+  const [me, setMe] = useState<Me | null>(null);
+
+  // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
+  // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
+  useEffect(() => {
+    getMe()
+      .then(setMe)
+      .catch(() => {});
+  }, []);
   const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
   const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
   // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
@@ -1404,6 +1427,15 @@ export default function GajiMarketApp() {
   // regions는 로딩됐는데 이 동네만 매칭이 안 되는 경우(위례/공릉/송파삼성래미안 등) —
   // 그 동네엔 실제로 상품이 하나도 없다는 뜻이라 전체 목록으로 대충 채우지 않고 빈 목록으로 둔다.
   const noRegionMatch = regionsLoaded && regionId === undefined;
+
+  // 백엔드는 user.region_id가 없으면 글쓰기(상품 등록 등)를 400으로 막는다 — 화면에서
+  // 고른 동네가 바뀔 때마다(최초 로그인 포함) 서버 쪽 활동동네도 같이 맞춰준다.
+  useEffect(() => {
+    if (!me || regionId === undefined || me.region?.id === regionId) return;
+    updateRegion(regionId)
+      .then(setMe)
+      .catch((error: unknown) => console.error("활동동네를 저장하지 못했습니다.", error));
+  }, [me, regionId]);
 
   useEffect(() => {
     if (!regionsLoaded) return; // region 목록 오기 전엔 아직 필터를 확정할 수 없어 대기(부팅 스켈레톤이 가려줌)
@@ -1712,36 +1744,53 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
 
-    if (title.length < 2 || description.length < 10) {
+    if (isGuestMode) {
       setSheet("status");
       return;
     }
 
-    const newProduct: ProductListItem = {
-      id: `p${Date.now()}`,
+    createProduct({
       title,
-      thumbnailLabel: title.slice(0, 2),
-      thumbnailTone: "mine",
-      neighborhoodName: activeNeighborhood,
-      distanceKm: 0,
-      createdAt: "방금 전",
-      price: isFree ? null : Math.max(0, price),
-      tradeStatus: "SALE",
-      tradeType: isFree ? "FREE" : "SALE",
-      purchaseMode: "NORMAL",
-      chatCount: 0,
-      favoriteCount: 0,
-      viewCount: 0,
-      interestCount: 0,
-      isFavorite: false,
-      mine: true,
       category,
       description,
-    };
+      desiredPrice: isFree ? null : Math.max(0, price),
+      tradeType: isFree ? "FREE" : "SALE",
+    })
+      .then(({ id }) => {
+        const newProduct: ProductListItem = {
+          id: String(id),
+          title,
+          thumbnailLabel: title.slice(0, 2),
+          thumbnailTone: "mine",
+          neighborhoodName: activeNeighborhood,
+          distanceKm: 0,
+          createdAt: "방금 전",
+          price: isFree ? null : Math.max(0, price),
+          tradeStatus: "SALE",
+          tradeType: isFree ? "FREE" : "SALE",
+          purchaseMode: "NORMAL",
+          chatCount: 0,
+          favoriteCount: 0,
+          viewCount: 0,
+          interestCount: 0,
+          isFavorite: false,
+          mine: true,
+          category,
+          description,
+        };
 
-    setProducts((current) => [newProduct, ...current]);
-    setActiveTab("my");
-    setSubPage({ type: "sales" });
+        setProducts((current) => [newProduct, ...current]);
+        setActiveTab("my");
+        setSubPage({ type: "sales" });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+        } else {
+          console.error("글을 등록하지 못했습니다.", error);
+        }
+        setSheet("status");
+      });
   }
 
   function submitCommunityPost(event: FormEvent<HTMLFormElement>) {
@@ -1750,10 +1799,6 @@ export default function GajiMarketApp() {
     const title = String(form.get("title") ?? "").trim();
     const content = String(form.get("content") ?? "").trim();
     const category = String(form.get("category") ?? "일반");
-    if (title.length < 2 || content.length < 6) {
-      setSheet("status");
-      return;
-    }
 
     const post: CommunityPost = {
       id: `cpost${Date.now()}`,
@@ -1967,6 +2012,7 @@ export default function GajiMarketApp() {
               onGuestToggle={() => setIsGuestMode((value) => !value)}
               onNetworkErrorToggle={() => setHasNetworkError((value) => !value)}
               hasNetworkError={hasNetworkError}
+              onLogout={handleLogout}
             />
           ) : subPage?.type === "sales" ? (
             <ManagementScreen
@@ -2088,6 +2134,7 @@ export default function GajiMarketApp() {
             />
           ) : (
             <MyScreen
+              nickname={me?.nickname}
               activeNeighborhood={activeNeighborhood}
               unreadCount={totalUnread}
               favoriteCount={favoriteProducts.length}
@@ -2791,7 +2838,7 @@ function ProductFormScreen({
         </div>
         <label>
           제목
-          <input name="title" minLength={2} maxLength={40} placeholder="물건 이름을 입력하세요" required />
+          <input name="title" maxLength={40} placeholder="물건 이름을 입력하세요" required />
         </label>
         <label>
           카테고리
@@ -2814,7 +2861,6 @@ function ProductFormScreen({
           설명
           <textarea
             name="description"
-            minLength={10}
             maxLength={2000}
             placeholder="상태, 거래 희망 장소, 가격 제안 가능 여부를 적어주세요."
             required
@@ -3642,11 +3688,11 @@ function CommunityFormScreen({
         </label>
         <label>
           제목
-          <input name="title" minLength={2} placeholder="동네 이웃에게 물어보세요" required />
+          <input name="title" placeholder="동네 이웃에게 물어보세요" required />
         </label>
         <label>
           내용
-          <textarea name="content" minLength={6} placeholder="상세 내용을 입력하세요" required />
+          <textarea name="content" placeholder="상세 내용을 입력하세요" required />
         </label>
         <button type="submit" className={styles.primaryButton}>
           올리기
@@ -5021,6 +5067,7 @@ function ChatRoomScreen({
 }
 
 function MyScreen({
+  nickname,
   activeNeighborhood,
   unreadCount,
   favoriteCount,
@@ -5034,6 +5081,7 @@ function MyScreen({
   onOpenFavorites,
   onOpenApartment,
 }: {
+  nickname?: string;
   activeNeighborhood: string;
   unreadCount: number;
   favoriteCount: number;
@@ -5090,7 +5138,7 @@ function MyScreen({
           <UserRound size={42} fill="currentColor" />
         </div>
         <div>
-          <strong>주황가지님</strong>
+          <strong>{nickname ? `${nickname}님` : "주황가지님"}</strong>
           <span>{activeNeighborhood} · 신뢰온도</span>
         </div>
         <span className={styles.temperature}>40.1°C</span>
@@ -5590,6 +5638,7 @@ function SettingsScreen({
   onLocationToggle,
   onGuestToggle,
   onNetworkErrorToggle,
+  onLogout,
 }: {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
@@ -5600,6 +5649,7 @@ function SettingsScreen({
   onLocationToggle: () => void;
   onGuestToggle: () => void;
   onNetworkErrorToggle: () => void;
+  onLogout: () => void;
 }) {
   return (
     <section className={styles.screen}>
@@ -5653,7 +5703,7 @@ function SettingsScreen({
           { label: "공지사항", icon: Bell },
           { label: "고객센터", icon: Headphones },
           { label: "의견 남기기", icon: Mail },
-          { label: "로그아웃", icon: LogOut },
+          { label: "로그아웃", icon: LogOut, onClick: onLogout },
           { label: "탈퇴하기", icon: X },
           { label: "가지마켓 알아보기", icon: Sparkles },
           { label: "약관 및 정책", icon: BookOpen },
@@ -6940,14 +6990,7 @@ function BottomSheet({
                 actionLabel="재시도"
                 onAction={onRetry}
               />
-            ) : (
-              <StateBlock
-                title="입력값을 확인해주세요"
-                body="제목은 2자 이상, 설명은 10자 이상이어야 합니다."
-                actionLabel="닫기"
-                onAction={onClose}
-              />
-            )}
+            ) : null}
           </>
         )}
       </section>

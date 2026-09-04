@@ -4,6 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart, MapPin } from "lucide-react";
 import styles from "./OnboardingScreen.module.css";
 
+// carrot/GajiMarketApp.tsx와 동일한 패턴 (NEXT_PUBLIC_API_BASE_URL 비어있으면 상대경로).
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+function apiUrl(path: string) {
+  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
+}
+
+async function startSocialLogin(provider: "kakao" | "naver") {
+  const res = await fetch(apiUrl(`/api/v1/auth/login/${provider}`));
+  if (!res.ok) return; // ponytail: 에러 토스트는 로그인 실패 처리 붙일 때 추가
+  const { auth_url: authUrl } = (await res.json()) as { auth_url: string };
+  window.location.href = authUrl;
+}
+
 type AccentIcon = "face" | "map" | "heart";
 
 type Feature = {
@@ -178,12 +191,19 @@ export default function OnboardingScreen() {
           </section>
 
           <div className={styles.actions}>
-            {/* TODO: 로그인 모듈 붙일 때 카카오/네이버 OAuth 연동 */}
-            <button type="button" className={`${styles.socialButton} ${styles.kakaoButton}`}>
+            <button
+              type="button"
+              className={`${styles.socialButton} ${styles.kakaoButton}`}
+              onClick={() => startSocialLogin("kakao")}
+            >
               <KakaoMark />
               <span>3초만에 카카오로 시작하기</span>
             </button>
-            <button type="button" className={`${styles.socialButton} ${styles.naverButton}`}>
+            <button
+              type="button"
+              className={`${styles.socialButton} ${styles.naverButton}`}
+              onClick={() => startSocialLogin("naver")}
+            >
               <span className={styles.naverMark}>N</span>
               <span>3초만에 네이버로 시작하기</span>
             </button>
