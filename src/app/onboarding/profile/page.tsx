@@ -13,7 +13,7 @@ import {
   selectNickname,
   updateProfile,
   type NicknameAvailability,
-} from "@/services/authService";
+} from "@/services";
 
 // 백엔드 검증(NICKNAME_*)과 동일한 규칙을 프론트에서 먼저 걸러서, 매 타이핑마다
 // 네트워크를 타지 않고도 형식 오류를 바로 보여준다. 최종 판정(중복/금칙어)은

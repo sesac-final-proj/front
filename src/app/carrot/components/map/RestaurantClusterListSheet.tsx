@@ -2,7 +2,7 @@
 
 import React from "react";
 import { X, ChevronRight, Star, MapPin, Sparkles } from "lucide-react";
-import type { Restaurant } from "@/services/restaurantService";
+import type { Restaurant } from "@/types";
 import styles from "../../GajiMarketApp.module.css";
 
 export interface RestaurantClusterListSheetProps {

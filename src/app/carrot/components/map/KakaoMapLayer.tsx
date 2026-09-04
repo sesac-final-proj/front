@@ -4,10 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   getCongestionLevelLabel,
   getSeedPastelTheme,
+  getRestaurantsByBounds,
   type CongestionZone,
-} from "@/services/congestionService";
-import type { Restaurant } from "@/services/restaurantService";
-import { getRestaurantsByBounds } from "@/services/restaurantService";
+  type Restaurant,
+} from "@/services";
 import styles from "../../GajiMarketApp.module.css";
 
 export const KAKAO_MAP_KEY =

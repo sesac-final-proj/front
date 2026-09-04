@@ -5,124 +5,79 @@ import type { FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Moon,
-  Sun,
-  Calendar,
-  EllipsisVertical,
-  FileText,
-  Footprints,
-  Package,
-  Share2,
-  BadgePercent,
-  Bell,
-  BookOpen,
-  BriefcaseBusiness,
-  Building,
-  Building2,
-  CakeSlice,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Coffee,
-  Crosshair,
-  Dumbbell,
-  Eye,
-  Gem,
-  Gamepad2,
-  GraduationCap,
-  Headphones,
-  Heart,
-  Home,
-  House,
-  Lock,
-  LogOut,
-  Mail,
-  MapPin,
-  MapPinned,
-  Menu,
-  MessageCircle,
-  MoreVertical,
-  NotebookTabs,
-  Plus,
-  QrCode,
-  ReceiptText,
-  RefreshCw,
-  Search,
-  Send,
-  Settings,
-  ShieldAlert,
-  ShieldCheck,
-  Shirt,
-  ShoppingBag,
-  ShoppingBasket,
-  SlidersHorizontal,
-  Sparkles,
-  SprayCan,
-  Store,
-  Tag,
-  Truck,
-  EyeOff,
-  UserRound,
-  Users,
-  UsersRound,
-  Utensils,
-  WalletCards,
-  X,
+  BadgePercent, Bell, BookOpen, BriefcaseBusiness, Building, Building2,
+  CakeSlice, Calendar, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
+  Clock3, Coffee, Crosshair, Dumbbell, EllipsisVertical, Eye, EyeOff,
+  FileText, Footprints, Gamepad2, Gem, GraduationCap, Headphones, Heart,
+  Home, House, Lock, LogOut, Mail, MapPin, MapPinned, Menu, MessageCircle,
+  Moon, MoreVertical, NotebookTabs, Package, Plus, QrCode, ReceiptText,
+  RefreshCw, Search, Send, Settings, Share2, ShieldAlert, ShieldCheck,
+  Shirt, ShoppingBag, ShoppingBasket, SlidersHorizontal, Sparkles, SprayCan,
+  Store, Sun, Tag, Truck, UserRound, Users, UsersRound, Utensils,
+  WalletCards, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
+
+// Components (Barrel Export)
 import {
+  KakaoMapLayer,
+  KAKAO_MAP_KEY,
+  loadKakaoMapScript,
+  RestaurantDetailSheet,
+  RestaurantClusterListSheet,
+  TogetherIntroView,
+  TogetherCategoryView,
+  TogetherFormView,
+  TogetherFeedCard,
+  TogetherDetailView,
+  GajiMergeGameScreen,
+} from "./components";
+
+// Services (Barrel Export)
+import {
+  getMe,
+  updateRegion,
+  listProducts,
+  getProduct,
+  createProduct,
+  setFavorite,
+  logout as logoutRequest,
+  AuthRequiredError,
+  getRentTransactions,
+  groupBuildingsByDong,
+  groupTransactionsByBuilding,
+  getKakaoPlaceUrl,
+  getRestaurantsByBounds,
+  getTogetherPosts,
+  createTogetherPost,
+  toggleTogetherJoin,
   getCongestionDelta,
   getCongestionLevelLabel,
+  summarizeCongestion,
   getCongestionZonesForNeighborhood,
   getCongestionZonesForBounds,
   getCongestionZonesNearCenter,
   getSeedPastelTheme,
   SEED_PASTEL_COLOR_BOARD,
-  summarizeCongestion,
-  type CongestionZone,
-} from "@/services/congestionService";
-import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
-import { getMe, updateRegion, type Me } from "@/services/authService";
-import {
-  AuthRequiredError,
-  createProduct,
-  getProduct,
-  listProducts,
-  logout as logoutRequest,
-  setFavorite,
-} from "@/services/tradeService";
-import type { TradeProduct } from "@/types/trade";
-import {
-  getRentTransactions,
-  groupBuildingsByDong,
-  groupTransactionsByBuilding,
-} from "@/services/realEstateService";
+} from "@/services";
+
+// Types (Barrel Export)
 import type {
+  TradeProduct,
+  TogetherCategory,
+  TogetherPost,
+  CreateTogetherPostInput,
   HouseTypeFilter,
   PropertyBuilding,
   RealEstateBounds,
   RentTransaction,
   RentTypeFilter,
-} from "@/types/realEstate";
-import { TogetherIntroView } from "./components/together/TogetherIntroView";
-import { TogetherCategoryView } from "./components/together/TogetherCategoryView";
-import { TogetherFormView } from "./components/together/TogetherFormView";
-import { TogetherFeedCard } from "./components/together/TogetherFeedCard";
-import { TogetherDetailView } from "./components/together/TogetherDetailView";
-import type { TogetherCategory, TogetherPost, CreateTogetherPostInput } from "@/types/together";
-import {
-  getTogetherPosts,
-  createTogetherPost,
-  toggleTogetherJoin,
-} from "@/services/togetherService";
-import { KakaoMapLayer, KAKAO_MAP_KEY, loadKakaoMapScript } from "./components/map/KakaoMapLayer";
-import { RestaurantDetailSheet } from "./components/map/RestaurantDetailSheet";
-import { RestaurantClusterListSheet } from "./components/map/RestaurantClusterListSheet";
-import { GajiMergeGameScreen } from "./components/merge-game/GajiMergeGameScreen";
+  Me,
+  Restaurant,
+  CongestionZone,
+} from "@/types";
 
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
