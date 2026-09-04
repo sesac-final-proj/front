@@ -777,6 +777,14 @@
   font-weight: 950;
 }
 
+.detailHeroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .detailHero::after {
   content: "";
   position: absolute;
@@ -1037,6 +1045,14 @@
   gap: 3px;
   background: rgba(255, 146, 43, 0.08);
   font-weight: 850;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.photoPreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .photoUploader small {
