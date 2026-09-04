@@ -1,0 +1,36 @@
+.section { padding: 22px 0 28px; color: var(--color-text); }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.heading h2 { margin: 0; font-size: 19px; letter-spacing: -.5px; }
+.heading h2 span { margin-left: 6px; color: var(--color-muted); font-size: 14px; font-weight: 500; }
+.heading > button { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); color: var(--color-text); cursor: pointer; }
+.heading > button:disabled { opacity: .5; cursor: wait; }
+.hint { margin: 6px 0 18px; color: var(--color-muted); font-size: 13px; line-height: 1.6; }
+.list { padding: 0; margin: 0; list-style: none; }
+.list li + li { border-top: 1px solid var(--color-line); }
+.stop { display: flex; width: 100%; align-items: center; gap: 12px; padding: 16px 8px; border: 0; border-radius: 12px; background: transparent; color: var(--color-text); text-align: left; cursor: pointer; }
+.stop:hover, .stop[aria-pressed="true"] { background: var(--color-surface-2); }
+.icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 14px; }
+.bike { color: #146c43; background: #d8f4e4; }
+.subway { color: #2453a0; background: #e2ecff; }
+.name { flex: 1; min-width: 0; }
+.name strong { display: block; font-size: 14px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.name small { display: block; margin-top: 4px; color: var(--color-muted); font-size: 12px; }
+.count { flex-shrink: 0; text-align: right; color: var(--color-success); font-size: 12px; }
+.count b { font-size: 23px; margin-right: 2px; font-variant-numeric: tabular-nums; }
+.count small { display: block; margin-top: 2px; font-size: 11px; }
+.empty { color: var(--color-muted); }
+.detail { padding: 18px; margin-bottom: 12px; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-surface-2); }
+.detail strong { font-size: 16px; }
+.detail p { margin: 8px 0; font-size: 14px; }
+.detail small { color: var(--color-muted); line-height: 1.6; }
+.detail a { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-top: 12px; color: var(--color-text); font-size: 13px; text-decoration: none; border-top: 1px solid var(--color-line); }
+.state { display: flex; flex-direction: column; align-items: center; padding: 30px 12px; text-align: center; color: var(--color-muted); font-size: 14px; line-height: 1.7; }
+.state small { font-size: 12px; }
+.state button { min-height: 44px; margin-top: 14px; padding: 8px 20px; border: 1px solid var(--color-line); border-radius: 12px; color: var(--color-text); background: var(--color-surface-2); cursor: pointer; }
+.source { margin: 20px 0 0; color: var(--color-muted); font-size: 11px; line-height: 1.8; }
+.source a { color: inherit; text-underline-offset: 3px; }
+.section button:focus-visible, .section a:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+.marker { display: flex; align-items: center; gap: 5px; min-height: 34px; max-width: 160px; padding: 6px 10px; border: 2px solid #2453a0; border-radius: 12px; background: #f8fbff; color: #173f80; font-family: inherit; font-size: 12px; font-weight: 750; box-shadow: 0 3px 10px #14294726; cursor: pointer; white-space: nowrap; }
+.marker[data-kind="bike"] { border-color: #168451; background: #f4fff8; color: #12633e; }
+.marker[data-empty="true"] { border-color: #707780; color: #51565d; background: #f5f6f7; }
+.marker[aria-pressed="true"], .marker:focus-visible { outline: 3px solid #ff8a3d; outline-offset: 2px; }

@@ -1307,26 +1307,37 @@
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: 18px 18px 18px 5px;
-  background: var(--danger-pin);
-  color: var(--danger-pin-text);
+  border-radius: 50%;
+  background: transparent;
   display: grid;
   place-items: center;
   position: relative;
   padding: 0;
-  transform: translate(-50%, -100%) rotate(-45deg);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.32);
+  transform: translate(-50%, -50%);
   cursor: pointer;
 }
 
+.dangerMapMarker::before {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--danger-pin) 42%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger-pin) 18%, transparent);
+}
+
 .dangerMapMarker span {
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  transform: rotate(45deg);
-  font-size: 18px;
-  font-weight: 950;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--danger-pin);
+  box-shadow: 0 2px 6px rgba(25, 28, 33, 0.28);
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -3621,19 +3632,11 @@
   width: 31px;
   height: 31px;
   flex: 0 0 31px;
-  overflow: visible;
-}
-
-.brandCore {
-  fill: var(--color-primary-pressed);
-}
-
-.brandLeaf {
-  fill: var(--color-success);
+  overflow: hidden;
 }
 
 .brandWord {
-  color: var(--color-primary-pressed);
+  color: #ff8a3d;
   font-family:
     "Arial Rounded MT Bold",
     "Pretendard",
@@ -7684,3 +7687,18 @@
 .congestionHeatmap .congestionMapStatus::before { display: none; }
 .congestionHeatmap .congestionMapLabel:active { opacity: 0.8; }
 .congestionHeatmap .congestionMapLabel::after { display: none; }
+
+
+/* Transit keeps the map visible above a scrollable station list. */
+.transitSheet.sheet_half {
+  height: min(58%, 460px);
+  overflow-y: auto;
+}
+.transitSheet .localDots { display: none; }
+.transitCanvas .kakaoMapFrame { height: auto; bottom: min(58%, 460px); }
+.transitCanvas[data-sheet="collapsed"] .kakaoMapFrame { bottom: calc(140px + env(safe-area-inset-bottom)); }
+.transitCanvas .mapControls { top: 96px; gap: 8px; }
+.transitCanvas .mapControls button { width: 42px; height: 42px; }
+
+.transitCanvas .mapSearchAgain { top: auto; bottom: calc(min(58%, 460px) + 12px); }
+.transitCanvas[data-sheet="collapsed"] .mapSearchAgain { bottom: calc(152px + env(safe-area-inset-bottom)); }

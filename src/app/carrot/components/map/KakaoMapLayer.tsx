@@ -9,6 +9,8 @@ import {
   type Restaurant,
 } from "@/services";
 import styles from "../../GajiMarketApp.module.css";
+import transitStyles from "./TransitSection.module.css";
+import type { TransitBounds, TransitStop } from "@/services/transitService";
 
 export const KAKAO_MAP_KEY =
   process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
@@ -350,13 +352,20 @@ export function createSeedPastelHeatmapElement(
   return container;
 }
 
-export interface KakaoMapLayerProps {
+export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   activeNeighborhood: string;
   currentLocation: { lat: number; lng: number } | null;
   centerRequest: number;
   selectedCategory?: string;
   selectedRestaurantId?: string | null;
   congestionZones?: CongestionZone[];
+  transitStops?: TransitStop[];
+  selectedTransitId?: string | null;
+  transitFocus?: TransitStop | null;
+  onTransitBoundsChange?: (bounds: TransitBounds) => void;
+  onSelectTransit?: (stop: TransitStop) => void;
+  businesses: T[];
+  renderBusinessMarker: (business: T) => HTMLElement;
   onCongestionBoundsChange: (bounds: { south: number; north: number; west: number; east: number }) => void;
   theme: "dark" | "light";
   onSelectRestaurants: (restaurants: Restaurant[], singleId: string | null) => void;
@@ -366,13 +375,20 @@ export interface KakaoMapLayerProps {
   coordsMap: Record<string, { lat: number; lng: number }>;
 }
 
-export function KakaoMapLayer({
+export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   activeNeighborhood,
   currentLocation,
   centerRequest,
   selectedCategory,
   selectedRestaurantId,
   congestionZones = [],
+  transitStops = [],
+  selectedTransitId,
+  transitFocus,
+  onTransitBoundsChange,
+  onSelectTransit,
+  businesses,
+  renderBusinessMarker,
   onCongestionBoundsChange,
   theme,
   onSelectRestaurants,
@@ -380,7 +396,7 @@ export function KakaoMapLayer({
   onClearRestaurants,
   onSearchBounds,
   coordsMap,
-}: KakaoMapLayerProps) {
+}: KakaoMapLayerProps<T>) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const clustererRef = useRef<any>(null);
@@ -391,7 +407,9 @@ export function KakaoMapLayer({
 
   const isRestaurantMode = selectedCategory === "food";
   const isCongestionMode = selectedCategory === "congestion";
+  const isTransitMode = selectedCategory === "subway" || selectedCategory === "bike";
   const restaurantOverlaysRef = useRef<any[]>([]);
+  const businessOverlaysRef = useRef<any[]>([]);
   const congestionOverlaysRef = useRef<any[]>([]);
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
@@ -474,6 +492,21 @@ export function KakaoMapLayer({
     }
   }, [activeNeighborhood, currentLocation, centerRequest, canUseKakaoMap, coordsMap]);
 
+  // Keep the visible map viewport above the transit sheet. Relayout preserves
+  // center, so selecting a station cannot put its marker behind the list.
+  useEffect(() => {
+    const map = mapRef.current;
+    const element = mapElementRef.current;
+    if (!map || !element || !canUseKakaoMap) return;
+    const observer = new ResizeObserver(() => {
+      const center = map.getCenter();
+      map.relayout();
+      map.setCenter(center);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [canUseKakaoMap]);
+
   // 3. Current Location ("내 장소") Overlay (사진 2번)
   useEffect(() => {
     const kakao = (window as any).kakao;
@@ -498,6 +531,31 @@ export function KakaoMapLayer({
       placeOverlay.setMap(null);
     };
   }, [activeNeighborhood, currentLocation, centerRequest, canUseKakaoMap, isDark, coordsMap]);
+
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    businessOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    businessOverlaysRef.current = [];
+    if (!map || !kakao?.maps || !canUseKakaoMap || selectedCategory !== "danger") return;
+
+    businessOverlaysRef.current = businesses.map((business) => {
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(business.lat, business.lng),
+        content: renderBusinessMarker(business),
+        xAnchor: 0,
+        yAnchor: 0,
+        zIndex: 80,
+      });
+      overlay.setMap(map);
+      return overlay;
+    });
+
+    return () => {
+      businessOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      businessOverlaysRef.current = [];
+    };
+  }, [businesses, canUseKakaoMap, renderBusinessMarker, selectedCategory]);
 
   // 4. Restaurant Layer: bounds fetch, 80% overlap clustering, and custom overlays
   useEffect(() => {
@@ -651,6 +709,64 @@ export function KakaoMapLayer({
     };
   }, [isRestaurantMode, canUseKakaoMap, isDark, selectedRestaurantId]);
 
+  // Transit uses its own overlays so switching categories removes every marker.
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isTransitMode) return;
+    const overlays = transitStops.map((stop) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = transitStyles.marker;
+      button.dataset.kind = stop.kind;
+      button.dataset.empty = String(stop.kind === "bike" && stop.bikes_available === 0);
+      button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
+      const availability = stop.bikes_available === null ? "확인 불가" : `${stop.bikes_available}대`;
+      button.textContent = stop.kind === "bike" ? `자전거 ${availability}` : stop.name;
+      button.setAttribute("aria-label", `${stop.name} ${stop.kind === "bike" ? availability : stop.line ?? ""}`);
+      button.title = `${stop.name} ${stop.line ?? ""}`.trim();
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        kakao.maps.event.preventMap?.();
+        onSelectTransit?.(stop);
+      });
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(stop.lat, stop.lng), content: button,
+        yAnchor: 1.2, xAnchor: 0.5, zIndex: stop.id === selectedTransitId ? 200 : 70,
+      });
+      overlay.setMap(map);
+      return overlay;
+    });
+    return () => overlays.forEach((overlay) => overlay.setMap(null));
+  }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit]);
+
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    if (!canUseKakaoMap || !isTransitMode || !transitFocus || !mapRef.current || !kakao?.maps) return;
+    mapRef.current.panTo(new kakao.maps.LatLng(transitFocus.lat, transitFocus.lng));
+  }, [canUseKakaoMap, isTransitMode, transitFocus]);
+
+  useEffect(() => {
+    if (!isTransitMode || !onTransitBoundsChange) return;
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    // The list remains usable if the map SDK is unavailable.
+    if (!map || !kakao?.maps || !canUseKakaoMap) {
+      const center = currentLocation ?? coordsMap[activeNeighborhood] ?? { lat: 37.5029, lng: 127.1194 };
+      onTransitBoundsChange({ south: center.lat - .015, north: center.lat + .015, west: center.lng - .02, east: center.lng + .02 });
+      return;
+    }
+    const publishBounds = () => {
+      const bounds = map.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      onTransitBoundsChange({ south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() });
+    };
+    publishBounds();
+    kakao.maps.event.addListener(map, "idle", publishBounds);
+    return () => kakao.maps.event.removeListener(map, "idle", publishBounds);
+  }, [canUseKakaoMap, isTransitMode, onTransitBoundsChange, activeNeighborhood, currentLocation, centerRequest, coordsMap]);
+
   // 6. Congestion Layer: 카카오 지도 위 SEED Design 파스텔 히트맵 오버레이
   useEffect(() => {
     const kakao = (window as any).kakao;
@@ -762,7 +878,9 @@ export function KakaoMapLayer({
           if (!bounds) return;
           const sw = bounds.getSouthWest();
           const ne = bounds.getNorthEast();
-          onSearchBounds({ south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() });
+          const currentBounds = { south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() };
+          if (isTransitMode) onTransitBoundsChange?.(currentBounds);
+          else onSearchBounds(currentBounds);
         }}
       >
         현 지도에서 검색
