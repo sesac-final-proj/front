@@ -61,9 +61,33 @@ import {
   getCongestionZonesNearCenter,
   getSeedPastelTheme,
   SEED_PASTEL_COLOR_BOARD,
+<<<<<<< HEAD
 } from "@/services";
 
 // Types (Barrel Export)
+=======
+  summarizeCongestion,
+  type CongestionZone,
+} from "@/services/congestionService";
+import { getKakaoPlaceUrl, getRestaurantsByBounds, type Restaurant } from "@/services/restaurantService";
+import { getMe, updateRegion, type Me } from "@/services/authService";
+import {
+  AuthRequiredError,
+  createProduct,
+  getMyFavorites,
+  getMyProducts,
+  getProduct,
+  listProducts,
+  logout as logoutRequest,
+  setFavorite,
+} from "@/services/tradeService";
+import type { TradeProduct } from "@/types/trade";
+import {
+  getRentTransactions,
+  groupBuildingsByDong,
+  groupTransactionsByBuilding,
+} from "@/services/realEstateService";
+>>>>>>> origin/staging
 import type {
   TradeProduct,
   TogetherCategory,
@@ -1246,6 +1270,8 @@ export default function GajiMarketApp() {
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
   const [me, setMe] = useState<Me | null>(null);
+  const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
+  const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
 
   // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
   // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
@@ -1254,6 +1280,32 @@ export default function GajiMarketApp() {
       .then(setMe)
       .catch(() => {});
   }, []);
+
+  // 판매내역/찜 목록은 일반 목록(products)을 mine/isFavorite로 거르는 방식으로는
+  // 못 만든다 — 그 두 값이 실서버 데이터에 대해 항상 false라 새로고침(새 세션)마다
+  // 빈 목록이 됐었다(버그). 서버가 이미 created_by/찜 여부로 걸러주는 전용
+  // 엔드포인트를 그대로 쓴다.
+  useEffect(() => {
+    // me는 로그아웃 전환 없이 null -> 값으로만 바뀌므로(로그아웃은 페이지 리로드),
+    // 로그인 전 상태는 그냥 초기값([])을 쓰면 된다 — 여기서 다시 비울 필요 없음.
+    if (!me) return;
+    const controller = new AbortController();
+    getMyProducts(controller.signal)
+      .then((page) => setMyProducts(page.items.map((item) => ({ ...toProductListItem(item), mine: true }))))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("판매내역을 불러오지 못했습니다.", error);
+      });
+    getMyFavorites(controller.signal)
+      .then((page) =>
+        setFavoriteProducts(page.items.map((item) => ({ ...toProductListItem(item), isFavorite: true }))),
+      )
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("찜 목록을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [me]);
   const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
   const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
   // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
@@ -1479,9 +1531,6 @@ export default function GajiMarketApp() {
     });
   }, [hasNetworkError, productFilter, products]);
 
-  const favoriteProducts = products.filter((product) => product.isFavorite);
-  const myProducts = products.filter((product) => product.mine);
-
   const filteredPosts = useMemo(() => {
     const scopedPosts = posts.filter(
       (post) =>
@@ -1640,6 +1689,12 @@ export default function GajiMarketApp() {
         setProducts((current) =>
           current.map((p) => (p.id === productId ? { ...p, isFavorite: favorited, favoriteCount } : p)),
         );
+        // 찜 목록 화면도 같이 맞춘다 — 서버에서 다시 안 받아와도 바로 반영되게.
+        setFavoriteProducts((current) =>
+          favorited
+            ? [{ ...product, isFavorite: true, favoriteCount }, ...current.filter((p) => p.id !== productId)]
+            : current.filter((p) => p.id !== productId),
+        );
       })
       .catch((error: unknown) => {
         setProducts((current) =>
@@ -1736,6 +1791,9 @@ export default function GajiMarketApp() {
         };
 
         setProducts((current) => [newProduct, ...current]);
+        // 판매내역 화면은 이제 서버 전용 목록(myProducts state)을 보므로 방금 올린
+        // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
+        setMyProducts((current) => [newProduct, ...current]);
         setActiveTab("my");
         setSubPage({ type: "sales" });
       })
