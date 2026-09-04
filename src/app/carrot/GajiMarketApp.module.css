@@ -1757,7 +1757,7 @@
 .stage:not([data-theme="light"]) .kakaoMapLayer img[src*="daumcdn"],
 .stage:not([data-theme="light"]) .kakaoMapLayer img[src*="kakaocdn"],
 .stage:not([data-theme="light"]) .kakaoMapLayer img[src*="kakao"] {
-  filter: invert(90%) hue-rotate(185deg) brightness(85%) contrast(90%) saturate(75%);
+  filter: invert(90%) hue-rotate(185deg) brightness(85%) contrast(90%) saturate(45%);
 }
 
 .stage[data-theme="light"] .kakaoMapLayer img {
@@ -7197,8 +7197,8 @@
 }
 
 .seedColorBoardLegend {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 12px;
@@ -7328,3 +7328,84 @@
   line-height: 1.4;
   font-weight: 600;
 }
+
+/* Dark map labels use the existing surface/text roles instead of additive light. */
+.congestionMapMarker {
+  position: relative;
+  pointer-events: none;
+}
+
+.congestionMapLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 48px;
+  max-width: min(208px, 56vw);
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  text-align: left;
+  text-shadow: none;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.congestionMapLabel::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 4px);
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  transform: rotate(45deg);
+}
+
+.congestionMapTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.congestionMapStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--congestion-accent);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.congestionMapStatus::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (hover: hover) {
+  .congestionMapLabel:hover { border-color: var(--color-muted); }
+}
+
+.congestionMapLabel:active { background: var(--color-surface-2); }
+.congestionMapLabel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.congestionZoneTop .seedZoneBadge { display: inline-flex; }
+.congestionZoneTop .seedPillDot { margin-top: 0; }
+.stage:not([data-theme="light"]) .congestionSummaryCard { background: var(--color-surface); }

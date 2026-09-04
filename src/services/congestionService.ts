@@ -13,7 +13,8 @@ export interface CongestionZone {
   level: CongestionLevel;
   summary: string;
   updatedAt: string;
-  source: string;
+  source: 
+  string;
   hourlyTrends?: number[];
   recommendation?: string;
 }
@@ -160,13 +161,34 @@ export const SEED_PASTEL_COLOR_BOARD: SeedPastelTheme[] = [
   },
 ];
 
-export function getSeedPastelTheme(score: number): SeedPastelTheme {
+// App-specific role colors inspired by SEED; these are not official SEED palette tokens.
+const DARK_CONGESTION_COLORS = [
+  { bg: "#1C3029", line: "#365A49", fg: "#8BC9AA" },
+  { bg: "#202D3A", line: "#3C536B", fg: "#9ABDE0" },
+  { bg: "#332D20", line: "#605337", fg: "#D7BF87" },
+  { bg: "#37291F", line: "#674A34", fg: "#E0AE85" },
+  { bg: "#362429", line: "#68414A", fg: "#DEA0AB" },
+];
+
+export function getSeedPastelTheme(
+  score: number,
+  colorScheme: "dark" | "light" = "light",
+): SeedPastelTheme {
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
-  if (clamped <= 25) return SEED_PASTEL_COLOR_BOARD[0];
-  if (clamped <= 50) return SEED_PASTEL_COLOR_BOARD[1];
-  if (clamped <= 70) return SEED_PASTEL_COLOR_BOARD[2];
-  if (clamped <= 85) return SEED_PASTEL_COLOR_BOARD[3];
-  return SEED_PASTEL_COLOR_BOARD[4];
+  const index = clamped <= 25 ? 0 : clamped <= 50 ? 1 : clamped <= 70 ? 2 : clamped <= 85 ? 3 : 4;
+  const theme = SEED_PASTEL_COLOR_BOARD[index];
+  if (colorScheme === "light") return theme;
+  const colors = DARK_CONGESTION_COLORS[index];
+  return {
+    ...theme,
+    badgeBg: colors.bg,
+    badgeBorder: colors.line,
+    badgeText: colors.fg,
+    tagColor: colors.fg,
+    meterGradient: colors.fg,
+    cardBg: "var(--color-surface)",
+    glowShadow: "none",
+  };
 }
 
 export const CONGESTION_ZONES: CongestionZone[] = [

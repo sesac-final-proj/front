@@ -22,6 +22,7 @@ export interface MarkerClusteringOptions {
   indexGenerator?: number[] | ((count: number) => number);
   stylingFunction?: (clusterMarker: any, count: number) => void;
   onClusterClick?: (cluster: Cluster, markers: any[]) => void;
+  overlapThreshold?: number; // 교집합 기준 비율 (기본값 0.8: 80% 이상 겹치면 클러스터링)
 }
 
 export class Cluster {
@@ -203,6 +204,7 @@ export class MarkerClustering {
   private _disableClickZoom: boolean = true;
   private _icons?: ((count: number) => ClusterIconOptions) | ClusterIconOptions[];
   private _onClusterClick?: (cluster: Cluster, markers: any[]) => void;
+  private _overlapThreshold: number = 0.8; // 80% 기준
 
   private _listeners: any[] = [];
 
@@ -216,6 +218,7 @@ export class MarkerClustering {
     this._disableClickZoom = options.disableClickZoom ?? true;
     this._icons = options.icons;
     this._onClusterClick = options.onClusterClick;
+    this._overlapThreshold = options.overlapThreshold ?? 0.8;
 
     this._initListeners();
     this._createClusters();
@@ -332,23 +335,88 @@ export class MarkerClustering {
 
     this._clearClusters();
 
-    for (const marker of this._markers) {
-      const position = marker.getPosition();
-      let addedToCluster = false;
+    const proj = this._map.getProjection ? this._map.getProjection() : null;
+    const n = this._markers.length;
+    if (n === 0) return;
 
-      for (const cluster of this._clusters) {
-        if (cluster.isInBounds(position)) {
+    if (!proj) {
+      // 투영 정보가 없을 때는 기존 바운드 방식 fallback
+      for (const marker of this._markers) {
+        const position = marker.getPosition();
+        let addedToCluster = false;
+        for (const cluster of this._clusters) {
+          if (cluster.isInBounds(position)) {
+            cluster.addMarker(marker);
+            addedToCluster = true;
+            break;
+          }
+        }
+        if (!addedToCluster) {
+          const cluster = new Cluster(this);
           cluster.addMarker(marker);
-          addedToCluster = true;
-          break;
+          this._clusters.push(cluster);
+        }
+      }
+    } else {
+      // 화면 픽셀 좌표 기준 Bounding Box 생성 및 교집합 80% 클러스터링
+      const boxes = this._markers.map((marker) => {
+        const point = proj.fromCoordToOffset(marker.getPosition());
+        const width = 110;
+        const height = 28;
+        return {
+          left: point.x - width / 2,
+          right: point.x + width / 2,
+          top: point.y - height / 2,
+          bottom: point.y + height / 2,
+          width,
+          height,
+          area: width * height,
+          cx: point.x,
+          cy: point.y,
+        };
+      });
+
+      const parent = Array.from({ length: n }, (_, idx) => idx);
+      const find = (i: number): number => {
+        if (parent[i] === i) return i;
+        return (parent[i] = find(parent[i]));
+      };
+      const union = (i: number, j: number) => {
+        const rI = find(i);
+        const rJ = find(j);
+        if (rI !== rJ) parent[rI] = rJ;
+      };
+
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const bA = boxes[i];
+          const bB = boxes[j];
+          const interW = Math.max(0, Math.min(bA.right, bB.right) - Math.max(bA.left, bB.left));
+          const interH = Math.max(0, Math.min(bA.bottom, bB.bottom) - Math.max(bA.top, bB.top));
+          const interArea = interW * interH;
+          const minArea = Math.min(bA.area, bB.area);
+          const ratio = interArea / minArea;
+          const dist = Math.hypot(bA.cx - bB.cx, bA.cy - bB.cy);
+
+          // 교집합 비율 80% (0.80) 이상이거나 거리가 14px 이하로 인접한 경우 클러스터 병합
+          if (ratio >= this._overlapThreshold || dist <= 14) {
+            union(i, j);
+          }
         }
       }
 
-      if (!addedToCluster) {
-        const cluster = new Cluster(this);
-        cluster.addMarker(marker);
-        this._clusters.push(cluster);
+      const clusterGroupMap = new Map<number, any[]>();
+      for (let i = 0; i < n; i++) {
+        const root = find(i);
+        if (!clusterGroupMap.has(root)) clusterGroupMap.set(root, []);
+        clusterGroupMap.get(root)!.push(this._markers[i]);
       }
+
+      clusterGroupMap.forEach((markers) => {
+        const cluster = new Cluster(this);
+        markers.forEach((m) => cluster.addMarker(m));
+        this._clusters.push(cluster);
+      });
     }
 
     for (const cluster of this._clusters) {

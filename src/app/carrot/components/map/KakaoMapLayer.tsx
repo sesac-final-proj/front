@@ -176,12 +176,194 @@ export function createRestaurantOverlayElement(
   return container;
 }
 
+// 80% 이상 중첩된 클러스터용 원형 뱃지 오버레이 엘리먼트
+export function createClusterOverlayElement(
+  count: number,
+  isDark: boolean,
+  onClick: () => void,
+): HTMLDivElement {
+  const container = document.createElement("div");
+  container.style.cursor = "pointer";
+  container.style.userSelect = "none";
+  container.style.display = "flex";
+  container.style.alignItems = "center";
+  container.style.justifyContent = "center";
+
+  const size = count >= 50 ? 42 : count >= 10 ? 36 : 30;
+  const fontSize = count >= 50 ? 15 : count >= 10 ? 14 : 13;
+
+  container.innerHTML = `
+    <div style="
+      position: relative;
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FF7E26 0%, #FF5500 100%);
+      color: #FFFFFF;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 3px 10px rgba(255, 85, 0, 0.45), 0 0 0 2px rgba(255, 111, 15, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 850;
+      font-size: ${fontSize}px;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+    " onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'">
+      <span>${count}</span>
+    </div>
+  `;
+
+  container.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return container;
+}
+
+interface MarkerBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  area: number;
+  cx: number;
+  cy: number;
+}
+
+function getRestaurantMarkerBox(point: { x: number; y: number }, name: string): MarkerBox {
+  const textWidth = Math.min(Math.max(name.length * 11.5, 36), 160);
+  const width = 24 + 5 + textWidth + 8;
+  const height = 26;
+  return {
+    left: point.x - width / 2,
+    right: point.x + width / 2,
+    top: point.y - height / 2,
+    bottom: point.y + height / 2,
+    width,
+    height,
+    area: width * height,
+    cx: point.x,
+    cy: point.y,
+  };
+}
+
+function calculateMarkerOverlapRatio(boxA: MarkerBox, boxB: MarkerBox): number {
+  const interLeft = Math.max(boxA.left, boxB.left);
+  const interRight = Math.min(boxA.right, boxB.right);
+  const interTop = Math.max(boxA.top, boxB.top);
+  const interBottom = Math.min(boxA.bottom, boxB.bottom);
+
+  if (interRight <= interLeft || interBottom <= interTop) {
+    return 0;
+  }
+
+  const interArea = (interRight - interLeft) * (interBottom - interTop);
+  const minArea = Math.min(boxA.area, boxB.area);
+  return interArea / minArea;
+}
+
+/**
+ * 교집합 80% (overlapRatio >= 0.80) 기준 스마트 클러스터링 알고리즘
+ */
+export function clusterRestaurantsByOverlap(
+  restaurants: Restaurant[],
+  map: any,
+): Restaurant[][] {
+  if (restaurants.length === 0) return [];
+  if (!map) return restaurants.map((r) => [r]);
+
+  const proj = map.getProjection ? map.getProjection() : null;
+  const kakao = (window as any).kakao;
+  if (!proj || !kakao?.maps) {
+    return restaurants.map((r) => [r]);
+  }
+
+  const n = restaurants.length;
+  const boxes: MarkerBox[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const pos = new kakao.maps.LatLng(restaurants[i].lat, restaurants[i].lng);
+    const point = proj.pointFromCoords(pos);
+    boxes.push(getRestaurantMarkerBox(point, restaurants[i].name));
+  }
+
+  // Disjoint-Set Union (Union-Find)
+  const parent = Array.from({ length: n }, (_, idx) => idx);
+  function find(i: number): number {
+    if (parent[i] === i) return i;
+    return (parent[i] = find(parent[i]));
+  }
+  function union(i: number, j: number) {
+    const rootI = find(i);
+    const rootJ = find(j);
+    if (rootI !== rootJ) parent[rootI] = rootJ;
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const overlap = calculateMarkerOverlapRatio(boxes[i], boxes[j]);
+      const dist = Math.hypot(boxes[i].cx - boxes[j].cx, boxes[i].cy - boxes[j].cy);
+
+      // 클러스터링 기준: 교집합 80% (0.80) 이상 또는 극히 인접(14px 이내)
+      if (overlap >= 0.80 || dist <= 14) {
+        union(i, j);
+      }
+    }
+  }
+
+  const clustersMap = new Map<number, Restaurant[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!clustersMap.has(root)) {
+      clustersMap.set(root, []);
+    }
+    clustersMap.get(root)!.push(restaurants[i]);
+  }
+
+  return Array.from(clustersMap.values());
+}
+
+
 // SEED Design System (seed-design.io) 기반 자연스럽게 녹아드는 파스텔 열지도 및 카토그래픽 텍스트 (박스 없는 자연스러운 지도 융합)
 export function createSeedPastelHeatmapElement(
   zone: CongestionZone,
   isDark: boolean,
   onClick?: () => void,
 ): HTMLDivElement {
+  if (isDark) {
+    const theme = getSeedPastelTheme(zone.currentScore, "dark");
+    const container = document.createElement("div");
+    container.className = styles.congestionMapAnchor;
+
+    // Only the label is interactive: empty space remains available for map dragging.
+    const label = document.createElement(onClick ? "button" : "div");
+    label.className = styles.congestionMapLabel;
+    if (label instanceof HTMLButtonElement) label.type = "button";
+    label.style.setProperty("--congestion-accent", theme.badgeText);
+    label.setAttribute("aria-label", `${zone.name}, 혼잡도 ${zone.currentScore}%, ${theme.label}`);
+
+    const title = document.createElement("span");
+    title.className = styles.congestionMapTitle;
+    title.textContent = zone.name;
+    const status = document.createElement("span");
+    status.className = styles.congestionMapStatus;
+    status.textContent = `${zone.currentScore}% · ${theme.label}`;
+    label.append(title, status);
+    container.append(label);
+
+    if (onClick) {
+      label.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onClick();
+      });
+    }
+    return container;
+  }
+
   const theme = getSeedPastelTheme(zone.currentScore);
   const container = document.createElement("div");
   container.style.position = "relative";
@@ -392,60 +574,6 @@ export function KakaoMapLayer({
       });
       mapRef.current = map;
 
-      // 카카오 맵 MarkerClusterer 클러스터러 초기화 (일반 살구색 마커 대비 선명하고 진한 고채도 오렌지 적용)
-      if (kakao.maps.MarkerClusterer) {
-        clustererRef.current = new kakao.maps.MarkerClusterer({
-          map: map,
-          averageCenter: true,
-          minLevel: 5,
-          disableClickZoom: false,
-          styles: [
-            {
-              width: "36px",
-              height: "36px",
-              background: "#FF4500",
-              borderRadius: "50%",
-              color: "#FFFFFF",
-              textAlign: "center",
-              fontWeight: "900",
-              fontSize: "14px",
-              lineHeight: "32px",
-              boxShadow: "0 4px 12px rgba(255, 69, 0, 0.45)",
-              border: "2px solid #FFFFFF",
-              cursor: "pointer",
-            },
-            {
-              width: "42px",
-              height: "42px",
-              background: "#E63900",
-              borderRadius: "50%",
-              color: "#FFFFFF",
-              textAlign: "center",
-              fontWeight: "900",
-              fontSize: "15px",
-              lineHeight: "37px",
-              boxShadow: "0 5px 15px rgba(230, 57, 0, 0.55)",
-              border: "2.5px solid #FFFFFF",
-              cursor: "pointer",
-            },
-            {
-              width: "48px",
-              height: "48px",
-              background: "#C92A00",
-              borderRadius: "50%",
-              color: "#FFFFFF",
-              textAlign: "center",
-              fontWeight: "900",
-              fontSize: "16px",
-              lineHeight: "43px",
-              boxShadow: "0 6px 18px rgba(201, 42, 0, 0.65)",
-              border: "2.5px solid #FFFFFF",
-              cursor: "pointer",
-            },
-          ],
-        });
-      }
-
       // 지도 빈 공간 클릭 시 음식점 선택 해제 (자연스럽게 원래로 복귀)
       kakao.maps.event.addListener(map, "click", () => {
         onClearRestaurantsRef.current();
@@ -480,18 +608,82 @@ export function KakaoMapLayer({
     };
   }, [activeNeighborhood, currentLocation, centerRequest, canUseKakaoMap, isDark, coordsMap]);
 
-  // 4. Restaurant Layer: bounds fetch, clusterer, and custom overlays
+  // 4. Restaurant Layer: bounds fetch, 80% overlap clustering, and custom overlays
   useEffect(() => {
     const kakao = (window as any).kakao;
     const map = mapRef.current;
     if (!map || !kakao?.maps || !canUseKakaoMap || !isRestaurantMode) {
       restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
       restaurantOverlaysRef.current = [];
-      if (clustererRef.current) clustererRef.current.clear();
       previousBoundsRef.current = null;
       setIsZoomTooLow(false);
       return;
     }
+
+    // 80% 교집합 기반 오버레이 렌더링 함수
+    const renderRestaurantClusters = () => {
+      restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
+      restaurantOverlaysRef.current = [];
+
+      const restaurants = allLoadedRestaurantsRef.current;
+      if (restaurants.length === 0) return;
+
+      const clusters = clusterRestaurantsByOverlap(restaurants, map);
+      const newOverlays: any[] = [];
+
+      clusters.forEach((cluster) => {
+        if (cluster.length === 1) {
+          // 단독 마커
+          const restaurant = cluster[0];
+          const isSelected = selectedRestaurantId === restaurant.id;
+          const pos = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+
+          const el = createRestaurantOverlayElement(restaurant, isSelected, isDark, () => {
+            onSelectRestaurantsRef.current([restaurant], restaurant.id);
+          });
+
+          const overlay = new kakao.maps.CustomOverlay({
+            position: pos,
+            content: el,
+            yAnchor: isSelected ? 0.95 : 0.5,
+            zIndex: isSelected ? 1000 : 50,
+          });
+          overlay.setMap(map);
+          newOverlays.push(overlay);
+        } else {
+          // 80% 이상 중첩된 클러스터 마커
+          let latSum = 0;
+          let lngSum = 0;
+          let hasSelected = false;
+          for (const r of cluster) {
+            latSum += r.lat;
+            lngSum += r.lng;
+            if (selectedRestaurantId === r.id) hasSelected = true;
+          }
+          const avgLat = latSum / cluster.length;
+          const avgLng = lngSum / cluster.length;
+          const clusterPos = new kakao.maps.LatLng(avgLat, avgLng);
+
+          const el = createClusterOverlayElement(cluster.length, isDark, () => {
+            // 클러스터 클릭 시: 해당 클러스터 식당 리스트로 전달하여 바텀시트에 목록 표시!
+            onSelectRestaurantsRef.current(cluster, null);
+            map.panTo(clusterPos);
+          });
+
+          const overlay = new kakao.maps.CustomOverlay({
+            position: clusterPos,
+            content: el,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+            zIndex: hasSelected ? 900 : 150,
+          });
+          overlay.setMap(map);
+          newOverlays.push(overlay);
+        }
+      });
+
+      restaurantOverlaysRef.current = newOverlays;
+    };
 
     const fetchRestaurantsForCurrentBounds = () => {
       const level = map.getLevel();
@@ -501,7 +693,6 @@ export function KakaoMapLayer({
         onRestaurantsLoadedRef.current([]);
         restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
         restaurantOverlaysRef.current = [];
-        if (clustererRef.current) clustererRef.current.clear();
         return;
       }
       setIsZoomTooLow(false);
@@ -536,56 +727,13 @@ export function KakaoMapLayer({
         allLoadedRestaurantsRef.current = restaurants;
         onRestaurantsLoadedRef.current(restaurants);
 
-        // 기존 오버레이 및 클러스터 마커 정리
-        restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
-        restaurantOverlaysRef.current = [];
-        if (clustererRef.current) clustererRef.current.clear();
-
-        const newOverlays: any[] = [];
-        const clusterMarkers: any[] = [];
-
-        restaurants.forEach((restaurant) => {
-          const isSelected = selectedRestaurantId === restaurant.id;
-          const pos = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
-
-          const el = createRestaurantOverlayElement(restaurant, isSelected, isDark, () => {
-            onSelectRestaurantsRef.current([restaurant], restaurant.id);
-          });
-
-          const overlay = new kakao.maps.CustomOverlay({
-            position: pos,
-            content: el,
-            yAnchor: isSelected ? 0.95 : 0.5,
-            zIndex: isSelected ? 1000 : 50,
-          });
-          overlay.setMap(map);
-          newOverlays.push(overlay);
-
-          // 클러스터러용 마커 등록 (기본 파란색 핀이 커스텀 오버레이 위에 중복 노출되지 않도록 투명 1x1 아이콘 적용)
-          if (kakao.maps.Marker) {
-            const transparentIcon = kakao.maps.MarkerImage && kakao.maps.Size
-              ? new kakao.maps.MarkerImage(
-                  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
-                  new kakao.maps.Size(1, 1),
-                )
-              : undefined;
-
-            const marker = new kakao.maps.Marker({
-              position: pos,
-              image: transparentIcon,
-            });
-            kakao.maps.event.addListener(marker, "click", () => {
-              onSelectRestaurantsRef.current([restaurant], restaurant.id);
-            });
-            clusterMarkers.push(marker);
-          }
-        });
-
-        restaurantOverlaysRef.current = newOverlays;
-        if (clustererRef.current && clusterMarkers.length > 0) {
-          clustererRef.current.addMarkers(clusterMarkers);
-        }
+        renderRestaurantClusters();
       });
+    };
+
+    // 지도를 확대/축소했을 때 클러스터링 즉시 재계산
+    const onZoomChanged = () => {
+      renderRestaurantClusters();
     };
 
     // Idle listener with 300ms debounce
@@ -597,47 +745,19 @@ export function KakaoMapLayer({
     };
 
     kakao.maps.event.addListener(map, "idle", onIdle);
+    kakao.maps.event.addListener(map, "zoom_changed", onZoomChanged);
 
     fetchRestaurantsForCurrentBounds();
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       kakao.maps.event.removeListener(map, "idle", onIdle);
+      kakao.maps.event.removeListener(map, "zoom_changed", onZoomChanged);
       restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
       restaurantOverlaysRef.current = [];
-      if (clustererRef.current) clustererRef.current.clear();
       previousBoundsRef.current = null;
     };
-  }, [isRestaurantMode, canUseKakaoMap, isDark]);
-
-  // 5. Re-render overlays when selectedRestaurantId changes (to toggle teardrop pin vs circular badge)
-  useEffect(() => {
-    const kakao = (window as any).kakao;
-    const map = mapRef.current;
-    if (!map || !kakao?.maps || !canUseKakaoMap || !isRestaurantMode) return;
-
-    restaurantOverlaysRef.current.forEach((o) => o.setMap(null));
-    restaurantOverlaysRef.current = [];
-
-    const newOverlays: any[] = [];
-    allLoadedRestaurantsRef.current.forEach((restaurant) => {
-      const isSelected = selectedRestaurantId === restaurant.id;
-      const el = createRestaurantOverlayElement(restaurant, isSelected, isDark, () => {
-        onSelectRestaurantsRef.current([restaurant], restaurant.id);
-      });
-
-      const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(restaurant.lat, restaurant.lng),
-        content: el,
-        yAnchor: isSelected ? 0.95 : 0.5,
-        zIndex: isSelected ? 1000 : 50,
-      });
-      overlay.setMap(map);
-      newOverlays.push(overlay);
-    });
-
-    restaurantOverlaysRef.current = newOverlays;
-  }, [selectedRestaurantId, isRestaurantMode, canUseKakaoMap, isDark]);
+  }, [isRestaurantMode, canUseKakaoMap, isDark, selectedRestaurantId]);
 
   // 6. Congestion Layer: 카카오 지도 위 SEED Design 파스텔 히트맵 오버레이
   useEffect(() => {
