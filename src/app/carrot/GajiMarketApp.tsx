@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  BadgePercent, Bell, BookOpen, BriefcaseBusiness, Building, Building2,
+  Bike, TrainFront, BadgePercent, Bell, BookOpen, BriefcaseBusiness, Building, Building2,
   CakeSlice, Calendar, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
   Clock3, Coffee, Crosshair, Dumbbell, EllipsisVertical, Eye, EyeOff,
   FileText, Footprints, Gamepad2, Gem, GraduationCap, Headphones, Heart,
@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import styles from "./GajiMarketApp.module.css";
+import { TransitSection } from "./components/map/TransitSection";
+import { useTransitStops } from "./components/map/useTransitStops";
+import type { TransitBounds, TransitKind, TransitStop } from "@/services/transitService";
 import { MarkerClustering } from "@/lib/naver-map/MarkerClustering";
 
 // Components (Barrel Export)
@@ -56,6 +59,7 @@ import {
   fetchCongestionZones,
   getCongestionPopulationLabel,
   getSeedPastelTheme,
+  getDreamFacilities,
   getMyFavorites,
   getMyProducts,
 } from "@/services";
@@ -87,6 +91,7 @@ import type {
   Restaurant,
   CongestionZone,
 } from "@/types";
+import type { DreamFacility } from "@/services";
 
 
 type TabId = "home" | "community" | "map" | "chats" | "my";
@@ -235,17 +240,7 @@ type DangerVisual = {
   tone: DangerTone;
 };
 
-type DonationFacility = {
-  id: string;
-  name: string;
-  facilityType: string;
-  neighborhoodName: string;
-  lat: number;
-  lng: number;
-  donationCount: number;
-  currentAmount: number;
-  targetAmount: number;
-};
+type DonationFacility = DreamFacility;
 
 type LocalCategory = {
   id: string;
@@ -777,9 +772,10 @@ const initialPosts: CommunityPost[] = [
 const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "food", name: "음식점", icon: Utensils, tone: "orange" },
   { id: "congestion", name: "혼잡도 분석", icon: Footprints, tone: "cyan" },
-  { id: "cafe", name: "카페", icon: Coffee, tone: "yellow" },
-  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
+  { id: "subway", name: "지하철", icon: TrainFront, tone: "blue" },
+  { id: "bike", name: "따릉이", icon: Bike, tone: "green" },
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
+  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
   { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
   { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
   { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
@@ -873,31 +869,6 @@ const LOCAL_BUSINESSES: LocalBusiness[] = [
     summary: "단지 근처 포장 주문 가능",
     lat: 37.5051,
     lng: 127.1187,
-  },
-];
-
-const DREAM_FACILITIES: DonationFacility[] = [
-  {
-    id: "df1",
-    name: "송파 아동복지센터",
-    facilityType: "아동복지센터",
-    neighborhoodName: "송파삼성래미안",
-    lat: 37.5063,
-    lng: 127.1198,
-    donationCount: 5,
-    currentAmount: 384000,
-    targetAmount: 600000,
-  },
-  {
-    id: "df2",
-    name: "송파 발달지원센터",
-    facilityType: "발달장애센터",
-    neighborhoodName: "송파삼성래미안",
-    lat: 37.5036,
-    lng: 127.1166,
-    donationCount: 2,
-    currentAmount: 216000,
-    targetAmount: 500000,
   },
 ];
 
@@ -2423,16 +2394,9 @@ function IconButton({
 function BrandWordmark() {
   return (
     <span className={styles.brandMark} aria-label="가지페이">
-      <svg className={styles.brandSymbol} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
-        <path
-          className={styles.brandLeaf}
-          d="M15.4 11.6c-4.7 0-7.8-2.5-7.8-5.6 0-2.9 2.6-5 5.9-4.4C15.2-.8 19.2-.3 20.6 2.8c1.9-1 5.1.2 5.7 2.9.7 3.1-2.2 5.9-6.8 5.9h-4.1Z"
-        />
-        <path
-          className={styles.brandCore}
-          fillRule="evenodd"
-          d="M22 12.5c9.1 0 16.3 6.8 16.3 15.2 0 7.5-5.4 11.9-16.3 16.1C11.1 39.6 5.7 35.2 5.7 27.7 5.7 19.3 12.9 12.5 22 12.5Zm0 10.3a5.8 5.8 0 1 0 0 11.6 5.8 5.8 0 0 0 0-11.6Z"
-        />
+      <svg className={styles.brandSymbol} viewBox="216 0 568 748" aria-hidden="true" focusable="false">
+        {/* Display the supplied symbol without the wordmark below it. */}
+        <image href="/brand/danggeun-reference.png" width="1000" height="1101" />
       </svg>
       <span className={styles.brandWord}>pay</span>
     </span>
@@ -3968,6 +3932,16 @@ function MapScreen({
   onRequestLocation: () => void;
   onOpenProfile: () => void;
 }) {
+  const transitKind: TransitKind | null = selectedCategory === "subway" || selectedCategory === "bike" ? selectedCategory : null;
+  const isTransitMode = transitKind !== null;
+  const [transitBounds, setTransitBounds] = useState<TransitBounds | null>(null);
+  const [selectedTransitId, setSelectedTransitId] = useState<string | null>(null);
+  const [transitFocus, setTransitFocus] = useState<TransitStop | null>(null);
+  const transit = useTransitStops(transitKind, transitBounds, query);
+  const handleTransitBounds = useCallback((bounds: TransitBounds) => {
+    setTransitBounds((previous) => previous &&
+      (Object.keys(bounds) as (keyof TransitBounds)[]).every((key) => Math.abs(previous[key] - bounds[key]) < 0.000001) ? previous : bounds);
+  }, []);
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const isCongestionMode = selectedCategory === "congestion";
   const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
@@ -3979,6 +3953,12 @@ function MapScreen({
   const locationRequestRef = useRef(0);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const handleSelectTransit = useCallback((stop: TransitStop) => {
+    setSelectedTransitId(stop.id);
+    setTransitFocus(stop);
+    onSheetStateChange("half");
+    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "instant" }));
+  }, [onSheetStateChange]);
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY > 6 && sheetState !== "expanded") {
@@ -4041,6 +4021,8 @@ function MapScreen({
       onCategoryChange("danger");
     }
   }, [selectedCategory, onCategoryChange]);
+  const renderDangerMarker = useCallback((business: LocalBusiness) =>
+    createDangerMarkerContent(business, getDangerVisual(business) ?? DANGER_VISUALS.default, selectDanger), [selectDanger]);
 
   const handleCardClick = useCallback((business: LocalBusiness) => {
     if (business.category === "food") {
@@ -4106,19 +4088,23 @@ function MapScreen({
   );
 
   function changeCategory(id: string) {
+    setSelectedTransitId(null);
+    setTransitFocus(null);
+    sheetRef.current?.scrollTo({ top: 0, behavior: "instant" });
     setSelectedDanger(null);
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
     if (id !== "food") {
       setRestaurantResults([]);
     }
-    if (id === "congestion" || id === "food") {
+    if (id === "congestion" || id === "food" || id === "subway" || id === "bike") {
       onSheetStateChange("half");
     }
     onCategoryChange(id);
   }
 
   function changeQuery(value: string) {
+    setSelectedTransitId(null);
     setSelectedDanger(null);
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
@@ -4173,7 +4159,7 @@ function MapScreen({
 
   return (
     <section className={styles.mapScreen}>
-      <div className={styles.mapCanvas}>
+      <div className={`${styles.mapCanvas} ${isTransitMode ? styles.transitCanvas : ""}`} data-sheet={sheetState}>
         <KakaoMapLayer
           activeNeighborhood={activeNeighborhood}
           currentLocation={currentLocation}
@@ -4181,7 +4167,14 @@ function MapScreen({
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
           congestionZones={isCongestionMode ? congestionZones : []}
+          businesses={businesses}
+          renderBusinessMarker={renderDangerMarker}
           onCongestionBoundsChange={handleCongestionBounds}
+          transitStops={isTransitMode ? transit.stops : []}
+          selectedTransitId={selectedTransitId}
+          transitFocus={transitFocus}
+          onTransitBoundsChange={handleTransitBounds}
+          onSelectTransit={handleSelectTransit}
           theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
@@ -4197,13 +4190,13 @@ function MapScreen({
           <input
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
-            placeholder="집 근처 업체 검색"
+            placeholder={transitKind === "subway" ? "역 이름 또는 호선 검색" : transitKind === "bike" ? "따릉이 대여소 검색" : "집 근처 업체 검색"}
           />
           <button type="button" onClick={onOpenProfile} aria-label="프로필">
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode ? (
           <RealtimeDangerTicker
             dangerSignals={businesses.filter((b) => b.category === "danger")}
             onSelectDanger={selectDanger}
@@ -4222,7 +4215,7 @@ function MapScreen({
             <Crosshair size={25} />
           </button>
         </div>
-        {!isCongestionMode && selectedCategory !== "food" && (
+        {!isCongestionMode && !isTransitMode && selectedCategory !== "food" && (
           <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
             <currentCategory.icon size={26} />
           </button>
@@ -4233,8 +4226,8 @@ function MapScreen({
 
       </div>
 
-      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
-        <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "업체 패널 접기" : "업체 패널 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
+      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${isTransitMode ? styles.transitSheet : ""} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
+        <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "지도 목록 접기" : "지도 목록 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
           const panel = event.currentTarget.parentElement;
           onSheetStateChange(nextState);
           window.requestAnimationFrame(() => panel?.scrollTo({ top: 0, behavior: "instant" }));
@@ -4294,7 +4287,21 @@ function MapScreen({
               <span />
               <span />
             </div>
-            {isCongestionMode ? (
+            {transitKind ? (
+              <TransitSection
+                kind={transitKind}
+                stops={transit.stops}
+                selectedId={selectedTransitId}
+                total={transit.total}
+                fetchedAt={transit.fetchedAt}
+                loading={transit.loading}
+                error={transit.error}
+                hasQuery={Boolean(query.trim())}
+                onRetry={transit.retry}
+                onClearQuery={() => changeQuery("")}
+                onSelect={handleSelectTransit}
+              />
+            ) : isCongestionMode ? (
               <CongestionAnalysisSection
                 colorScheme={theme}
                 zones={congestionZones}
@@ -5345,10 +5352,27 @@ function DreamDashboardScreen({
 }) {
   const facilityListRef = useRef<HTMLElement | null>(null);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
-  const visibleFacilities = useMemo(
-    () => DREAM_FACILITIES.filter((facility) => facility.neighborhoodName === activeNeighborhood),
-    [activeNeighborhood],
-  );
+  const district = NEIGHBORHOOD_DISTRICTS[activeNeighborhood] ?? activeNeighborhood;
+  const [facilityResult, setFacilityResult] = useState<{
+    district: string;
+    items: DonationFacility[];
+    status: "ready" | "error";
+  }>({ district: "", items: [], status: "ready" });
+  const facilityStatus = facilityResult.district === district ? facilityResult.status : "loading";
+  const visibleFacilities = facilityResult.district === district ? facilityResult.items : [];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getDreamFacilities(district, controller.signal)
+      .then((items) => {
+        setFacilityResult({ district, items, status: "ready" });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setFacilityResult({ district, items: [], status: "error" });
+      });
+    return () => controller.abort();
+  }, [district]);
   const visibleSelectedFacilityId = visibleFacilities.some((facility) => facility.id === selectedFacilityId)
     ? selectedFacilityId
     : null;
@@ -5396,7 +5420,7 @@ function DreamDashboardScreen({
         <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
           <span className={styles.dreamMapTitleCopy}>
             <span>우리 동네 모금가지</span>
-            <strong>{activeNeighborhood === "송파삼성래미안" ? "송파구" : activeNeighborhood}</strong>
+            <strong>{district}</strong>
             <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 - 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
           </span>
           <ChevronRight size={24} aria-hidden="true" />
@@ -5420,9 +5444,11 @@ function DreamDashboardScreen({
           <h2>함께 키우는 우리 동네 꿈</h2>
           <span>{visibleFacilities.length}곳</span>
         </div>
-        {visibleFacilities.length === 0 && <p className={styles.dreamEmpty}>아직 이 동네에서 진행 중인 모금이 없어요.</p>}
+        {facilityStatus === "loading" && <p className={styles.dreamEmpty}>어린이 센터를 불러오는 중이에요.</p>}
+        {facilityStatus === "error" && <p className={styles.dreamEmpty}>어린이 센터를 불러오지 못했어요.</p>}
+        {facilityStatus === "ready" && visibleFacilities.length === 0 && <p className={styles.dreamEmpty}>이 구에서 확인된 어린이 센터가 없어요.</p>}
         {visibleFacilities.map((facility) => {
-          const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
+          const progress = facility.targetAmount > 0 ? Math.round((facility.currentAmount / facility.targetAmount) * 100) : 0;
           return (
             <button
               type="button"
@@ -5453,7 +5479,7 @@ function DreamFacilityCallout({
   facility: DonationFacility;
   onClose: () => void;
 }) {
-  const progress = Math.round((facility.currentAmount / facility.targetAmount) * 100);
+  const progress = facility.targetAmount > 0 ? Math.round((facility.currentAmount / facility.targetAmount) * 100) : 0;
   return (
     <aside className={styles.dreamFacilityCallout} role="dialog" aria-label={`${facility.name} 상세 정보`}>
       <div className={styles.dreamFacilityCalloutTop}>
