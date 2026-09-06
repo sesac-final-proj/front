@@ -16,6 +16,8 @@ export interface TradeProduct {
   tradePlace?: string;
   sellerNickname?: string;
   sellerMannerTemp?: number;
+  isMine?: boolean;
+  thumbnailUrl?: string;
 }
 
 export interface TradeProductPage {

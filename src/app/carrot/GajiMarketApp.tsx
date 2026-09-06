@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -62,6 +62,8 @@ import {
   getDreamFacilities,
   getMyFavorites,
   getMyProducts,
+  updateProduct,
+  uploadProductImage,
 } from "@/services";
 import {
   createOrGetChatRoom,
@@ -69,6 +71,7 @@ import {
   listChatRooms,
   listMessages as listChatMessages,
   sendMessage as sendChatMessage,
+  sendImageMessage,
   updateChatTradeStatus,
   type ChatMessageDto,
   type ChatRoomDto,
@@ -181,6 +184,7 @@ type ProductListItem = {
   sellerNickname?: string;
   sellerMannerTemp?: number;
   category: string;
+  thumbnailUrl?: string;
 };
 
 type CommunityPost = {
@@ -582,11 +586,12 @@ function toProductListItem(item: TradeProduct): ProductListItem {
     viewCount: item.viewCount,
     interestCount: item.interestCount,
     isFavorite: false,
-    mine: false,
+    mine: item.isMine ?? false,
     // ponytail: 백엔드 상세 카테고리(예: "청소기")는 검색어로만 노출 — 목록 상단 탭 필터는
     // "중고거래"(이 API가 다루는 섹션 자체) 기준으로 매칭시킴
     description: item.description ?? (item.searchKeyword ? `연관 검색어: ${item.searchKeyword}` : ""),
     category: "중고거래",
+    thumbnailUrl: item.thumbnailUrl,
   };
 }
 
@@ -606,11 +611,12 @@ function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
   };
 }
 
-function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): { mine: boolean; text: string; time: string } {
+function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): ChatMessageUi {
   return {
     mine: dto.senderId === myUserId,
-    text: dto.content,
+    text: dto.content ?? "",
     time: formatRelativeTime(dto.createdAt),
+    imageUrl: dto.messageType === "IMAGE" ? (dto.imageUrl ?? undefined) : undefined,
   };
 }
 
@@ -872,7 +878,9 @@ const LOCAL_BUSINESSES: LocalBusiness[] = [
   },
 ];
 
-const baseMessages = [
+type ChatMessageUi = { mine: boolean; text: string; time: string; imageUrl?: string };
+
+const baseMessages: ChatMessageUi[] = [
   { mine: false, text: "안녕하세요. 아직 거래 가능할까요?", time: "오후 5:11" },
   { mine: true, text: "네 가능해요. 오늘 저녁에도 괜찮습니다.", time: "오후 5:14" },
   { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18" },
@@ -1253,7 +1261,7 @@ export default function GajiMarketApp() {
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [regions, setRegions] = useState<Region[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
-  const [roomMessages, setRoomMessages] = useState<Record<string, typeof baseMessages>>({});
+  const [roomMessages, setRoomMessages] = useState<Record<string, ChatMessageUi[]>>({});
   // 차단/신고엔 상대방 user id가 필요한데 채팅방 응답엔 없어서, 메시지에 실려오는
   // sender_id로부터 알아낸다 — 아직 메시지가 하나도 없으면 모르는 채로 남는다.
   const [roomOtherUserId, setRoomOtherUserId] = useState<Record<string, number>>({});
@@ -1443,6 +1451,10 @@ export default function GajiMarketApp() {
                 tradePlace: detail.tradePlace,
                 sellerNickname: detail.sellerNickname,
                 sellerMannerTemp: detail.sellerMannerTemp,
+                // 홈 목록에서 바로 들어온 경우 mine=false로 깔려있어서(그 목록 API는
+                // is_mine을 안 줌) 상세 API가 내려주는 값으로 덮어써야 "수정" 메뉴가 뜬다.
+                mine: detail.isMine ?? p.mine,
+                thumbnailUrl: detail.thumbnailUrl ?? p.thumbnailUrl,
               }
             : p;
         // selectedProduct는 products/myProducts/favoriteProducts 중 어디서 찾았는지에
@@ -1556,6 +1568,10 @@ export default function GajiMarketApp() {
     });
   }
 
+  function findProductById(id: string): ProductListItem | undefined {
+    return products.find((p) => p.id === id) ?? myProducts.find((p) => p.id === id);
+  }
+
   function goBack() {
     if (
       subPage?.type === "settings" ||
@@ -1593,6 +1609,10 @@ export default function GajiMarketApp() {
     }
     if (subPage?.type === "chat-room-list") {
       setSubPage({ type: "product-detail", id: subPage.productId });
+      return;
+    }
+    if (subPage?.type === "product-form" && subPage.editId) {
+      setSubPage({ type: "product-detail", id: subPage.editId });
       return;
     }
     setSubPage(null);
@@ -1724,6 +1744,31 @@ export default function GajiMarketApp() {
       });
   }
 
+  function submitImageMessage(chatId: string, file: File) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    sendImageMessage(numericId, file)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId ? { ...chat, lastMessage: "사진을 보냈습니다", lastMessageAt: "방금 전" } : chat,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("이미지를 보내지 못했습니다.", error);
+        }
+      });
+  }
+
   function leaveChat(chatId: string) {
     const numericId = Number(chatId);
     if (!Number.isFinite(numericId)) return;
@@ -1754,7 +1799,7 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: message.content, lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId ? { ...chat, lastMessage: message.content ?? "", lastMessageAt: "방금 전" } : chat,
           ),
         );
         // 채팅방에 걸린 상품 상태도 같이 반영 — 목록/판매내역/상세 화면 전부 동일 값을 보게.
@@ -1803,7 +1848,20 @@ export default function GajiMarketApp() {
       });
   }
 
-  function submitProduct(event: FormEvent<HTMLFormElement>) {
+  // 이미지는 상품이 있어야(product_id 필요) 업로드할 수 있어서, 등록/수정 성공 후에
+  // 별도로 붙인다 — 실패해도 글 자체는 이미 저장됐으니 콘솔에만 남기고 넘어간다.
+  function attachImageIfAny(productId: string, imageFile: File | null) {
+    if (!imageFile) return;
+    uploadProductImage(Number(productId), imageFile)
+      .then((imageUrl) => {
+        const patch = (p: ProductListItem) => (p.id === productId ? { ...p, thumbnailUrl: imageUrl } : p);
+        setProducts((current) => current.map(patch));
+        setMyProducts((current) => current.map(patch));
+      })
+      .catch((error: unknown) => console.error("이미지를 업로드하지 못했습니다.", error));
+  }
+
+  function submitProduct(event: FormEvent<HTMLFormElement>, imageFile: File | null) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const title = String(form.get("title") ?? "").trim();
@@ -1851,6 +1909,7 @@ export default function GajiMarketApp() {
         // 판매내역 화면은 이제 서버 전용 목록(myProducts state)을 보므로 방금 올린
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
+        attachImageIfAny(String(id), imageFile);
         setActiveTab("my");
         setSubPage({ type: "sales" });
       })
@@ -1859,6 +1918,49 @@ export default function GajiMarketApp() {
           setAuthRequired(true);
         } else {
           console.error("글을 등록하지 못했습니다.", error);
+        }
+        setSheet("status");
+      });
+  }
+
+  function submitProductEdit(event: FormEvent<HTMLFormElement>, imageFile: File | null, productId: string) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const title = String(form.get("title") ?? "").trim();
+    const description = String(form.get("description") ?? "").trim();
+    const category = String(form.get("category") ?? "중고거래");
+    const isFree = form.get("free") === "on";
+    const price = Number(form.get("price") ?? 0);
+
+    updateProduct(Number(productId), {
+      title,
+      category,
+      description,
+      desiredPrice: isFree ? null : Math.max(0, price),
+    })
+      .then(() => {
+        const patch = (p: ProductListItem) =>
+          p.id === productId
+            ? {
+                ...p,
+                title,
+                thumbnailLabel: title.slice(0, 2),
+                category,
+                description,
+                price: isFree ? null : Math.max(0, price),
+                tradeType: isFree ? ("FREE" as const) : ("SALE" as const),
+              }
+            : p;
+        setProducts((current) => current.map(patch));
+        setMyProducts((current) => current.map(patch));
+        attachImageIfAny(productId, imageFile);
+        setSubPage({ type: "product-detail", id: productId });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+        } else {
+          console.error("글을 수정하지 못했습니다.", error);
         }
         setSheet("status");
       });
@@ -1990,9 +2092,18 @@ export default function GajiMarketApp() {
               onReportProduct={(id, _reason) => {
                 setProducts((prev) => prev.filter((p) => p.id !== id));
               }}
+              onEdit={(id) => setSubPage({ type: "product-form", editId: id })}
             />
           ) : subPage?.type === "product-form" ? (
-            <ProductFormScreen onBack={goBack} onSubmit={submitProduct} />
+            <ProductFormScreen
+              onBack={goBack}
+              initialProduct={subPage.editId ? findProductById(subPage.editId) : undefined}
+              onSubmit={
+                subPage.editId
+                  ? (event, imageFile) => submitProductEdit(event, imageFile, subPage.editId!)
+                  : submitProduct
+              }
+            />
           ) : subPage?.type === "community-detail" && selectedPost ? (
             <CommunityDetailScreen post={selectedPost} onBack={goBack} />
           ) : subPage?.type === "community-form" ? (
@@ -2032,6 +2143,7 @@ export default function GajiMarketApp() {
               draft={messageDraft}
               onDraftChange={setMessageDraft}
               onSubmit={(event) => submitMessage(event, selectedChat.id)}
+              onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
               onBack={goBack}
               otherUserId={roomOtherUserId[selectedChat.id]}
               onLeave={() => leaveChat(selectedChat.id)}
@@ -2562,7 +2674,7 @@ function ProductRow({
   return (
     <article className={styles.productRow}>
       <button type="button" className={styles.productTapArea} onClick={onClick}>
-        <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} />
+        <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} imageUrl={product.thumbnailUrl} />
         <div className={styles.productInfo}>
           <div className={styles.rowTopLine}>
             <h2>{product.title}</h2>
@@ -2615,7 +2727,11 @@ function ProductRow({
   );
 }
 
-function Thumbnail({ tone, label }: { tone: string; label: string }) {
+function Thumbnail({ tone, label, imageUrl }: { tone: string; label: string; imageUrl?: string }) {
+  if (imageUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL, next/image 도메인 설정 없이 바로 사용
+    return <img src={imageUrl} alt={label} className={styles.thumbnail} />;
+  }
   return (
     <div className={`${styles.thumbnail} ${styles[`tone_${tone}` as keyof typeof styles] ?? ""}`}>
       <span>{label}</span>
@@ -2739,6 +2855,7 @@ function ProductDetailScreen({
   onChat,
   onHideSeller,
   onReportProduct,
+  onEdit,
 }: {
   product: ProductListItem;
   onBack: () => void;
@@ -2747,6 +2864,7 @@ function ProductDetailScreen({
   onChat: () => void;
   onHideSeller: (productId: string) => void;
   onReportProduct: (productId: string, reason: string) => void;
+  onEdit: (productId: string) => void;
 }) {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -2762,14 +2880,21 @@ function ProductDetailScreen({
 
   return (
     <section className={styles.detailScreen}>
-      <div className={`${styles.detailHero} ${styles[`tone_${product.thumbnailTone}` as keyof typeof styles] ?? ""}`}>
+      <div
+        className={`${styles.detailHero} ${product.thumbnailUrl ? "" : (styles[`tone_${product.thumbnailTone}` as keyof typeof styles] ?? "")}`}
+      >
         <IconButton label="뒤로" onClick={onBack} className={styles.backFloating}>
           <ChevronLeft size={28} />
         </IconButton>
         <IconButton label="더보기" className={styles.moreFloating} onClick={() => setShowMoreSheet(true)}>
           <MoreVertical size={24} />
         </IconButton>
-        <span>{product.thumbnailLabel}</span>
+        {product.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
+          <img src={product.thumbnailUrl} alt={product.title} className={styles.detailHeroImage} />
+        ) : (
+          <span>{product.thumbnailLabel}</span>
+        )}
       </div>
       <div className={styles.detailBody}>
         <div className={styles.sellerCard}>
@@ -2844,30 +2969,46 @@ function ProductDetailScreen({
               <span />
             </div>
             <div className={styles.productActionGroup}>
-              <button
-                type="button"
-                className={styles.productActionBtn}
-                onClick={() => {
-                  setShowMoreSheet(false);
-                  onHideSeller(product.id);
-                  alert("이 사용자의 글을 더 이상 보지 않습니다.");
-                  onBack();
-                }}
-              >
-                <EyeOff size={22} />
-                <span>이 사용자의 글 보지 않기</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.productActionBtn} ${styles.productActionReport}`}
-                onClick={() => {
-                  setShowMoreSheet(false);
-                  setShowReportModal(true);
-                }}
-              >
-                <MessageCircle size={22} />
-                <span>신고하기</span>
-              </button>
+              {product.mine ? (
+                <button
+                  type="button"
+                  className={styles.productActionBtn}
+                  onClick={() => {
+                    setShowMoreSheet(false);
+                    onEdit(product.id);
+                  }}
+                >
+                  <FileText size={22} />
+                  <span>글 수정하기</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.productActionBtn}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      onHideSeller(product.id);
+                      alert("이 사용자의 글을 더 이상 보지 않습니다.");
+                      onBack();
+                    }}
+                  >
+                    <EyeOff size={22} />
+                    <span>이 사용자의 글 보지 않기</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      setShowReportModal(true);
+                    }}
+                  >
+                    <MessageCircle size={22} />
+                    <span>신고하기</span>
+                  </button>
+                </>
+              )}
             </div>
             <button
               type="button"
@@ -2931,33 +3072,56 @@ function ProductDetailScreen({
 function ProductFormScreen({
   onBack,
   onSubmit,
+  initialProduct,
 }: {
   onBack: () => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, imageFile: File | null) => void;
+  initialProduct?: ProductListItem;
 }) {
+  const isEdit = Boolean(initialProduct);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialProduct?.thumbnailUrl ?? null);
+  const imageFileRef = useRef<File | null>(null);
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    imageFileRef.current = file;
+    setPreviewUrl((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return file ? URL.createObjectURL(file) : (initialProduct?.thumbnailUrl ?? null);
+    });
+  }
+
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="중고거래 글쓰기"
+        title={isEdit ? "중고거래 글 수정" : "중고거래 글쓰기"}
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
           </IconButton>
         }
       />
-      <form className={styles.formStack} onSubmit={onSubmit}>
-        <div className={styles.photoUploader}>
-          <Plus size={28} />
-          <span>사진 추가</span>
-          <small>최대 10장</small>
-        </div>
+      <form className={styles.formStack} onSubmit={(event) => onSubmit(event, imageFileRef.current)}>
+        <label className={styles.photoUploader}>
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 로컬 미리보기(blob:) 또는 NCP 원본 URL
+            <img src={previewUrl} alt="상품 사진 미리보기" className={styles.photoPreview} />
+          ) : (
+            <>
+              <Plus size={28} />
+              <span>사진 추가</span>
+              <small>1장</small>
+            </>
+          )}
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} hidden />
+        </label>
         <label>
           제목
-          <input name="title" maxLength={40} placeholder="물건 이름을 입력하세요" required />
+          <input name="title" maxLength={40} placeholder="물건 이름을 입력하세요" defaultValue={initialProduct?.title} required />
         </label>
         <label>
           카테고리
-          <select name="category" defaultValue="중고거래">
+          <select name="category" defaultValue={initialProduct?.category ?? "중고거래"}>
             <option>중고거래</option>
             <option>중고차</option>
             <option>알바</option>
@@ -2966,10 +3130,16 @@ function ProductFormScreen({
         </label>
         <label>
           가격
-          <input name="price" type="number" min={0} max={999999999} defaultValue={30000} />
+          <input
+            name="price"
+            type="number"
+            min={0}
+            max={999999999}
+            defaultValue={initialProduct?.price ?? 30000}
+          />
         </label>
         <label className={styles.checkRow}>
-          <input name="free" type="checkbox" />
+          <input name="free" type="checkbox" defaultChecked={initialProduct?.tradeType === "FREE"} />
           나눔으로 등록
         </label>
         <label>
@@ -2978,11 +3148,12 @@ function ProductFormScreen({
             name="description"
             maxLength={2000}
             placeholder="상태, 거래 희망 장소, 가격 제안 가능 여부를 적어주세요."
+            defaultValue={initialProduct?.description}
             required
           />
         </label>
         <button type="submit" className={styles.primaryButton}>
-          등록하기
+          {isEdit ? "수정하기" : "등록하기"}
         </button>
       </form>
     </section>
@@ -5033,6 +5204,7 @@ function ChatRoomScreen({
   draft,
   onDraftChange,
   onSubmit,
+  onSendImage,
   onBack,
   otherUserId,
   onLeave,
@@ -5042,10 +5214,11 @@ function ChatRoomScreen({
 }: {
   room: ChatRoom;
   product?: ProductListItem;
-  messages: typeof baseMessages;
+  messages: ChatMessageUi[];
   draft: string;
   onDraftChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSendImage: (file: File) => void;
   onBack: () => void;
   otherUserId?: number;
   onLeave: () => void;
@@ -5182,7 +5355,7 @@ function ChatRoomScreen({
       )}
       {product && (
         <div className={styles.chatProductCard}>
-          <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} />
+          <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} imageUrl={product.thumbnailUrl} />
           <div>
             <h2>{product.title}</h2>
             <span>
@@ -5195,12 +5368,30 @@ function ChatRoomScreen({
       <div className={styles.messageStack}>
         {messages.map((message, index) => (
           <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
-            <p>{message.text}</p>
+            {message.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
+              <img src={message.imageUrl} alt="전송된 사진" className={styles.messageImage} />
+            ) : (
+              <p>{message.text}</p>
+            )}
             <span>{message.time}</span>
           </div>
         ))}
       </div>
       <form className={styles.messageComposer} onSubmit={onSubmit}>
+        <label className={styles.messageImageButton} aria-label="사진 보내기">
+          <Plus size={20} />
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onSendImage(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
         <input
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -5923,7 +6114,7 @@ function ManagementScreen({
           {products.map((product) => (
             <article className={styles.manageRow} key={product.id}>
               <button type="button" onClick={() => onProductClick(product.id)}>
-                <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} />
+                <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} imageUrl={product.thumbnailUrl} />
                 <div>
                   <h2>{product.title}</h2>
                   <p>{formatPrice(product)}</p>
