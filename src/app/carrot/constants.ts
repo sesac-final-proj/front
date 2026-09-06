@@ -14,7 +14,7 @@ import {
   Truck,
   Utensils,
 } from "lucide-react";
-import type { AlbaItem, CommunityPost, DangerTone, DangerVisual, LocalBusiness, LocalCategory, ProductListItem } from "./types";
+import type { AlbaItem, ChatMessageUi, CommunityPost, DangerTone, DangerVisual, LocalBusiness, LocalCategory, ProductListItem } from "./types";
 
 export const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부동산", "기타 서비스"];
 export const COMMUNITY_TABS = ["전체", "자유 주제", "같이해요", "질문", "동네 정보"];
@@ -312,7 +312,7 @@ export const LOCAL_BUSINESSES: LocalBusiness[] = [
   },
 ];
 
-export const baseMessages = [
+export const baseMessages: ChatMessageUi[] = [
   { mine: false, text: "안녕하세요. 아직 거래 가능할까요?", time: "오후 5:11" },
   { mine: true, text: "네 가능해요. 오늘 저녁에도 괜찮습니다.", time: "오후 5:14" },
   { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18" },

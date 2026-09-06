@@ -5,6 +5,7 @@ import type { CongestionZone, Restaurant, TradeProduct } from "@/types";
 import type { ChatMessageDto, ChatRoomDto } from "@/services/chatService";
 import { API_BASE_URL, DANGER_VISUALS, NAVER_MAP_SCRIPT_ID, NEIGHBORHOOD_DISTRICTS, THEME_STORAGE_KEY } from "./constants";
 import type {
+  ChatMessageUi,
   ChatRoom,
   DangerSignalApiItem,
   LocalBusiness,
@@ -218,11 +219,12 @@ export function toProductListItem(item: TradeProduct): ProductListItem {
     viewCount: item.viewCount,
     interestCount: item.interestCount,
     isFavorite: false,
-    mine: false,
+    mine: item.isMine ?? false,
     // ponytail: 백엔드 상세 카테고리(예: "청소기")는 검색어로만 노출 — 목록 상단 탭 필터는
     // "중고거래"(이 API가 다루는 섹션 자체) 기준으로 매칭시킴
     description: item.description ?? (item.searchKeyword ? `연관 검색어: ${item.searchKeyword}` : ""),
     category: "중고거래",
+    thumbnailUrl: item.thumbnailUrl,
   };
 }
 
@@ -242,11 +244,12 @@ export function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
   };
 }
 
-export function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): { mine: boolean; text: string; time: string } {
+export function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): ChatMessageUi {
   return {
     mine: dto.senderId === myUserId,
-    text: dto.content,
+    text: dto.content ?? "",
     time: formatRelativeTime(dto.createdAt),
+    imageUrl: dto.messageType === "IMAGE" ? (dto.imageUrl ?? undefined) : undefined,
   };
 }
 

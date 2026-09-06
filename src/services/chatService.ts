@@ -30,11 +30,15 @@ export interface ChatRoomDto {
   isSeller: boolean;
 }
 
+export type MessageType = "TEXT" | "IMAGE";
+
 export interface ChatMessageDto {
   id: number;
   chatRoomId: number;
   senderId: number;
-  content: string;
+  messageType: MessageType;
+  content: string | null;
+  imageUrl: string | null;
   createdAt: string;
 }
 
@@ -59,7 +63,9 @@ interface ApiChatMessage {
   id: number;
   chat_room_id: number;
   sender_id: number;
-  content: string;
+  message_type: MessageType;
+  content: string | null;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -87,7 +93,9 @@ function toChatMessage(item: ApiChatMessage): ChatMessageDto {
     id: item.id,
     chatRoomId: item.chat_room_id,
     senderId: item.sender_id,
+    messageType: item.message_type,
     content: item.content,
+    imageUrl: item.image_url,
     createdAt: item.created_at,
   };
 }
@@ -158,12 +166,56 @@ export async function sendMessage(chatRoomId: number, content: string): Promise<
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ message_type: "TEXT", content }),
   });
   if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("메시지를 보내지 못했습니다.");
 
   const payload: ApiChatMessage = await response.json();
+  return toChatMessage(payload);
+}
+
+// 채팅 이미지: presign → 브라우저에서 NCP에 직접 PUT → object_key를 메시지로 등록, 3단계.
+// 상품 이미지와 달리 등록 엔드포인트가 따로 없고 메시지 전송 자체가 등록이다.
+export async function sendImageMessage(chatRoomId: number, file: File): Promise<ChatMessageDto> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const presignResponse = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/images/presign`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ filename: file.name, content_type: file.type }),
+  });
+  if (presignResponse.status === 401) throw new AuthRequiredError();
+  if (!presignResponse.ok) throw new Error("이미지 업로드 URL을 받지 못했습니다.");
+  const { upload_url, object_key }: { upload_url: string; object_key: string } = await presignResponse.json();
+
+  const putResponse = await fetch(upload_url, {
+    method: "PUT",
+    // 상품 이미지와 동일한 이유 — presign 서명에 ACL(public-read)이 포함돼 있어서
+    // 이 헤더가 빠지면 NCP가 SignatureDoesNotMatch(403)로 거부한다.
+    headers: { "Content-Type": file.type, "x-amz-acl": "public-read" },
+    body: file,
+  });
+  if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
+
+  const messageResponse = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/messages`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ message_type: "IMAGE", image_object_key: object_key }),
+  });
+  if (messageResponse.status === 401) throw new AuthRequiredError();
+  if (!messageResponse.ok) throw new Error("이미지 메시지를 보내지 못했습니다.");
+
+  const payload: ApiChatMessage = await messageResponse.json();
   return toChatMessage(payload);
 }
 

@@ -95,7 +95,10 @@ export type ProductListItem = {
   sellerNickname?: string;
   sellerMannerTemp?: number;
   category: string;
+  thumbnailUrl?: string;
 };
+
+export type ChatMessageUi = { mine: boolean; text: string; time: string; imageUrl?: string };
 
 export type CommunityPost = {
   id: string;
