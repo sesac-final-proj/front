@@ -72,6 +72,7 @@ import {
   listChatRooms,
   listMessages as listChatMessages,
   sendMessage as sendChatMessage,
+  sendImageMessage,
   updateChatTradeStatus,
   type ChatMessageDto,
   type ChatRoomDto,
@@ -620,11 +621,12 @@ function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
   };
 }
 
-function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): { mine: boolean; text: string; time: string } {
+function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefined): ChatMessageUi {
   return {
     mine: dto.senderId === myUserId,
-    text: dto.content,
+    text: dto.content ?? "",
     time: formatRelativeTime(dto.createdAt),
+    imageUrl: dto.messageType === "IMAGE" ? (dto.imageUrl ?? undefined) : undefined,
   };
 }
 
@@ -910,7 +912,9 @@ const DREAM_FACILITIES: DonationFacility[] = [
   },
 ];
 
-const baseMessages = [
+type ChatMessageUi = { mine: boolean; text: string; time: string; imageUrl?: string };
+
+const baseMessages: ChatMessageUi[] = [
   { mine: false, text: "안녕하세요. 아직 거래 가능할까요?", time: "오후 5:11" },
   { mine: true, text: "네 가능해요. 오늘 저녁에도 괜찮습니다.", time: "오후 5:14" },
   { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18" },
@@ -1291,7 +1295,7 @@ export default function GajiMarketApp() {
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
   const [regions, setRegions] = useState<Region[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
-  const [roomMessages, setRoomMessages] = useState<Record<string, typeof baseMessages>>({});
+  const [roomMessages, setRoomMessages] = useState<Record<string, ChatMessageUi[]>>({});
   // 차단/신고엔 상대방 user id가 필요한데 채팅방 응답엔 없어서, 메시지에 실려오는
   // sender_id로부터 알아낸다 — 아직 메시지가 하나도 없으면 모르는 채로 남는다.
   const [roomOtherUserId, setRoomOtherUserId] = useState<Record<string, number>>({});
@@ -1774,6 +1778,31 @@ export default function GajiMarketApp() {
       });
   }
 
+  function submitImageMessage(chatId: string, file: File) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    sendImageMessage(numericId, file)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId ? { ...chat, lastMessage: "사진을 보냈습니다", lastMessageAt: "방금 전" } : chat,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("이미지를 보내지 못했습니다.", error);
+        }
+      });
+  }
+
   function leaveChat(chatId: string) {
     const numericId = Number(chatId);
     if (!Number.isFinite(numericId)) return;
@@ -1804,7 +1833,7 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: message.content, lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId ? { ...chat, lastMessage: message.content ?? "", lastMessageAt: "방금 전" } : chat,
           ),
         );
         // 채팅방에 걸린 상품 상태도 같이 반영 — 목록/판매내역/상세 화면 전부 동일 값을 보게.
@@ -2148,6 +2177,7 @@ export default function GajiMarketApp() {
               draft={messageDraft}
               onDraftChange={setMessageDraft}
               onSubmit={(event) => submitMessage(event, selectedChat.id)}
+              onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
               onBack={goBack}
               otherUserId={roomOtherUserId[selectedChat.id]}
               onLeave={() => leaveChat(selectedChat.id)}
@@ -5358,6 +5388,7 @@ function ChatRoomScreen({
   draft,
   onDraftChange,
   onSubmit,
+  onSendImage,
   onBack,
   otherUserId,
   onLeave,
@@ -5367,10 +5398,11 @@ function ChatRoomScreen({
 }: {
   room: ChatRoom;
   product?: ProductListItem;
-  messages: typeof baseMessages;
+  messages: ChatMessageUi[];
   draft: string;
   onDraftChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSendImage: (file: File) => void;
   onBack: () => void;
   otherUserId?: number;
   onLeave: () => void;
@@ -5520,12 +5552,30 @@ function ChatRoomScreen({
       <div className={styles.messageStack}>
         {messages.map((message, index) => (
           <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
-            <p>{message.text}</p>
+            {message.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
+              <img src={message.imageUrl} alt="전송된 사진" className={styles.messageImage} />
+            ) : (
+              <p>{message.text}</p>
+            )}
             <span>{message.time}</span>
           </div>
         ))}
       </div>
       <form className={styles.messageComposer} onSubmit={onSubmit}>
+        <label className={styles.messageImageButton} aria-label="사진 보내기">
+          <Plus size={20} />
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onSendImage(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
         <input
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}

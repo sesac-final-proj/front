@@ -2963,7 +2963,7 @@
   min-height: 76px;
   padding: 10px 17px calc(10px + env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 46px;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
   gap: 10px;
   background: rgba(17, 17, 20, 0.94);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -2972,13 +2972,27 @@
   z-index: 55;
 }
 
-.messageComposer button {
+.messageComposer button,
+.messageImageButton {
   width: 46px;
   height: 46px;
   border: 0;
   border-radius: 999px;
   background: var(--color-primary);
   color: var(--color-on-primary);
+}
+
+.messageImageButton {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.messageImage {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 18px;
+  object-fit: cover;
 }
 
 .promoCard,
