@@ -193,7 +193,7 @@ export function createClusterOverlayElement(
   button.className = styles.restaurantClusterMarker;
   button.dataset.theme = isDark ? "dark" : "light";
   button.setAttribute("aria-label", `이 위치의 음식점 ${count}곳 보기`);
-  button.textContent = String(count);
+  button.textContent = `🍽️ ${count}`;
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     onClick();
@@ -305,6 +305,60 @@ export function clusterRestaurantsByOverlap(
   }
 
   return Array.from(clustersMap.values());
+}
+
+export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): TransitStop[][] {
+  if (stops.length === 0) return [];
+  if (!map) return stops.map((stop) => [stop]);
+
+  const proj = map.getProjection ? map.getProjection() : null;
+  const kakao = (window as any).kakao;
+  if (!proj || !kakao?.maps) return stops.map((stop) => [stop]);
+
+  const boxes = stops.map((stop) => {
+    const pos = new kakao.maps.LatLng(stop.lat, stop.lng);
+    return getRestaurantMarkerBox(proj.pointFromCoords(pos), stop.name);
+  });
+  const parent = stops.map((_, index) => index);
+  const find = (index: number): number => {
+    if (parent[index] === index) return index;
+    parent[index] = find(parent[index]);
+    return parent[index];
+  };
+  const union = (left: number, right: number) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent[leftRoot] = rightRoot;
+  };
+
+  for (let left = 0; left < boxes.length; left += 1) {
+    for (let right = left + 1; right < boxes.length; right += 1) {
+      const overlap = calculateMarkerOverlapRatio(boxes[left], boxes[right]);
+      const distance = Math.hypot(boxes[left].cx - boxes[right].cx, boxes[left].cy - boxes[right].cy);
+      if (overlap >= 0.8 || distance <= 14) union(left, right);
+    }
+  }
+
+  const clusters = new Map<number, TransitStop[]>();
+  stops.forEach((stop, index) => {
+    const root = find(index);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root)!.push(stop);
+  });
+  return Array.from(clusters.values());
+}
+
+function createBikeClusterOverlayElement(count: number, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = transitStyles.clusterMarker;
+  button.textContent = `🚲 ${count}`;
+  button.setAttribute("aria-label", `이 위치의 따릉이 대여소 ${count}곳 보기`);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
 }
 
 
@@ -714,7 +768,26 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     const kakao = (window as any).kakao;
     const map = mapRef.current;
     if (!map || !kakao?.maps || !canUseKakaoMap || !isTransitMode) return;
-    const overlays = transitStops.map((stop) => {
+    const bikeClusters = selectedCategory === "bike" ? clusterBikeStopsByOverlap(transitStops, map) : transitStops.map((stop) => [stop]);
+    const overlays = bikeClusters.map((cluster) => {
+      const stop = cluster[0];
+      if (cluster.length > 1) {
+        const position = new kakao.maps.LatLng(
+          cluster.reduce((sum, item) => sum + item.lat, 0) / cluster.length,
+          cluster.reduce((sum, item) => sum + item.lng, 0) / cluster.length,
+        );
+        const button = createBikeClusterOverlayElement(cluster.length, () => onSelectTransit?.(stop));
+        const overlay = new kakao.maps.CustomOverlay({
+          position,
+          content: button,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          zIndex: 120,
+        });
+        overlay.setMap(map);
+        return overlay;
+      }
+
       const button = document.createElement("button");
       button.type = "button";
       button.className = transitStyles.marker;
@@ -722,7 +795,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
       button.dataset.empty = String(stop.kind === "bike" && stop.bikes_available === 0);
       button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
       const availability = stop.bikes_available === null ? "확인 불가" : `${stop.bikes_available}대`;
-      button.textContent = stop.kind === "bike" ? `자전거 ${availability}` : stop.name;
+      button.textContent = stop.name;
       button.setAttribute("aria-label", `${stop.name} ${stop.kind === "bike" ? availability : stop.line ?? ""}`);
       button.title = `${stop.name} ${stop.line ?? ""}`.trim();
       button.addEventListener("click", (event) => {
