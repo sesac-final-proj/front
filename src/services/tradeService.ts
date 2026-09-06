@@ -184,6 +184,38 @@ export async function getMyFavorites(signal?: AbortSignal): Promise<TradeProduct
   return { items: payload.items.map(toTradeProduct), total: payload.total };
 }
 
+// 최근 본 상품(최대 20개, 계정별). 로그인 계정 기준으로 서버가 관리 —
+// 로그아웃/재로그인해도 유지되고, 다른 계정으로 로그인하면 그 계정 것만 보인다.
+export async function getRecentlyViewed(signal?: AbortSignal): Promise<TradeProductPage> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const response = await fetch(apiUrl("/api/v1/trades/products/recently-viewed"), {
+    signal,
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("최근 본 목록을 불러오지 못했습니다.");
+
+  const payload: ApiProductPage = await response.json();
+  return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 상품 상세 진입 시 조회 기록 — best-effort. 비로그인(게스트)이면 조용히 무시.
+export async function recordProductView(id: number): Promise<void> {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    await fetch(apiUrl(`/api/v1/trades/products/${id}/view`), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // ponytail: 조회 기록 실패는 화면에 영향 주지 않는다 — 조용히 무시.
+  }
+}
+
 // 목록 API는 description을 안 내려줘서(상세 API만 채워짐) 상세 화면 진입 시 따로 조회.
 export async function getProduct(id: number, signal?: AbortSignal): Promise<TradeProduct> {
   const response = await fetch(apiUrl(`/api/v1/trades/products/${id}`), {

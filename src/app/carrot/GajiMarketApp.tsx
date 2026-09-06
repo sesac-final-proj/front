@@ -61,6 +61,8 @@ import {
   getDreamFacilities,
   getMyFavorites,
   getMyProducts,
+  getRecentlyViewed,
+  recordProductView,
   updateProduct,
   uploadProductImage,
   listCategories,
@@ -203,6 +205,7 @@ export default function GajiMarketApp() {
   const [me, setMe] = useState<Me | null>(null);
   const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
   const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
+  const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<ProductListItem[]>([]);
 
   // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
   // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
@@ -490,6 +493,32 @@ export default function GajiMarketApp() {
       .finally(() => setIsLoadingMoreProducts(false));
   }, [isLoadingMoreProducts, products.length, productsTotal, regionId, productFilters]);
 
+  // 상품 상세를 열 때마다 "최근 본" 기록도 같이 남긴다 (best-effort, 실패해도 화면엔 영향 없음).
+  useEffect(() => {
+    if (subPage?.type !== "product-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    recordProductView(id);
+  }, [subPage]);
+
+  // "최근 본" 화면을 열 때마다 매번 새로 받아온다 — 그 사이 새로 본 상품이 반영되게.
+  useEffect(() => {
+    if (subPage?.type !== "recently-viewed") return;
+    const controller = new AbortController();
+    getRecentlyViewed(controller.signal)
+      .then((page) => setRecentlyViewedProducts(page.items.map(toProductListItem)))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("최근 본 목록을 불러오지 못했습니다.", error);
+        }
+      });
+    return () => controller.abort();
+  }, [subPage]);
+
   // 목록 API는 description/tradePlace/판매자 정보가 없어서 상세보기 진입 시 상세 API로 채워 넣음.
   useEffect(() => {
     if (subPage?.type !== "product-detail") return;
@@ -636,7 +665,8 @@ export default function GajiMarketApp() {
       subPage?.type === "alba" ||
       subPage?.type === "alba-form" ||
       subPage?.type === "sales" ||
-      subPage?.type === "favorites"
+      subPage?.type === "favorites" ||
+      subPage?.type === "recently-viewed"
     ) {
       setActiveTab("my");
       setSubPage(null);
@@ -1097,7 +1127,7 @@ export default function GajiMarketApp() {
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
 
   return (
@@ -1316,6 +1346,16 @@ export default function GajiMarketApp() {
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onFavorite={toggleFavorite}
             />
+          ) : subPage?.type === "recently-viewed" ? (
+            <FavoriteScreen
+              products={recentlyViewedProducts}
+              onBack={goBack}
+              onProductClick={(id) => setSubPage({ type: "product-detail", id })}
+              onFavorite={toggleFavorite}
+              title="최근 본"
+              emptyTitle="최근 본 상품이 없어요"
+              emptyBody="상품 상세를 열어보면 여기에 기록돼요."
+            />
           ) : subPage?.type === "search" ? (
             <SearchScreen
               products={products}
@@ -1436,6 +1476,7 @@ export default function GajiMarketApp() {
               onOpenAlba={() => setSubPage({ type: "alba" })}
               onOpenSales={() => setSubPage({ type: "sales" })}
               onOpenFavorites={() => setSubPage({ type: "favorites" })}
+              onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
               onOpenApartment={openApartmentFlow}
             />
           )}
@@ -4669,6 +4710,7 @@ function MyScreen({
   onOpenAlba,
   onOpenSales,
   onOpenFavorites,
+  onOpenRecentlyViewed,
   onOpenApartment,
 }: {
   nickname?: string;
@@ -4683,6 +4725,7 @@ function MyScreen({
   onOpenAlba: () => void;
   onOpenSales: () => void;
   onOpenFavorites: () => void;
+  onOpenRecentlyViewed: () => void;
   onOpenApartment?: () => void;
 }) {
   const services: IconItem[] = [
@@ -4759,10 +4802,9 @@ function MyScreen({
           관심목록
           <strong>{favoriteCount}</strong>
         </button>
-        <button type="button">
+        <button type="button" onClick={onOpenRecentlyViewed}>
           <Clock3 size={31} />
           최근 본
-          <strong>8</strong>
         </button>
         <button type="button">
           <Gem size={31} />
@@ -5396,16 +5438,22 @@ function FavoriteScreen({
   onBack,
   onProductClick,
   onFavorite,
+  title = "관심목록",
+  emptyTitle = "관심 상품이 없어요",
+  emptyBody = "마음에 드는 물건의 하트를 눌러 모아보세요.",
 }: {
   products: ProductListItem[];
   onBack: () => void;
   onProductClick: (id: string) => void;
   onFavorite: (id: string) => void;
+  title?: string;
+  emptyTitle?: string;
+  emptyBody?: string;
 }) {
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="관심목록"
+        title={title}
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
@@ -5414,8 +5462,8 @@ function FavoriteScreen({
       />
       {products.length === 0 ? (
         <StateBlock
-          title="관심 상품이 없어요"
-          body="마음에 드는 물건의 하트를 눌러 모아보세요."
+          title={emptyTitle}
+          body={emptyBody}
           actionLabel="돌아가기"
           onAction={onBack}
         />
