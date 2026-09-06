@@ -63,6 +63,7 @@ import {
   getMyProducts,
   updateProduct,
   uploadProductImage,
+  listCategories,
 } from "@/services";
 import {
   createOrGetChatRoom,
@@ -149,6 +150,34 @@ import {
   toDangerBusiness,
   toProductListItem,
 } from "./utils";
+
+const PRICE_FILTER_MIN = 0;
+const PRICE_FILTER_MAX = 1000000;
+const PRICE_FILTER_STEP = 10000;
+
+type ProductSort = "latest" | "price_asc" | "price_desc";
+
+interface ProductFilters {
+  category?: string;
+  tradeType?: "SALE" | "FREE";
+  priceMin?: number;
+  priceMax?: number;
+  sort: ProductSort;
+  excludeSold?: boolean;
+}
+
+const DEFAULT_PRODUCT_FILTERS: ProductFilters = { sort: "latest" };
+
+function hasActiveProductFilters(filters: ProductFilters): boolean {
+  return (
+    Boolean(filters.category) ||
+    Boolean(filters.tradeType) ||
+    filters.priceMin !== undefined ||
+    filters.priceMax !== undefined ||
+    filters.sort !== "latest" ||
+    Boolean(filters.excludeSold)
+  );
+}
 
 export default function GajiMarketApp() {
   const router = useRouter();
@@ -237,6 +266,14 @@ export default function GajiMarketApp() {
     setSubPage(null);
   }
   const [productFilter, setProductFilter] = useState("전체");
+  const [productFilters, setProductFilters] = useState<ProductFilters>(DEFAULT_PRODUCT_FILTERS);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    listCategories()
+      .then(setCategories)
+      .catch((error: unknown) => console.error("카테고리 목록을 불러오지 못했습니다.", error));
+  }, []);
   const [communityTab, setCommunityTab] = useState("동네생활");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
@@ -400,7 +437,20 @@ export default function GajiMarketApp() {
       return;
     }
     const controller = new AbortController();
-    listProducts({ page: 1, size: 60, regionId }, controller.signal)
+    listProducts(
+      {
+        page: 1,
+        size: 60,
+        regionId,
+        category: productFilters.category,
+        tradeType: productFilters.tradeType,
+        priceMin: productFilters.priceMin,
+        priceMax: productFilters.priceMax,
+        sort: productFilters.sort,
+        excludeSold: productFilters.excludeSold,
+      },
+      controller.signal,
+    )
       .then((page) => {
         setProducts(page.items.map(toProductListItem));
         setProductsTotal(page.total);
@@ -411,14 +461,24 @@ export default function GajiMarketApp() {
         console.error("상품 목록을 불러오지 못했습니다.", error);
       });
     return () => controller.abort();
-  }, [regionsLoaded, noRegionMatch, regionId]);
+  }, [regionsLoaded, noRegionMatch, regionId, productFilters]);
 
   // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
   const loadMoreProducts = useCallback(() => {
     if (isLoadingMoreProducts || products.length >= productsTotal) return;
     setIsLoadingMoreProducts(true);
     const nextPage = productPageRef.current + 1;
-    listProducts({ page: nextPage, size: 60, regionId })
+    listProducts({
+      page: nextPage,
+      size: 60,
+      regionId,
+      category: productFilters.category,
+      tradeType: productFilters.tradeType,
+      priceMin: productFilters.priceMin,
+      priceMax: productFilters.priceMax,
+      sort: productFilters.sort,
+      excludeSold: productFilters.excludeSold,
+    })
       .then((page) => {
         productPageRef.current = nextPage;
         setProducts((prev) => [...prev, ...page.items.map(toProductListItem)]);
@@ -428,7 +488,7 @@ export default function GajiMarketApp() {
         console.error("추가 상품을 불러오지 못했습니다.", error);
       })
       .finally(() => setIsLoadingMoreProducts(false));
-  }, [isLoadingMoreProducts, products.length, productsTotal, regionId]);
+  }, [isLoadingMoreProducts, products.length, productsTotal, regionId, productFilters]);
 
   // 목록 API는 description/tradePlace/판매자 정보가 없어서 상세보기 진입 시 상세 API로 채워 넣음.
   useEffect(() => {
@@ -1303,6 +1363,9 @@ export default function GajiMarketApp() {
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onFavorite={toggleFavorite}
               onRetry={() => setHasNetworkError(false)}
+              categories={categories}
+              filters={productFilters}
+              onApplyFilters={setProductFilters}
             />
           ) : activeTab === "community" ? (
             <CommunityScreen
@@ -1528,6 +1591,9 @@ function HomeScreen({
   onProductClick,
   onFavorite,
   onRetry,
+  categories,
+  filters,
+  onApplyFilters,
 }: {
   isLoading: boolean;
   hasError: boolean;
@@ -1546,7 +1612,17 @@ function HomeScreen({
   onProductClick: (id: string) => void;
   onFavorite: (id: string) => void;
   onRetry: () => void;
+  categories: string[];
+  filters: ProductFilters;
+  onApplyFilters: (filters: ProductFilters) => void;
 }) {
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [draftFilters, setDraftFilters] = useState<ProductFilters>(filters);
+
+  function openFilterSheet() {
+    setDraftFilters(filters);
+    setShowFilterSheet(true);
+  }
   // ref(useRef)로 재는 대신 state로 들고 있어야, 스켈레톤(isBooting)이 걷히고
   // sentinel이 뒤늦게 처음 마운트되는 순간에도 effect가 그 변화를 감지해 재실행된다
   // — hasMore useRef만 의존성으로 쓰면 sentinel이 아직 없을 때 딱 한 번 실행되고
@@ -1590,10 +1666,141 @@ function HomeScreen({
       />
       <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
         <span>{activeNeighborhood}</span>
-        <span>{secondaryNeighborhood}</span>
+        {secondaryNeighborhood && <span>· {secondaryNeighborhood}</span>}
         <ChevronDown size={16} />
       </button>
-      <ChipScroller items={PRODUCT_FILTERS} value={productFilter} onChange={onFilterChange} />
+      <div className={styles.filterLine}>
+        <button
+          type="button"
+          className={styles.roundTool}
+          aria-label="상세 필터"
+          onClick={openFilterSheet}
+        >
+          <SlidersHorizontal size={23} />
+          {hasActiveProductFilters(filters) && <span className={styles.notificationDot} />}
+        </button>
+        <ChipScroller items={PRODUCT_FILTERS} value={productFilter} onChange={onFilterChange} />
+      </div>
+
+      {showFilterSheet && (
+        <>
+          <div className={styles.filterSheetBackdrop} onClick={() => setShowFilterSheet(false)} />
+          <div className={styles.filterSheetPanel} role="dialog" aria-modal="true">
+            <div className={styles.sheetHandle}>
+              <span />
+            </div>
+
+            <span className={styles.filterSectionLabel}>카테고리</span>
+            <div className={styles.filterChipRow}>
+              {["전체", ...categories].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`${styles.filterChip} ${
+                    (c === "전체" && !draftFilters.category) || draftFilters.category === c
+                      ? styles.filterChipActive
+                      : ""
+                  }`}
+                  onClick={() => setDraftFilters((prev) => ({ ...prev, category: c === "전체" ? undefined : c }))}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <span className={styles.filterSectionLabel}>거래방식</span>
+            <div className={styles.filterChipRow}>
+              {([
+                { label: "전체", value: undefined },
+                { label: "판매", value: "SALE" as const },
+                { label: "나눔", value: "FREE" as const },
+              ]).map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  className={`${styles.filterChip} ${draftFilters.tradeType === option.value ? styles.filterChipActive : ""}`}
+                  onClick={() => setDraftFilters((prev) => ({ ...prev, tradeType: option.value }))}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <span className={styles.filterSectionLabel}>가격범위</span>
+            <div className={styles.priceSliderValues}>
+              <span>{(draftFilters.priceMin ?? PRICE_FILTER_MIN).toLocaleString()}원</span>
+              <span>
+                {draftFilters.priceMax === undefined || draftFilters.priceMax >= PRICE_FILTER_MAX
+                  ? `${PRICE_FILTER_MAX.toLocaleString()}원 이상`
+                  : `${draftFilters.priceMax.toLocaleString()}원`}
+              </span>
+            </div>
+            <PriceRangeSlider
+              min={PRICE_FILTER_MIN}
+              max={PRICE_FILTER_MAX}
+              step={PRICE_FILTER_STEP}
+              valueMin={draftFilters.priceMin ?? PRICE_FILTER_MIN}
+              valueMax={draftFilters.priceMax ?? PRICE_FILTER_MAX}
+              onChange={(min, max) =>
+                setDraftFilters((prev) => ({
+                  ...prev,
+                  priceMin: min <= PRICE_FILTER_MIN ? undefined : min,
+                  priceMax: max >= PRICE_FILTER_MAX ? undefined : max,
+                }))
+              }
+            />
+
+            <span className={styles.filterSectionLabel}>정렬</span>
+            <div className={styles.filterChipRow}>
+              {([
+                { label: "최신순", value: "latest" as const },
+                { label: "가격 낮은순", value: "price_asc" as const },
+                { label: "가격 높은순", value: "price_desc" as const },
+              ]).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.filterChip} ${draftFilters.sort === option.value ? styles.filterChipActive : ""}`}
+                  onClick={() => setDraftFilters((prev) => ({ ...prev, sort: option.value }))}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <section className={styles.toggleCard}>
+              <button
+                type="button"
+                onClick={() => setDraftFilters((prev) => ({ ...prev, excludeSold: !prev.excludeSold }))}
+              >
+                거래완료 제외
+                <span className={draftFilters.excludeSold ? styles.switchOn : ""} />
+              </button>
+            </section>
+
+            <button
+              type="button"
+              className={styles.filterApplyBtn}
+              onClick={() => {
+                onApplyFilters(draftFilters);
+                setShowFilterSheet(false);
+              }}
+            >
+              적용하기
+            </button>
+            <button
+              type="button"
+              className={styles.productActionCloseBtn}
+              onClick={() => {
+                onApplyFilters(DEFAULT_PRODUCT_FILTERS);
+                setShowFilterSheet(false);
+              }}
+            >
+              필터 초기화
+            </button>
+          </div>
+        </>
+      )}
 
       {hasError ? (
         <StateBlock
@@ -1653,6 +1860,55 @@ function ChipScroller({
           {item}
         </button>
       ))}
+    </div>
+  );
+}
+
+// 네이티브 range input 두 개를 겹쳐서 만드는 흔한 듀얼 슬라이더 구현 — 별도
+// 라이브러리 없이 손잡이 두 개(최소/최대)로 가격 구간을 고를 수 있게 한다.
+function PriceRangeSlider({
+  min,
+  max,
+  step,
+  valueMin,
+  valueMax,
+  onChange,
+}: {
+  min: number;
+  max: number;
+  step: number;
+  valueMin: number;
+  valueMax: number;
+  onChange: (min: number, max: number) => void;
+}) {
+  const percent = (value: number) => ((value - min) / (max - min)) * 100;
+
+  return (
+    <div className={styles.priceSlider}>
+      <div className={styles.priceSliderTrack}>
+        <div
+          className={styles.priceSliderRange}
+          style={{ left: `${percent(valueMin)}%`, right: `${100 - percent(valueMax)}%` }}
+        />
+      </div>
+      <input
+        type="range"
+        className={styles.priceSliderInput}
+        min={min}
+        max={max}
+        step={step}
+        value={valueMin}
+        onChange={(event) => onChange(Math.min(Number(event.target.value), valueMax - step), valueMax)}
+      />
+      <input
+        type="range"
+        className={styles.priceSliderInput}
+        min={min}
+        max={max}
+        step={step}
+        value={valueMax}
+        onChange={(event) => onChange(valueMin, Math.max(Number(event.target.value), valueMin + step))}
+      />
     </div>
   );
 }

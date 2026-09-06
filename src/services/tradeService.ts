@@ -108,6 +108,11 @@ export async function listProducts(
   const params = new URLSearchParams();
   if (query.category) params.set("category", query.category);
   if (query.tradeStatus) params.set("trade_status", query.tradeStatus);
+  if (query.tradeType) params.set("trade_type", query.tradeType);
+  if (query.priceMin !== undefined) params.set("price_min", String(query.priceMin));
+  if (query.priceMax !== undefined) params.set("price_max", String(query.priceMax));
+  if (query.sort) params.set("sort", query.sort);
+  if (query.excludeSold) params.set("exclude_sold", "true");
   if (query.q) params.set("q", query.q);
   if (query.regionId !== undefined) params.set("region_id", String(query.regionId));
   params.set("page", String(query.page ?? 1));
@@ -123,6 +128,20 @@ export async function listProducts(
 
   const payload: ApiProductPage = await response.json();
   return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 실제 존재하는 카테고리 목록. 프론트에 하드코딩하면 데이터가 바뀔 때마다
+// 같이 배포해야 해서, 서버에서 그때그때 실제 값을 받아온다.
+export async function listCategories(signal?: AbortSignal): Promise<string[]> {
+  const response = await fetch(apiUrl("/api/v1/trades/products/categories"), {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error("카테고리 목록을 불러오지 못했습니다.");
+  }
+  const payload: { items: string[] } = await response.json();
+  return payload.items;
 }
 
 // 내 판매내역. "판매내역에 예전 글이 안 보임" 버그의 원인이 여기 있었다 —
