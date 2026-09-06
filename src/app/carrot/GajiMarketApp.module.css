@@ -1256,6 +1256,8 @@
 }
 
 .mapCanvas {
+  isolation: isolate;
+  z-index: 0;
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -1321,26 +1323,37 @@
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: 18px 18px 18px 5px;
-  background: var(--danger-pin);
-  color: var(--danger-pin-text);
+  border-radius: 50%;
+  background: transparent;
   display: grid;
   place-items: center;
   position: relative;
   padding: 0;
-  transform: translate(-50%, -100%) rotate(-45deg);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.32);
+  transform: translate(-50%, -50%);
   cursor: pointer;
 }
 
+.dangerMapMarker::before {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--danger-pin) 42%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger-pin) 18%, transparent);
+}
+
 .dangerMapMarker span {
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  transform: rotate(45deg);
-  font-size: 18px;
-  font-weight: 950;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--danger-pin);
+  box-shadow: 0 2px 6px rgba(25, 28, 33, 0.28);
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -1813,6 +1826,8 @@
 
 /* Kakao Map Frame & Dark Mode Tiles */
 .kakaoMapFrame {
+  isolation: isolate;
+  z-index: 0;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2146,6 +2161,7 @@
 }
 
 .localSheet {
+  isolation: isolate;
   position: absolute;
   z-index: 5;
   left: 0;
@@ -3646,19 +3662,11 @@
   width: 31px;
   height: 31px;
   flex: 0 0 31px;
-  overflow: visible;
-}
-
-.brandCore {
-  fill: var(--color-primary-pressed);
-}
-
-.brandLeaf {
-  fill: var(--color-success);
+  overflow: hidden;
 }
 
 .brandWord {
-  color: var(--color-primary-pressed);
+  color: #ff8a3d;
   font-family:
     "Arial Rounded MT Bold",
     "Pretendard",
@@ -7644,3 +7652,83 @@
 .congestionZoneTop .seedZoneBadge { display: inline-flex; }
 .congestionZoneTop .seedPillDot { margin-top: 0; }
 .stage:not([data-theme="light"]) .congestionSummaryCard { background: var(--color-surface); }
+
+/* Pastel-orange cluster marker: visually matches restaurant apricot/orange markers */
+.restaurantClusterMarker {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #F5A66A;
+  border-radius: 50%;
+  background: #FFD6B0;
+  color: #7A3E10;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgb(255 111 15 / 22%);
+  cursor: pointer;
+}
+.restaurantClusterMarker:active { background: #FFC48E; }
+.restaurantClusterMarker:focus-visible,
+.restaurantClusterRow:focus-visible,
+.restaurantClusterClose:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.restaurantClusterSheet { padding: 4px 0 24px; color: var(--color-text); }
+.restaurantSheet.sheet_half { height: min(52%, 420px); overflow-y: auto; }
+.restaurantClusterHeader { display: flex; gap: 12px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--color-line); }
+.restaurantClusterHeader h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.restaurantClusterHeader p { margin: 4px 0 0; color: var(--color-muted); font-size: 12px; }
+.restaurantClusterCount { min-width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--color-surface-2); font-weight: 600; }
+.restaurantClusterClose { margin-left: auto; flex-shrink: 0; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--color-surface-2); color: var(--color-text); cursor: pointer; }
+.restaurantClusterList { margin: 0; padding: 0; list-style: none; }
+.restaurantClusterList li + li { border-top: 1px solid var(--color-line); }
+.restaurantClusterRow { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border: 0; background: transparent; color: var(--color-text); text-align: left; cursor: pointer; font-family: inherit; }
+.restaurantClusterRow:active { background: var(--color-surface-2); }
+.restaurantClusterThumbnail { width: 56px; height: 56px; flex-shrink: 0; display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: var(--color-surface-2); color: var(--color-muted); }
+.restaurantClusterThumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.restaurantClusterCopy { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.restaurantClusterCopy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.restaurantClusterCopy small { color: var(--color-muted); font-size: 12px; line-height: 1.4; }
+.restaurantClusterBenefit { color: var(--color-primary); font-size: 11px; }
+.congestionHeatmap { position: relative; width: var(--heat-size); height: var(--heat-size); display: grid; place-items: center; pointer-events: none; }
+.congestionHeatmapField { position: absolute; inset: 0; pointer-events: none; }
+.congestionHeatmap .congestionMapLabel {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 6px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--heat-label-color);
+  text-align: center;
+  text-shadow: -1px 0 var(--heat-label-halo), 1px 0 var(--heat-label-halo), 0 -1px var(--heat-label-halo), 0 1px var(--heat-label-halo);
+  box-shadow: none;
+}
+.congestionHeatmap .congestionMapTitle { font-size: 12px; font-weight: 650; }
+.congestionHeatmap .congestionMapStatus { font-size: 11px; font-weight: 600; }
+.congestionHeatmap .congestionMapStatus::before { display: none; }
+.congestionHeatmap .congestionMapLabel:active { opacity: 0.8; }
+.congestionHeatmap .congestionMapLabel::after { display: none; }
+
+
+/* Transit keeps the map visible above a scrollable station list. */
+.transitSheet.sheet_half {
+  height: min(58%, 460px);
+  overflow-y: auto;
+}
+.transitSheet .localDots { display: none; }
+.transitCanvas .kakaoMapFrame { height: auto; bottom: min(58%, 460px); }
+.transitCanvas[data-sheet="collapsed"] .kakaoMapFrame { bottom: calc(140px + env(safe-area-inset-bottom)); }
+.transitCanvas .mapControls { top: 96px; gap: 8px; }
+.transitCanvas .mapControls button { width: 42px; height: 42px; }
+
+.transitCanvas .mapSearchAgain { top: auto; bottom: calc(min(58%, 460px) + 12px); }
+.transitCanvas[data-sheet="collapsed"] .mapSearchAgain { bottom: calc(152px + env(safe-area-inset-bottom)); }

@@ -9,7 +9,10 @@ export interface CongestionZone {
   lng: number;
   distance: string;
   currentScore: number; // 0 ~ 100%
-  baselineScore: number;
+  baselineScore?: number;
+  levelLabel?: string;
+  populationMin?: number;
+  populationMax?: number;
   level: CongestionLevel;
   summary: string;
   updatedAt: string;
@@ -458,7 +461,7 @@ export function getCongestionLevelFromScore(score: number): CongestionLevel {
 }
 
 export function getCongestionDelta(zone: Pick<CongestionZone, "currentScore" | "baselineScore">): number {
-  return zone.currentScore - zone.baselineScore;
+  return zone.currentScore - (zone.baselineScore ?? zone.currentScore);
 }
 
 export function getCongestionZonesForNeighborhood(
@@ -573,4 +576,32 @@ export function summarizeCongestion(zones: CongestionZone[]) {
     peakZone,
     crowdedCount,
   };
+}
+
+
+/** Query the visible map only. No generated places or scores on API failure. */
+export async function fetchCongestionZones(
+  bounds: { south: number; north: number; west: number; east: number },
+  signal?: AbortSignal,
+): Promise<CongestionZone[]> {
+  const params = new URLSearchParams({
+    sw_lat: String(bounds.south), sw_lng: String(bounds.west),
+    ne_lat: String(bounds.north), ne_lng: String(bounds.east), limit: "30",
+  });
+  const response = await fetch(`/api/v1/local/congestion-zones?${params}`, { signal, cache: "no-store" });
+  if (!response.ok) throw new Error("혼잡도 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error("혼잡도 응답을 확인하지 못했어요.");
+  return data.filter((zone): zone is CongestionZone =>
+    zone && zone.source === "seoul_citydata_api" && typeof zone.name === "string" &&
+    typeof zone.id === "string" && Number.isFinite(zone.currentScore) &&
+    Number.isFinite(zone.lat) && Number.isFinite(zone.lng) &&
+    zone.lat >= bounds.south && zone.lat <= bounds.north &&
+    zone.lng >= bounds.west && zone.lng <= bounds.east,
+  );
+}
+
+export function getCongestionPopulationLabel(zone: CongestionZone): string {
+  if (!Number.isFinite(zone.populationMin) || !Number.isFinite(zone.populationMax)) return "";
+  return `약 ${zone.populationMin!.toLocaleString("ko-KR")}~${zone.populationMax!.toLocaleString("ko-KR")}명`;
 }
