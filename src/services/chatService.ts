@@ -196,7 +196,9 @@ export async function sendImageMessage(chatRoomId: number, file: File): Promise<
 
   const putResponse = await fetch(upload_url, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    // 상품 이미지와 동일한 이유 — presign 서명에 ACL(public-read)이 포함돼 있어서
+    // 이 헤더가 빠지면 NCP가 SignatureDoesNotMatch(403)로 거부한다.
+    headers: { "Content-Type": file.type, "x-amz-acl": "public-read" },
     body: file,
   });
   if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");

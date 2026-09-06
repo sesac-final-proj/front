@@ -284,7 +284,9 @@ export async function uploadProductImage(productId: number, file: File): Promise
 
   const putResponse = await fetch(upload_url, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    // 백엔드 presign이 ACL(public-read)까지 서명에 포함시켜서, 이 헤더가 빠지면
+    // NCP가 SignatureDoesNotMatch(403)로 거부한다 — 반드시 같이 보내야 한다.
+    headers: { "Content-Type": file.type, "x-amz-acl": "public-read" },
     body: file,
   });
   if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
