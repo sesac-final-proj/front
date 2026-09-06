@@ -67,6 +67,7 @@ export type SubPage =
   | { type: "settings" }
   | { type: "sales" }
   | { type: "favorites" }
+  | { type: "recently-viewed" }
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" }
