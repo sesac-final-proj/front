@@ -236,6 +236,7 @@ interface ApiProductCreateRequest {
   description?: string | null;
   desired_price?: number | null;
   trade_type?: TradeProduct["tradeType"];
+  trade_place?: string | null;
 }
 
 interface ApiProductCreated {
@@ -249,6 +250,7 @@ export async function createProduct(input: {
   description: string;
   desiredPrice: number | null;
   tradeType: TradeProduct["tradeType"];
+  tradePlace?: string;
 }): Promise<{ id: number }> {
   const token = getAuthToken();
   if (!token) throw new AuthRequiredError();
@@ -259,6 +261,7 @@ export async function createProduct(input: {
     description: input.description,
     desired_price: input.desiredPrice,
     trade_type: input.tradeType,
+    trade_place: input.tradePlace,
   };
 
   const response = await fetch(apiUrl("/api/v1/trades/products"), {

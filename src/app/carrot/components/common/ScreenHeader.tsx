@@ -10,7 +10,7 @@ export function ScreenHeader({
   actions,
   compact = false,
 }: {
-  title: string;
+  title: React.ReactNode;
   leading?: React.ReactNode;
   titleAccessory?: React.ReactNode;
   actions?: React.ReactNode;

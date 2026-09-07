@@ -12,6 +12,33 @@ interface KakaoKeywordResponse {
   documents: KakaoKeywordDocument[];
 }
 
+// 역지오코딩(좌표 -> 주소) — 거래 희망 장소를 지도에서 직접 찍을 때 씀.
+interface KakaoAddressDocument {
+  address?: { address_name: string } | null;
+  road_address?: { building_name: string; address_name: string } | null;
+}
+
+interface KakaoAddressResponse {
+  documents: KakaoAddressDocument[];
+}
+
+async function reverseGeocode(lat: number, lng: number, apiKey: string): Promise<string | null> {
+  const params = new URLSearchParams({ x: String(lng), y: String(lat) });
+  const res = await fetch(`https://dapi.kakao.com/v2/local/geo/coord2address.json?${params}`, {
+    headers: { Authorization: `KakaoAK ${apiKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Kakao API error ${res.status}`);
+  }
+  const data: KakaoAddressResponse = await res.json();
+  const doc = data.documents?.[0];
+  if (!doc) return null;
+  // 건물명이 있으면(아파트/상가 등) 그게 사람이 알아보기 쉬우니 도로명 주소보다 우선.
+  const roadName = doc.road_address?.building_name;
+  return (roadName && roadName.trim()) || doc.road_address?.address_name || doc.address?.address_name || null;
+}
+
 async function searchKeyword(
   query: string,
   apiKey: string,
@@ -37,17 +64,34 @@ async function searchKeyword(
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const lat = searchParams.get("lat");
+  const lng = searchParams.get("lng");
   const query = searchParams.get("query")?.trim();
   // 항상 존재하는 동네 이름(neighborhood_name) — query 검색의 지역 편향 기준점으로 쓰고,
   // query가 아예 매칭 안 되면 최종 폴백으로도 쓴다.
   const fallback = searchParams.get("fallback")?.trim();
-  if (!query) {
-    return NextResponse.json({ error: "Missing query" }, { status: 400 });
+  if (!query && !(lat && lng)) {
+    return NextResponse.json({ error: "Missing query or lat/lng" }, { status: 400 });
   }
 
   const kakaoApiKey = process.env.KAKAO_REST_API_KEY?.trim();
   if (!kakaoApiKey) {
     return NextResponse.json({ error: "Kakao API key not configured" }, { status: 503 });
+  }
+
+  if (lat && lng) {
+    try {
+      const name = await reverseGeocode(Number(lat), Number(lng), kakaoApiKey);
+      if (!name) return NextResponse.json({ error: "No match" }, { status: 404 });
+      return NextResponse.json({ name, lat: Number(lat), lng: Number(lng) });
+    } catch (error) {
+      console.error("[Kakao reverse geocode] Fetch failed:", error);
+      return NextResponse.json({ error: "Fetch failed" }, { status: 502 });
+    }
+  }
+
+  if (!query) {
+    return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
   try {

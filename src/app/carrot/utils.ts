@@ -3,7 +3,14 @@
 import { getKakaoPlaceUrl } from "@/services";
 import type { CongestionZone, Restaurant, TradeProduct } from "@/types";
 import type { ChatMessageDto, ChatRoomDto } from "@/services/chatService";
-import { API_BASE_URL, DANGER_VISUALS, NAVER_MAP_SCRIPT_ID, NEIGHBORHOOD_DISTRICTS, THEME_STORAGE_KEY } from "./constants";
+import {
+  API_BASE_URL,
+  DANGER_VISUALS,
+  NAVER_MAP_SCRIPT_ID,
+  NEIGHBORHOOD_DISTRICTS,
+  NEIGHBORHOOD_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "./constants";
 import type {
   ChatMessageUi,
   ChatRoom,
@@ -279,6 +286,34 @@ export function subscribeTheme(onChange: () => void) {
 // 바인딩 제약) setter로 감싼다 — GajiMarketApp.tsx의 changeTheme이 이걸 호출한다.
 export function setSessionTheme(value: ThemeMode) {
   sessionTheme = value;
+}
+
+export interface NeighborhoodCache {
+  primary: string;
+  secondary: string | null;
+}
+
+// 로그인 유저는 대표 동네가 서버(User.region)에도 저장되지만, 게스트는 저장할
+// 계정이 없어 이 로컬 캐시가 유일한 저장소다. 부동네(secondary)는 서버에 아예
+// 대응 개념이 없어 로그인 여부와 무관하게 항상 이 캐시로만 유지된다.
+export function readNeighborhoodCache(): NeighborhoodCache | null {
+  try {
+    const saved = window.localStorage.getItem(NEIGHBORHOOD_STORAGE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (typeof parsed?.primary !== "string") return null;
+    return { primary: parsed.primary, secondary: typeof parsed.secondary === "string" ? parsed.secondary : null };
+  } catch {
+    return null;
+  }
+}
+
+export function writeNeighborhoodCache(cache: NeighborhoodCache) {
+  try {
+    window.localStorage.setItem(NEIGHBORHOOD_STORAGE_KEY, JSON.stringify(cache));
+  } catch {
+    // 저장 불가(프라이빗 모드 등)면 이번 세션만 상태로 유지 — 조용히 넘어간다.
+  }
 }
 
 export function formatPrice(product: ProductListItem) {

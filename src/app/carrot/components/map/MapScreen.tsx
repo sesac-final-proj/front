@@ -54,7 +54,7 @@ export function createDangerMarkerContent(
 
 export interface MapScreenProps {
   activeNeighborhood: string;
-  secondaryNeighborhood: string;
+  secondaryNeighborhood: string | null;
   categories: LocalCategory[];
   selectedCategory: string;
   sheetState: "collapsed" | "half" | "expanded";

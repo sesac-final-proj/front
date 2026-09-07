@@ -2,24 +2,29 @@
 
 import React, { useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem } from "../../types";
 import { IconButton } from "../common/IconButton";
 import { ScreenHeader } from "../common/ScreenHeader";
+import { TradePlacePickerScreen } from "./TradePlacePickerScreen";
 
 export function ProductFormScreen({
   onBack,
   onSubmit,
   initialProduct,
+  initialCenter,
 }: {
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, imageFile: File | null) => void;
   initialProduct?: ProductListItem;
+  initialCenter?: { lat: number; lng: number };
 }) {
   const isEdit = Boolean(initialProduct);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialProduct?.thumbnailUrl ?? null);
   const imageFileRef = useRef<File | null>(null);
+  const [tradePlace, setTradePlace] = useState<string | undefined>(initialProduct?.tradePlace);
+  const [showPlacePicker, setShowPlacePicker] = useState(false);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -91,10 +96,34 @@ export function ProductFormScreen({
             required
           />
         </label>
+        <input type="hidden" name="tradePlace" value={tradePlace ?? ""} />
+        <span className={styles.formSectionLabel}>거래 설정</span>
+        <button
+          type="button"
+          className={styles.tradePlaceRow}
+          onClick={() => setShowPlacePicker(true)}
+        >
+          <span>거래 희망 장소</span>
+          <span className={styles.tradePlaceRowValue}>
+            {tradePlace || "위치 추가"}
+            <ChevronRight size={20} />
+          </span>
+        </button>
         <button type="submit" className={styles.primaryButton}>
           {isEdit ? "수정하기" : "등록하기"}
         </button>
       </form>
+      {showPlacePicker && (
+        <TradePlacePickerScreen
+          initialLat={initialCenter?.lat}
+          initialLng={initialCenter?.lng}
+          onCancel={() => setShowPlacePicker(false)}
+          onConfirm={(place) => {
+            setTradePlace(place.name);
+            setShowPlacePicker(false);
+          }}
+        />
+      )}
     </section>
   );
 }
