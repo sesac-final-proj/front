@@ -9,7 +9,6 @@ export interface FavoriteScreenProps {
   products: ProductListItem[];
   onBack: () => void;
   onProductClick: (id: string) => void;
-  onFavorite: (id: string) => void;
   title?: string;
   emptyTitle?: string;
   emptyBody?: string;
@@ -19,7 +18,6 @@ export function FavoriteScreen({
   products,
   onBack,
   onProductClick,
-  onFavorite,
   title = "관심목록",
   emptyTitle = "관심 상품이 없어요",
   emptyBody = "마음에 드는 물건의 하트를 눌러 모아보세요.",
@@ -48,7 +46,6 @@ export function FavoriteScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => onFavorite(product.id)}
             />
           ))}
         </div>
