@@ -26,7 +26,10 @@ pipeline {
         stage('Load Env') {
             steps {
                 withCredentials([file(credentialsId: 'front-env-file', variable: 'ENV_FILE')]) {
-                    sh 'cp $ENV_FILE .env'
+                    // Next.js는 .env.prod라는 파일명을 자동으로 읽지 않으므로, 운영 시크릿은
+                    // .env.prod로 보관하고 빌드가 실제로 읽는 .env로도 복사해준다.
+                    sh 'cp $ENV_FILE .env.prod'
+                    sh 'cp .env.prod .env'
                 }
             }
         }

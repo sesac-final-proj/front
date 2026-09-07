@@ -58,6 +58,11 @@ export const DANGER_VISUALS: Record<DangerTone, DangerVisual> = {
 };
 
 export const THEME_STORAGE_KEY = "carrot-theme";
+// 새로고침해도 골랐던 동네(대표/부동네)가 유지되도록 — 로그인 유저는 대표 동네가
+// 서버(User.region)에도 저장되지만, 게스트는 저장할 계정이 없어 이 로컬 캐시가
+// 유일한 저장소다. 부동네는 서버에 아예 대응 개념이 없어 로그인 여부와 무관하게
+// 항상 이 캐시로만 유지된다.
+export const NEIGHBORHOOD_STORAGE_KEY = "carrot-neighborhoods";
 
 export const initialProducts: ProductListItem[] = [
   {

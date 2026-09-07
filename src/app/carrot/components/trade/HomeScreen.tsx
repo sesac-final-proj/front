@@ -206,7 +206,7 @@ export function HomeScreen({
   isLoading: boolean;
   hasError: boolean;
   activeNeighborhood: string;
-  secondaryNeighborhood: string;
+  secondaryNeighborhood: string | null;
   productFilter: string;
   products: ProductListItem[];
   onLoadMore: () => void;
@@ -249,7 +249,13 @@ export function HomeScreen({
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title={activeNeighborhood}
+        title={
+          <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
+            <span>{activeNeighborhood}</span>
+            {secondaryNeighborhood && <span>· {secondaryNeighborhood}</span>}
+            <ChevronDown size={16} />
+          </button>
+        }
         leading={<MapPin className={styles.titlePin} size={28} fill="currentColor" />}
         actions={
           <>
@@ -266,11 +272,6 @@ export function HomeScreen({
           </>
         }
       />
-      <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
-        <span>{activeNeighborhood}</span>
-        {secondaryNeighborhood && <span>· {secondaryNeighborhood}</span>}
-        <ChevronDown size={16} />
-      </button>
       <div className={styles.filterLine}>
         <button
           type="button"

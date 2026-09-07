@@ -376,9 +376,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 1px 8px;
-  font-size: 18px;
-  font-weight: 700;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  letter-spacing: inherit;
 }
 
 .neighborhoodSwitch span:nth-child(2) {
@@ -907,6 +909,84 @@
   color: var(--color-dim);
 }
 
+.tradePlacePicker {
+  position: fixed;
+  inset: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.tradePlacePickerHeader {
+  position: relative;
+  padding: calc(14px + env(safe-area-inset-top)) 20px 20px;
+  background: var(--color-bg);
+}
+
+.tradePlacePickerClose {
+  margin-bottom: 12px;
+}
+
+.tradePlacePickerHeader h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--color-text);
+}
+
+.tradePlacePickerHeader p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-dim);
+}
+
+.tradePlacePickerMapWrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.tradePlacePickerMap {
+  position: absolute;
+  inset: 0;
+}
+
+.tradePlacePickerPin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+
+.tradePlacePickerTooltip {
+  position: absolute;
+  top: calc(50% - 92px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.tradePlacePickerFooter {
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+}
+
 .statusPanel {
   margin-top: 22px;
   padding: 17px;
@@ -1008,6 +1088,36 @@
   min-height: 150px;
   padding-block: 13px;
   resize: vertical;
+}
+
+.formSectionLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  margin: 4px 0 -6px;
+}
+
+.tradePlaceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tradePlaceRowValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-dim);
+  font-weight: 600;
 }
 
 .formStack input:focus,

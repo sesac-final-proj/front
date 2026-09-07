@@ -34,7 +34,7 @@ export function BottomSheet({
 }: {
   sheet: SheetId;
   activeNeighborhood: string;
-  secondaryNeighborhood: string;
+  secondaryNeighborhood: string | null;
   onClose: () => void;
   onSelectPrimary: (dongName: string) => void;
   onRemoveNeighborhood: (target: "primary" | "secondary") => void;
@@ -83,7 +83,7 @@ export function BottomSheet({
             <div className={styles.myRegionList}>
               {[
                 { name: activeNeighborhood, target: "primary" as const },
-                { name: secondaryNeighborhood, target: "secondary" as const },
+                ...(secondaryNeighborhood ? [{ name: secondaryNeighborhood, target: "secondary" as const }] : []),
               ].map(({ name, target }) => (
                 <div className={styles.myRegionRow} key={target}>
                   <button
@@ -95,20 +95,25 @@ export function BottomSheet({
                     <span className={target === "primary" ? styles.myRegionRadioOn : ""} />
                   </button>
                   <span className={styles.myRegionName}>{name}</span>
-                  <button
-                    type="button"
-                    className={styles.myRegionRemove}
-                    aria-label={`${name} 삭제`}
-                    onClick={() => onRemoveNeighborhood(target)}
-                  >
-                    <X size={18} />
-                  </button>
+                  {/* 동네가 1개뿐이면 마지막 하나는 못 지운다 — secondary가 있을 때만 X가 보인다. */}
+                  {secondaryNeighborhood && (
+                    <button
+                      type="button"
+                      className={styles.myRegionRemove}
+                      aria-label={`${name} 삭제`}
+                      onClick={() => onRemoveNeighborhood(target)}
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-            <button type="button" className={styles.myRegionAddBtn} onClick={onOpenRegionSearch}>
-              <Plus size={18} /> 동네 추가
-            </button>
+            {!secondaryNeighborhood && (
+              <button type="button" className={styles.myRegionAddBtn} onClick={onOpenRegionSearch}>
+                <Plus size={18} /> 동네 추가
+              </button>
+            )}
           </>
         )}
         {sheet === "notifications" && (
