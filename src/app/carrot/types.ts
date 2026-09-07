@@ -71,7 +71,7 @@ export type SubPage =
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" }
-  | { type: "region-search" };
+  | { type: "region-search"; returnTo?: "dream-dashboard" };
 
 export type ProductListItem = {
   id: string;
@@ -127,6 +127,14 @@ export type ChatRoom = {
   verified: boolean;
   muted: boolean;
   productId?: string;
+  onClick?: () => void;
+  // 채팅방 헤더/물품카드용 — 백엔드가 ChatRoomResponse에 얹어준 상대방/물품 요약.
+  counterpartNickname?: string;
+  counterpartMannerTemp?: number;
+  counterpartNeighborhoodName?: string;
+  productThumbnailUrl?: string;
+  productPrice?: number | null;
+  productTradeStatus?: TradeStatus;
 };
 
 export type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
@@ -156,6 +164,9 @@ export type DangerVisual = {
   label: string;
   emoji: string;
   tone: DangerTone;
+  badgeLabel?: string;
+  subLabel?: string;
+  helperEmoji?: string;
 };
 
 export type DonationFacility = DreamFacility;

@@ -17,10 +17,16 @@ export function DangerSignalCallout({ business, onClose }: DangerSignalCalloutPr
 
   return (
     <aside className={`${styles.dangerCallout} ${toneClass}`} role="status" aria-live="polite">
-      <span className={styles.dangerCalloutAvatar} aria-hidden="true">{visual.emoji}</span>
+      <div className={styles.dangerCalloutAvatarWrap}>
+        <span className={styles.dangerCalloutMascot} aria-hidden="true" />
+        <span className={styles.dangerCalloutBadge} aria-hidden="true">{visual.emoji}</span>
+      </div>
       <div className={styles.dangerCalloutBubble}>
         <div className={styles.dangerCalloutTop}>
-          <span>안전 알림</span>
+          <span className={styles.dangerCalloutPill}>
+            <span className={styles.dangerPillDot} />
+            {visual.label}
+          </span>
           <button type="button" onClick={onClose} aria-label="위험 알림 닫기">
             <X size={16} />
           </button>

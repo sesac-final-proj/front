@@ -74,7 +74,8 @@ export function AlbaMainScreen({
 
   return (
     <section className={styles.albaScreen}>
-      <header className={styles.albaHeader}>
+      <div className={styles.albaScrollContent}>
+        <header className={styles.albaHeader}>
         <button type="button" onClick={onBack} aria-label="닫기" className={styles.iconButton}>
           <X size={26} />
         </button>
@@ -87,7 +88,7 @@ export function AlbaMainScreen({
             <Menu size={26} />
           </button>
         </div>
-      </header>
+        </header>
 
       {currentTab === "home" && (
         <>
@@ -250,6 +251,7 @@ export function AlbaMainScreen({
           </div>
         </section>
       )}
+      </div>
 
       <button type="button" className={styles.albaFloatingWrite} onClick={onWrite} aria-label="알바 공고 작성">
         <Plus size={22} strokeWidth={2.5} />

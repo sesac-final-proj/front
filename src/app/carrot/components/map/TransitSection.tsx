@@ -1,7 +1,7 @@
 "use client";
 
 import { Bike, ChevronRight, MapPin, RefreshCw, TrainFront } from "lucide-react";
-import type { TransitKind, TransitStop } from "@/services/transitService";
+import { getSubwayLineColor, getSubwayLineNames, type TransitKind, type TransitStop } from "@/services/transitService";
 import styles from "./TransitSection.module.css";
 
 interface Props {
@@ -36,7 +36,7 @@ export function TransitSection({ kind, stops, selectedId, total, fetchedAt, load
         : <>
           {selected && <div className={styles.detail} role="status">
             <strong>{selected.name}</strong>
-            <p>{bike ? selected.bikes_available === null ? "대여 가능 대수 확인 불가" : `현재 대여 가능한 자전거 ${selected.bikes_available}대` : selected.line || "호선 정보 없음"}</p>
+            {bike ? <p>{selected.bikes_available === null ? "대여 가능 대수 확인 불가" : `현재 대여 가능한 자전거 ${selected.bikes_available}대`}</p> : <LineBadges line={selected.line} />}
             {bike && selected.racks !== null && <small>거치대 {selected.racks}개 · 현장 상황에 따라 달라질 수 있어요.</small>}
             <a href={`https://map.kakao.com/link/to/${encodeURIComponent(selected.name)},${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer">카카오맵 길찾기 <ChevronRight size={15} /></a>
           </div>}
@@ -44,7 +44,7 @@ export function TransitSection({ kind, stops, selectedId, total, fetchedAt, load
             {stops.map((stop) => <li key={stop.id}>
               <button type="button" className={styles.stop} aria-pressed={stop.id === selectedId} onClick={() => onSelect(stop)}>
                 <span className={`${styles.icon} ${bike ? styles.bike : styles.subway}`}><Icon size={22} aria-hidden="true" /></span>
-                <span className={styles.name}><strong>{stop.name}</strong><small>{bike ? stop.racks === null ? "따릉이 대여소" : `거치대 ${stop.racks}개` : stop.line || "호선 정보 없음"}</small></span>
+                <span className={styles.name}><strong>{stop.name}</strong>{bike ? <small>{stop.racks === null ? "따릉이 대여소" : `거치대 ${stop.racks}개`}</small> : <LineBadges line={stop.line} />}</span>
                 {bike ? <span className={`${styles.count} ${stop.bikes_available === 0 ? styles.empty : ""}`}>{stop.bikes_available === null ? "확인 불가" : <><b>{stop.bikes_available}</b>대<small>{stop.bikes_available === 0 ? "대여 불가" : "대여 가능"}</small></>}</span> : <ChevronRight size={18} aria-hidden="true" />}
               </button>
             </li>)}
@@ -58,4 +58,9 @@ export function TransitSection({ kind, stops, selectedId, total, fetchedAt, load
       </p>
     </section>
   );
+}
+
+function LineBadges({ line }: { line: string | null }) {
+  const lines = getSubwayLineNames(line);
+  return <span className={styles.lineBadges}>{lines.length > 0 ? lines.map((name) => <span key={name} className={styles.lineBadge} style={{ "--line-color": getSubwayLineColor(name) } as React.CSSProperties}>{name}</span>) : <small>호선 정보 없음</small>}</span>;
 }

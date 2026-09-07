@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, UserRound, Heart, House, Crosshair } from "lucide-react";
+import { Search, UserRound, House, Crosshair, X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type {
   LocalCategory,
@@ -20,7 +20,7 @@ import {
   getDangerVisual,
   restaurantToLocalBusiness,
 } from "../../utils";
-import { fetchCongestionZones } from "@/services";
+import { fetchCongestionZones, getCongestionPopulationLabel } from "@/services";
 import { StateBlock } from "../common";
 import { KakaoMapLayer } from "./KakaoMapLayer";
 import { RestaurantClusterListSheet } from "./RestaurantClusterListSheet";
@@ -106,7 +106,6 @@ export function MapScreen({
   }, []);
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const isCongestionMode = selectedCategory === "congestion";
-  const nextState = sheetState === "collapsed" ? "half" : sheetState === "half" ? "expanded" : "collapsed";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [centerRequest, setCenterRequest] = useState(0);
   const [selectedDanger, setSelectedDanger] = useState<LocalBusiness | null>(null);
@@ -123,23 +122,77 @@ export function MapScreen({
   const currentDeltaYRef = useRef(0);
   const hasMovedSignificantRef = useRef(false);
   const touchStartY = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
   const wheelTimeoutRef = useRef<number | null>(null);
+  const animationTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    originStateRef.current = sheetState;
+  }, [sheetState]);
+
+  const getSnapHeights = useCallback(() => {
+    const parent = sheetRef.current?.parentElement;
+    const parentH = parent ? parent.clientHeight : (typeof window !== "undefined" ? window.innerHeight : 800);
+    const expandedH = Math.max(200, parentH - 60);
+    const halfH = Math.min(parentH * 0.52, 420);
+    const collapsedH = 198;
+    return { expanded: expandedH, half: halfH, collapsed: collapsedH };
+  }, []);
+
+  const transitionToState = useCallback((targetState: "collapsed" | "half" | "expanded") => {
+    const sheetEl = sheetRef.current;
+    if (!sheetEl) {
+      onSheetStateChange(targetState);
+      return;
+    }
+
+    if (animationTimeoutRef.current) {
+      window.clearTimeout(animationTimeoutRef.current);
+      animationTimeoutRef.current = null;
+    }
+
+    const origin = originStateRef.current;
+    if (targetState === origin) {
+      sheetEl.style.transition = "transform 260ms cubic-bezier(0.25, 1, 0.5, 1)";
+      sheetEl.style.transform = "translate3d(0, 0, 0)";
+      animationTimeoutRef.current = window.setTimeout(() => {
+        sheetEl.style.transition = "";
+        sheetEl.style.transform = "";
+      }, 260);
+      return;
+    }
+
+    const heights = getSnapHeights();
+    const currentH = heights[origin];
+    const targetH = heights[targetState];
+    const targetDeltaY = currentH - targetH;
+
+    sheetEl.style.transition = "transform 280ms cubic-bezier(0.25, 1, 0.5, 1)";
+    sheetEl.style.transform = `translate3d(0, ${targetDeltaY}px, 0)`;
+
+    animationTimeoutRef.current = window.setTimeout(() => {
+      sheetEl.style.transition = "none";
+      sheetEl.style.transform = "translate3d(0, 0, 0)";
+      onSheetStateChange(targetState);
+      window.requestAnimationFrame(() => {
+        sheetEl.style.transition = "";
+        sheetEl.style.transform = "";
+      });
+    }, 280);
+  }, [getSnapHeights, onSheetStateChange]);
 
   const handleSelectTransit = useCallback((stop: TransitStop) => {
     setSelectedTransitId(stop.id);
     setTransitFocus(stop);
-    onSheetStateChange("half");
-    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "instant" }));
-  }, [onSheetStateChange]);
+    transitionToState("half");
+    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "smooth" }));
+  }, [transitionToState]);
 
   const onGlobalPointerMove = useCallback((e: PointerEvent) => {
     const deltaY = e.clientY - dragStartYRef.current;
 
     if (!isDraggingRef.current) {
       if (Math.abs(deltaY) > 5) {
-        if (originStateRef.current === "expanded" && deltaY > 0 && sheetRef.current && sheetRef.current.scrollTop > 5) {
-          return;
-        }
         isDraggingRef.current = true;
         hasMovedSignificantRef.current = true;
       } else {
@@ -168,10 +221,20 @@ export function MapScreen({
     }
   }, []);
 
-  const endDrag = useCallback(() => {
+  const endDragRef = useRef<() => void>(() => {});
+
+  const handlePointerUp = useCallback(() => {
+    endDragRef.current();
+  }, []);
+
+  const cleanupDragListeners = useCallback(() => {
     window.removeEventListener("pointermove", onGlobalPointerMove);
-    window.removeEventListener("pointerup", endDrag);
-    window.removeEventListener("pointercancel", endDrag);
+    window.removeEventListener("pointerup", handlePointerUp);
+    window.removeEventListener("pointercancel", handlePointerUp);
+  }, [onGlobalPointerMove, handlePointerUp]);
+
+  const endDrag = useCallback(() => {
+    cleanupDragListeners();
 
     const sheetEl = sheetRef.current;
     if (!sheetEl) return;
@@ -190,33 +253,30 @@ export function MapScreen({
     let targetState: "collapsed" | "half" | "expanded" = origin;
 
     // Fast flick or clear drag threshold
-    if (velocity < -0.3 || deltaY < -45) {
+    if (velocity < -0.28 || deltaY < -40) {
       // Dragged UP ("올리면")
       if (origin === "collapsed") {
-        targetState = (velocity < -0.8 || deltaY < -130) ? "expanded" : "half";
+        targetState = (velocity < -0.7 || deltaY < -130) ? "expanded" : "half";
       } else if (origin === "half") {
         targetState = "expanded";
       }
-    } else if (velocity > 0.3 || deltaY > 45) {
-      // Dragged DOWN ("내리면")
+    } else if (velocity > 0.28 || deltaY > 40) {
+      // Dragged DOWN ("자연스럽게 내리면")
       if (origin === "expanded") {
-        targetState = (velocity > 0.8 || deltaY > 130) ? "collapsed" : "half";
+        targetState = (velocity > 0.7 || deltaY > 130) ? "collapsed" : "half";
       } else if (origin === "half") {
         targetState = "collapsed";
       }
     }
 
-    // Smooth release transition with native spring physics
-    sheetEl.style.transition = "transform 320ms cubic-bezier(0.32, 0.72, 0, 1), height 320ms cubic-bezier(0.32, 0.72, 0, 1)";
-    sheetEl.style.transform = "translate3d(0, 0, 0)";
-
-    if (targetState !== origin) {
-      onSheetStateChange(targetState);
-    }
-
+    transitionToState(targetState);
     currentDeltaYRef.current = 0;
     hasMovedSignificantRef.current = false;
-  }, [onGlobalPointerMove, onSheetStateChange]);
+  }, [cleanupDragListeners, transitionToState]);
+
+  useEffect(() => {
+    endDragRef.current = endDrag;
+  }, [endDrag]);
 
   const handleHandlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
@@ -229,25 +289,33 @@ export function MapScreen({
     hasMovedSignificantRef.current = false;
 
     window.addEventListener("pointermove", onGlobalPointerMove);
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
   };
 
   const handleHandleClick = () => {
     if (hasMovedSignificantRef.current) return;
-    onSheetStateChange(nextState);
-    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: "instant" }));
+    // 클릭 시: 펼쳐져 있으면 자연스럽게 아래로 내려가고, 닫혀 있으면 절반으로 올라옴
+    const target = sheetState === "expanded" ? "half" : sheetState === "half" ? "collapsed" : "half";
+    transitionToState(target);
+    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
+    const isHandle = target.closest(`.${styles.sheetHandle}`) !== null;
+    const isTopHeaderArea = e.clientY - (sheetRef.current?.getBoundingClientRect().top ?? 0) < 44;
+    const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
+
+    // 핸들이나 맨 위 빈 영역이 아니면 본문 정상 스크롤 허용
+    if (!isHandle && (!isTopHeaderArea || !isAtTop)) {
+      return;
+    }
     if (target.closest("button, a, input, textarea, select, [role='button']")) {
       return;
     }
-    if (sheetRef.current && sheetRef.current.scrollTop > 5 && sheetState === "expanded") {
-      return;
-    }
     if (e.button !== 0) return;
+
     dragStartYRef.current = e.clientY;
     lastYRef.current = e.clientY;
     lastTimeRef.current = performance.now();
@@ -257,62 +325,84 @@ export function MapScreen({
     hasMovedSignificantRef.current = false;
 
     window.addEventListener("pointermove", onGlobalPointerMove);
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
   };
 
   useEffect(() => {
     return () => {
-      window.removeEventListener("pointermove", onGlobalPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointercancel", endDrag);
+      cleanupDragListeners();
+      if (animationTimeoutRef.current) {
+        window.clearTimeout(animationTimeoutRef.current);
+      }
     };
-  }, [onGlobalPointerMove, endDrag]);
+  }, [cleanupDragListeners]);
 
   // Wheel & Trackpad scrolling
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (wheelTimeoutRef.current) return;
-    if (e.deltaY > 16 && sheetState !== "expanded") {
-      wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 280);
-      onSheetStateChange(sheetState === "collapsed" ? "half" : "expanded");
-    } else if (e.deltaY < -16 && sheetState !== "collapsed") {
-      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
-        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 280);
-        onSheetStateChange(sheetState === "expanded" ? "half" : "collapsed");
+    const sheetEl = sheetRef.current;
+    if (!sheetEl) return;
+
+    const isOverHandle = (e.target as HTMLElement).closest(`.${styles.sheetHandle}`) !== null;
+    const isAtTop = sheetEl.scrollTop <= 2;
+
+    // 핸들 위에서 휠을 돌리거나, 맨 위에서 아래로 내릴 때 언더바가 자연스럽게 내려감
+    if (isOverHandle || (isAtTop && e.deltaY < -18)) {
+      if (e.deltaY > 16 || (isAtTop && e.deltaY < -18)) {
+        // Lower sheet naturally
+        if (sheetState !== "collapsed") {
+          wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
+          transitionToState(sheetState === "expanded" ? "half" : "collapsed");
+        }
+      } else if (e.deltaY < -16 && isOverHandle) {
+        // Raise sheet
+        if (sheetState !== "expanded") {
+          wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
+          transitionToState(sheetState === "collapsed" ? "half" : "expanded");
+        }
       }
     }
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (touchStartY.current === null) return;
-    const delta = touchStartY.current - e.touches[0].clientY; // > 0: swipe up, < 0: swipe down
+    if (touchStartY.current === null || touchStartX.current === null) return;
+    const deltaY = e.touches[0].clientY - touchStartY.current; // > 0: 아래로 당김, < 0: 위로 당김
+    const deltaX = e.touches[0].clientX - touchStartX.current;
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.5) return;
 
-    // Swipe UP
-    if (delta > 20) {
+    const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
+
+    // 맨 위에서 아래로 스와이프하면 언더바가 자연스럽게 내려감
+    if (deltaY > 36 && isAtTop) {
+      if (sheetState === "expanded") {
+        transitionToState("half");
+        touchStartY.current = null;
+      } else if (sheetState === "half") {
+        transitionToState("collapsed");
+        touchStartY.current = null;
+      }
+    }
+    // 위로 스와이프하면 언더바 펼침
+    else if (deltaY < -36) {
       if (sheetState === "collapsed") {
-        onSheetStateChange("half");
+        transitionToState("half");
         touchStartY.current = null;
-      } else if (sheetState === "half" && sheetRef.current && sheetRef.current.scrollTop + sheetRef.current.clientHeight >= sheetRef.current.scrollHeight - 10) {
-        onSheetStateChange("expanded");
+      } else if (sheetState === "half" && isAtTop) {
+        transitionToState("expanded");
         touchStartY.current = null;
       }
     }
-    // Swipe DOWN ("자연스럽게 내리면")
-    else if (delta < -20) {
-      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
-        if (sheetState === "expanded") {
-          onSheetStateChange("half");
-          touchStartY.current = null;
-        } else if (sheetState === "half") {
-          onSheetStateChange("collapsed");
-          touchStartY.current = null;
-        }
-      }
-    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartY.current = null;
+    touchStartX.current = null;
   };
 
   const [selectedRestaurants, setSelectedRestaurants] = useState<Restaurant[]>([]);
@@ -375,6 +465,10 @@ export function MapScreen({
   const [congestionLoading, setCongestionLoading] = useState(false);
   const [congestionError, setCongestionError] = useState("");
   const [congestionRefresh, setCongestionRefresh] = useState(0);
+  const [selectedCongestion, setSelectedCongestion] = useState<CongestionZone | null>(null);
+  const handleSelectCongestion = useCallback((zone: CongestionZone) => {
+    setSelectedCongestion(zone);
+  }, []);
   const handleCongestionBounds = useCallback((bounds: MapSearchBounds) => {
     setCongestionBounds((previous: MapSearchBounds | null) => previous &&
       (Object.keys(bounds) as (keyof MapSearchBounds)[]).every((key) =>
@@ -421,6 +515,7 @@ export function MapScreen({
     setTransitFocus(null);
     sheetRef.current?.scrollTo({ top: 0, behavior: "instant" });
     setSelectedDanger(null);
+    setSelectedCongestion(null);
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
     if (id !== "food") {
@@ -437,6 +532,7 @@ export function MapScreen({
   function changeQuery(value: string) {
     setSelectedTransitId(null);
     setSelectedDanger(null);
+    setSelectedCongestion(null);
     setSelectedRestaurants([]);
     setSelectedRestaurantId(null);
     onQueryChange(value);
@@ -498,6 +594,7 @@ export function MapScreen({
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
           congestionZones={isCongestionMode ? congestionZones : []}
+          onSelectCongestion={handleSelectCongestion}
           businesses={selectedCategory === "danger" && businesses.length === 0 ? liveDangerSignals : businesses}
           renderBusinessMarker={renderDangerMarker}
           onCongestionBoundsChange={handleCongestionBounds}
@@ -535,10 +632,31 @@ export function MapScreen({
         ) : null}
         {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
         {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
+        {isCongestionMode && selectedCongestion ? (() => {
+          const score = selectedCongestion.currentScore;
+          const baselineGap = selectedCongestion.baselineScore === undefined ? 0 : Math.abs(score - selectedCongestion.baselineScore);
+          const safetyLevel = score >= 30 && score <= 70 && baselineGap <= 20 ? 2 : score >= 15 && score <= 85 ? 1 : 0;
+          const safetyLabel = ["다른 장소를 권해요", "주변을 확인해요", "거래하기 괜찮아요"][safetyLevel];
+          return (
+            <aside className={styles.tradeSafetyCard} aria-label={`${selectedCongestion.name} 거래안전 참고 지표`}>
+              <div className={styles.tradeSafetyHeader}>
+                <span className={styles.tradeSafetyMascot} aria-hidden="true" />
+                <div>
+                  <small>거래 장소 참고</small>
+                  <strong>{selectedCongestion.name}</strong>
+                </div>
+                <button type="button" onClick={() => setSelectedCongestion(null)} aria-label="거래안전 지표 닫기"><X size={18} /></button>
+              </div>
+              <div className={styles.tradeSafetyResult}>
+                <strong>{safetyLabel}</strong>
+                <span>{selectedCongestion.levelLabel} · {getCongestionPopulationLabel(selectedCongestion)}</span>
+              </div>
+              <p>밝고 사람이 보이는 공공장소에서 거래하세요.</p>
+              <small className={styles.tradeSafetyDisclaimer}>현재 혼잡도만 반영한 참고 정보예요.</small>
+            </aside>
+          );
+        })() : null}
         <div className={styles.mapControls}>
-          <button type="button" aria-label="관심 장소">
-            <Heart size={25} />
-          </button>
           <button type="button" aria-label="내 장소" title="내 장소로 이동" onClick={() => setCenterRequest((value) => value + 1)}>
             <House size={25} />
           </button>
@@ -563,6 +681,7 @@ export function MapScreen({
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onPointerDown={handleSheetPointerDown}
       >
         <button
@@ -672,7 +791,7 @@ export function MapScreen({
                     onAction={() => changeQuery("")}
                   />
                 ) : (
-                  <div className={styles.businessGrid}>
+                  <div className={`${styles.businessGrid} ${selectedCategory === "danger" ? styles.dangerResultGrid : ""}`}>
                     {displayedBusinesses.map((business) => {
                       const dangerVisual = getDangerVisual(business);
                       const isFood = business.category === "food";
@@ -682,17 +801,10 @@ export function MapScreen({
                       return (
                         <article
                           key={business.id}
-                          className={`${styles.businessCard} ${isSelected ? styles.businessCardSelected : ""}`}
+                          className={`${styles.businessCard} ${dangerVisual ? styles.dangerResultCard : ""} ${isSelected ? styles.businessCardSelected : ""}`}
                           onClick={() => handleCardClick(business)}
                           style={{ cursor: "pointer" }}
                         >
-                          <button
-                            type="button"
-                            aria-label={`${business.name} 관심`}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Heart size={25} fill={business.liked ? "currentColor" : "none"} />
-                          </button>
                           <div
                             className={`${styles.businessImage} ${
                               dangerVisual
@@ -701,10 +813,23 @@ export function MapScreen({
                             }`}
                           >
                             {dangerVisual ? (
-                              <>
-                                <span className={styles.dangerEmoji}>{dangerVisual.emoji}</span>
-                                <span>{dangerVisual.label}</span>
-                              </>
+                              <div className={styles.dangerCardVisual}>
+                                <div className={styles.dangerMascotWrapper}>
+                                  <span className={styles.dangerMascotFigure} aria-hidden="true" />
+                                  <span className={styles.dangerMascotMiniBadge} aria-hidden="true">
+                                    {dangerVisual.emoji}
+                                  </span>
+                                </div>
+                                <div className={styles.dangerMetaGroup}>
+                                  <span className={styles.dangerPillLabel}>
+                                    <span className={styles.dangerPillDot} />
+                                    {dangerVisual.label}
+                                  </span>
+                                  {dangerVisual.subLabel ? (
+                                    <span className={styles.dangerSubNotice}>{dangerVisual.subLabel}</span>
+                                  ) : null}
+                                </div>
+                              </div>
                             ) : thumbUrl ? (
                               <img
                                 src={thumbUrl}

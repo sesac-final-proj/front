@@ -183,6 +183,9 @@ export default function GajiMarketApp() {
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
   const [me, setMe] = useState<Me | null>(null);
+  // 로그인 필수 게이트: getMe() 응답이 오기 전엔 화면을 그리지 않고, 비로그인/토큰
+  // 만료면 온보딩으로 보낸다 — 게스트 열람 허용하던 이전 동작을 없앤 것.
+  const [authChecked, setAuthChecked] = useState(false);
   const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
   const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<ProductListItem[]>([]);
@@ -199,8 +202,8 @@ export default function GajiMarketApp() {
     writeNeighborhoodCache({ primary: activeNeighborhood, secondary: secondaryNeighborhood });
   }, [activeNeighborhood, secondaryNeighborhood]);
 
-  // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
-  // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
+  // 로그인 필수: 토큰이 없거나 만료됐으면(getMe 실패) 온보딩으로 보낸다.
+  // 네트워크 일시 오류도 신원 확인이 안 된 것이므로 동일하게 처리한다.
   useEffect(() => {
     getMe()
       .then((fetchedMe) => {
@@ -209,9 +212,12 @@ export default function GajiMarketApp() {
         if (fetchedMe.region) {
           setActiveNeighborhood(fetchedMe.region.dongName);
         }
+        setAuthChecked(true);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        router.replace("/onboarding");
+      });
+  }, [router]);
 
   // 판매내역/찜 목록은 일반 목록(products)을 mine/isFavorite로 거르는 방식으로는
   // 못 만든다 — 그 두 값이 실서버 데이터에 대해 항상 false라 새로고침(새 세션)마다
@@ -251,11 +257,12 @@ export default function GajiMarketApp() {
   // 동네 검색은 이제 "대표 전환"이 아니라 항상 "2번째 동네 추가"다 — 빈 슬롯이 있을 때만
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
   function addNeighborhood(dongName: string) {
+    const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
     setToastMessage(`'${dongName}'을 동네에 추가했어요.`);
     setSheet(null);
-    setSubPage(null);
+    setSubPage(returnTo ? { type: returnTo } : null);
   }
   const [productFilter, setProductFilter] = useState("전체");
   const [productFilters, setProductFilters] = useState<ProductFilters>(DEFAULT_PRODUCT_FILTERS);
@@ -280,6 +287,11 @@ export default function GajiMarketApp() {
   const productPageRef = useRef(1);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>([]);
+  // 판매자가 본인 글에서 "채팅하기" → 그 글에 걸린 N:1 채팅방 목록(chat-room-list)용.
+  // 최초 1회 불러온 전체 chats 상태는 그 이후 새로 생긴 방을 못 담을 수 있어서(스테일),
+  // 이 화면에 들어갈 때마다 product_id 필터로 서버에서 새로 받아온다.
+  const [productChatRooms, setProductChatRooms] = useState<ChatRoom[]>([]);
+  const [productChatRoomsLoading, setProductChatRoomsLoading] = useState(false);
   const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
   const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
@@ -317,6 +329,47 @@ export default function GajiMarketApp() {
       });
     return () => controller.abort();
   }, [me]);
+
+  // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
+  // 컨테이너라 이전 화면의 스크롤 위치가 그대로 남아있어서, 이게 없으면 헤더(뒤로가기)가
+  // 화면 밖으로 밀려나 있어 위로 스크롤해야 뒤로 갈 수 있었다.
+  useEffect(() => {
+    if (!subPage) return;
+    window.requestAnimationFrame(() => {
+      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [subPage]);
+
+  // 상품별 채팅방 N:1 목록 — 판매자 본인 글의 "채팅하기"로 chat-room-list에 들어갈 때마다
+  // product_id 필터로 새로 받아온다(버그: 예전엔 최초 1회 받은 전체 chats를 클라이언트에서
+  // productId로만 걸러서 보여줬는데, 그 이후 새로 생긴 채팅방이 반영이 안 됐다).
+  useEffect(() => {
+    if (subPage?.type !== "chat-room-list") return;
+    const numericProductId = Number(subPage.productId);
+    if (!Number.isFinite(numericProductId)) return;
+    const controller = new AbortController();
+    // productId가 바뀔 때마다 새로 로딩 시작을 알려야 해서(스켈레톤 표시) 불가피하게
+    // effect 본문에서 동기 setState — fetch 시작을 어차피 여기서 트리거하므로 의미상
+    // 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setProductChatRoomsLoading(true);
+    listChatRooms(controller.signal, numericProductId)
+      .then((page) => {
+        const rooms = page.items.map(toChatRoomUi);
+        setProductChatRooms(rooms);
+        // chat-room 화면은 chats 상태에서 room을 찾으므로(selectedChat), 여기서 받은
+        // 최신 정보로 병합해둬야 openChat 이후 헤더/물품카드가 최신 값으로 보인다.
+        setChats((current) => [...rooms, ...current.filter((c) => !rooms.some((r) => r.id === c.id))]);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("상품별 채팅방 목록을 불러오지 못했습니다.", error);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setProductChatRoomsLoading(false);
+      });
+    return () => controller.abort();
+  }, [subPage]);
 
   function recordOtherUserId(chatId: string, items: ChatMessageDto[]) {
     const other = items.find((m) => m.senderId !== me?.id);
@@ -1136,13 +1189,25 @@ export default function GajiMarketApp() {
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
   const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
-  const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
+  const isDreamPage =
+    subPage?.type === "dream-dashboard" ||
+    subPage?.type === "dream-notice" ||
+    (subPage?.type === "region-search" && subPage.returnTo === "dream-dashboard");
+
+  // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
+  // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
+  if (!authChecked) {
+    return <div className={styles.stage} data-theme={theme} />;
+  }
 
   return (
-    <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
+    <div
+      className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`}
+      data-theme={isDreamPage ? "light" : theme}
+    >
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -1232,7 +1297,6 @@ export default function GajiMarketApp() {
           ) : subPage?.type === "chat-room" && selectedChat ? (
             <ChatRoomScreen
               room={selectedChat}
-              product={selectedChat.productId ? products.find((product) => product.id === selectedChat.productId) : undefined}
               messages={roomMessages[selectedChat.id] ?? []}
               draft={messageDraft}
               onDraftChange={setMessageDraft}
@@ -1247,9 +1311,9 @@ export default function GajiMarketApp() {
             />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
-              rooms={chats.filter((chat) => chat.productId === subPage.productId)}
+              rooms={productChatRooms}
               activeFilter={chatFilter}
-              isLoading={false}
+              isLoading={productChatRoomsLoading}
               unreadCount={totalUnread}
               onFilterChange={setChatFilter}
               onOpenNotifications={() => setSheet("notifications")}
@@ -1259,7 +1323,11 @@ export default function GajiMarketApp() {
               onBack={goBack}
             />
           ) : subPage?.type === "my-menu" ? (
-            <MyMenuScreen onBack={goBack} onOpenAlba={(tab) => setSubPage({ type: "alba", tab })} />
+            <MyMenuScreen
+              onBack={goBack}
+              onOpenSettings={() => setSubPage({ type: "settings" })}
+              onOpenAlba={(tab) => setSubPage({ type: "alba", tab })}
+            />
           ) : subPage?.type === "all-services" ? (
             <AllServicesScreen
               onBack={goBack}
@@ -1377,7 +1445,7 @@ export default function GajiMarketApp() {
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
               onBack={() => {
-                setSubPage(null);
+                setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");
               }}
               onPick={addNeighborhood}
@@ -1533,7 +1601,10 @@ export default function GajiMarketApp() {
           }}
           onOpenRegionSearch={() => {
             setSheet(null);
-            setSubPage({ type: "region-search" });
+            setSubPage({
+              type: "region-search",
+              returnTo: subPage?.type === "dream-dashboard" ? "dream-dashboard" : undefined,
+            });
           }}
           onProductWrite={() => {
             setSheet(null);
