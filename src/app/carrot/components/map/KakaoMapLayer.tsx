@@ -267,7 +267,7 @@ export function clusterRestaurantsByOverlap(
 
   for (let i = 0; i < n; i++) {
     const pos = new kakao.maps.LatLng(restaurants[i].lat, restaurants[i].lng);
-    const point = proj.pointFromCoords(pos);
+    const point = proj.containerPointFromCoords ? proj.containerPointFromCoords(pos) : proj.pointFromCoords(pos);
     boxes.push(getRestaurantMarkerBox(point, restaurants[i].name));
   }
 
@@ -315,9 +315,20 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
   const kakao = (window as any).kakao;
   if (!proj || !kakao?.maps) return stops.map((stop) => [stop]);
 
+  const currentLevel = typeof map.getLevel === "function" ? map.getLevel() : 4;
+
+  // 지도를 확대하면 (레벨 1~2) 클러스터링을 해제하여 모든 따릉이 대여소와 자전거 대수를 개별 표시
+  // 레벨 3에서도 근접(24px 이하)에만 묶고, 레벨 4는 38px, 레벨 5 이상에서만 넓게 클러스터링
+  if (currentLevel <= 2) {
+    return stops.map((stop) => [stop]);
+  }
+
+  const clusterDistancePx = currentLevel === 3 ? 24 : currentLevel === 4 ? 38 : 54;
+
+  // 화면 컨테이너 기준 픽셀 좌표 사용 (확대 시 픽셀 거리가 벌어지고 축소 시 가까워짐)
   const points = stops.map((stop) => {
     const pos = new kakao.maps.LatLng(stop.lat, stop.lng);
-    return proj.pointFromCoords(pos);
+    return proj.containerPointFromCoords ? proj.containerPointFromCoords(pos) : proj.pointFromCoords(pos);
   });
   const parent = stops.map((_, index) => index);
   const find = (index: number): number => {
@@ -331,13 +342,11 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
     if (leftRoot !== rightRoot) parent[leftRoot] = rightRoot;
   };
 
-  const CLUSTER_DISTANCE_PX = 56;
-
   for (let left = 0; left < points.length; left += 1) {
     for (let right = left + 1; right < points.length; right += 1) {
       if (!points[left] || !points[right]) continue;
       const distance = Math.hypot(points[left].x - points[right].x, points[left].y - points[right].y);
-      if (distance <= CLUSTER_DISTANCE_PX) {
+      if (distance <= clusterDistancePx) {
         union(left, right);
       }
     }
@@ -357,7 +366,7 @@ function createBikeClusterOverlayElement(cluster: TransitStop[], onClick: () => 
   button.type = "button";
   button.className = transitStyles.clusterMarker;
   const totalBikes = cluster.reduce((sum, item) => sum + (item.bikes_available ?? 0), 0);
-  button.textContent = `🚲 ${totalBikes}`;
+  button.textContent = `🚲 ${totalBikes}대 (${cluster.length}곳)`;
   button.setAttribute("aria-label", `따릉이 대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)`);
   button.title = `대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)\n${cluster.map((s) => `• ${s.name}: ${s.bikes_available ?? 0}대`).join("\n")}`;
   button.addEventListener("click", (event) => {
@@ -815,10 +824,10 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
         button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
 
         if (stop.kind === "bike") {
-          const countStr = stop.bikes_available !== null ? String(stop.bikes_available) : "-";
+          const countStr = stop.bikes_available !== null ? `${stop.bikes_available}대` : "-";
           button.textContent = `🚲 ${countStr}`;
-          button.setAttribute("aria-label", `${stop.name} (대여 가능: ${countStr}대)`);
-          button.title = `${stop.name} (대여 가능: ${countStr}대)`;
+          button.setAttribute("aria-label", `${stop.name} (대여 가능: ${countStr})`);
+          button.title = `${stop.name} (대여 가능: ${countStr})`;
         } else {
           button.textContent = stop.name;
           button.setAttribute("aria-label", `${stop.name} ${stop.line ?? ""}`.trim());
@@ -844,14 +853,16 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
 
     renderTransitMarkers();
 
-    const onZoomChanged = () => {
+    const handleMapChange = () => {
       renderTransitMarkers();
     };
 
-    kakao.maps.event.addListener(map, "zoom_changed", onZoomChanged);
+    kakao.maps.event.addListener(map, "zoom_changed", handleMapChange);
+    kakao.maps.event.addListener(map, "idle", handleMapChange);
 
     return () => {
-      kakao.maps.event.removeListener(map, "zoom_changed", onZoomChanged);
+      kakao.maps.event.removeListener(map, "zoom_changed", handleMapChange);
+      kakao.maps.event.removeListener(map, "idle", handleMapChange);
       overlays.forEach((overlay) => overlay.setMap(null));
     };
   }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit, selectedCategory]);

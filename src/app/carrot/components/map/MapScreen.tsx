@@ -60,6 +60,7 @@ export interface MapScreenProps {
   sheetState: "collapsed" | "half" | "expanded";
   query: string;
   businesses: LocalBusiness[];
+  allDangerSignals?: LocalBusiness[];
   hasSearchedArea: boolean;
   searchBounds: MapSearchBounds | null;
   onSearchBounds: (bounds: MapSearchBounds) => void;
@@ -80,6 +81,7 @@ export function MapScreen({
   sheetState,
   query,
   businesses,
+  allDangerSignals = [],
   hasSearchedArea,
   searchBounds,
   onSearchBounds,
@@ -91,6 +93,7 @@ export function MapScreen({
   onRequestLocation,
   onOpenProfile,
 }: MapScreenProps) {
+  const liveDangerSignals = allDangerSignals.length > 0 ? allDangerSignals : businesses.filter((b) => b.category === "danger");
   const transitKind: TransitKind | null = selectedCategory === "subway" || selectedCategory === "bike" ? selectedCategory : null;
   const isTransitMode = transitKind !== null;
   const [transitBounds, setTransitBounds] = useState<TransitBounds | null>(null);
@@ -111,7 +114,17 @@ export function MapScreen({
   const [locationError, setLocationError] = useState("");
   const locationRequestRef = useRef(0);
   const sheetRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartYRef = useRef(0);
+  const lastYRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const dragVelocityRef = useRef(0);
+  const originStateRef = useRef<"collapsed" | "half" | "expanded">(sheetState);
+  const currentDeltaYRef = useRef(0);
+  const hasMovedSignificantRef = useRef(false);
   const touchStartY = useRef<number | null>(null);
+  const wheelTimeoutRef = useRef<number | null>(null);
+
   const handleSelectTransit = useCallback((stop: TransitStop) => {
     setSelectedTransitId(stop.id);
     setTransitFocus(stop);
@@ -119,12 +132,153 @@ export function MapScreen({
     window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "instant" }));
   }, [onSheetStateChange]);
 
+  const onGlobalPointerMove = useCallback((e: PointerEvent) => {
+    const deltaY = e.clientY - dragStartYRef.current;
+
+    if (!isDraggingRef.current) {
+      if (Math.abs(deltaY) > 5) {
+        if (originStateRef.current === "expanded" && deltaY > 0 && sheetRef.current && sheetRef.current.scrollTop > 5) {
+          return;
+        }
+        isDraggingRef.current = true;
+        hasMovedSignificantRef.current = true;
+      } else {
+        return;
+      }
+    }
+
+    const now = performance.now();
+    const dt = Math.max(1, now - lastTimeRef.current);
+    const dy = e.clientY - lastYRef.current;
+    dragVelocityRef.current = dy / dt;
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = now;
+    currentDeltaYRef.current = deltaY;
+
+    const sheetEl = sheetRef.current;
+    if (sheetEl) {
+      sheetEl.style.transition = "none";
+      let visualDy = deltaY;
+      if (originStateRef.current === "collapsed" && deltaY > 0) {
+        visualDy = deltaY * 0.2;
+      } else if (originStateRef.current === "expanded" && deltaY < 0) {
+        visualDy = deltaY * 0.2;
+      }
+      sheetEl.style.transform = `translate3d(0, ${visualDy}px, 0)`;
+    }
+  }, []);
+
+  const endDrag = useCallback(() => {
+    window.removeEventListener("pointermove", onGlobalPointerMove);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", endDrag);
+
+    const sheetEl = sheetRef.current;
+    if (!sheetEl) return;
+
+    if (!isDraggingRef.current) {
+      currentDeltaYRef.current = 0;
+      hasMovedSignificantRef.current = false;
+      return;
+    }
+
+    isDraggingRef.current = false;
+    const deltaY = currentDeltaYRef.current;
+    const velocity = dragVelocityRef.current;
+    const origin = originStateRef.current;
+
+    let targetState: "collapsed" | "half" | "expanded" = origin;
+
+    // Fast flick or clear drag threshold
+    if (velocity < -0.3 || deltaY < -45) {
+      // Dragged UP ("올리면")
+      if (origin === "collapsed") {
+        targetState = (velocity < -0.8 || deltaY < -130) ? "expanded" : "half";
+      } else if (origin === "half") {
+        targetState = "expanded";
+      }
+    } else if (velocity > 0.3 || deltaY > 45) {
+      // Dragged DOWN ("내리면")
+      if (origin === "expanded") {
+        targetState = (velocity > 0.8 || deltaY > 130) ? "collapsed" : "half";
+      } else if (origin === "half") {
+        targetState = "collapsed";
+      }
+    }
+
+    // Smooth release transition with native spring physics
+    sheetEl.style.transition = "transform 320ms cubic-bezier(0.32, 0.72, 0, 1), height 320ms cubic-bezier(0.32, 0.72, 0, 1)";
+    sheetEl.style.transform = "translate3d(0, 0, 0)";
+
+    if (targetState !== origin) {
+      onSheetStateChange(targetState);
+    }
+
+    currentDeltaYRef.current = 0;
+    hasMovedSignificantRef.current = false;
+  }, [onGlobalPointerMove, onSheetStateChange]);
+
+  const handleHandlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    dragStartYRef.current = e.clientY;
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = performance.now();
+    dragVelocityRef.current = 0;
+    originStateRef.current = sheetState;
+    currentDeltaYRef.current = 0;
+    hasMovedSignificantRef.current = false;
+
+    window.addEventListener("pointermove", onGlobalPointerMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+  };
+
+  const handleHandleClick = () => {
+    if (hasMovedSignificantRef.current) return;
+    onSheetStateChange(nextState);
+    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: "instant" }));
+  };
+
+  const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, select, [role='button']")) {
+      return;
+    }
+    if (sheetRef.current && sheetRef.current.scrollTop > 5 && sheetState === "expanded") {
+      return;
+    }
+    if (e.button !== 0) return;
+    dragStartYRef.current = e.clientY;
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = performance.now();
+    dragVelocityRef.current = 0;
+    originStateRef.current = sheetState;
+    currentDeltaYRef.current = 0;
+    hasMovedSignificantRef.current = false;
+
+    window.addEventListener("pointermove", onGlobalPointerMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+  };
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("pointermove", onGlobalPointerMove);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+    };
+  }, [onGlobalPointerMove, endDrag]);
+
+  // Wheel & Trackpad scrolling
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.deltaY > 6 && sheetState !== "expanded") {
-      onSheetStateChange("expanded");
-    } else if (e.deltaY < -6 && sheetState === "expanded") {
+    if (wheelTimeoutRef.current) return;
+    if (e.deltaY > 16 && sheetState !== "expanded") {
+      wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 280);
+      onSheetStateChange(sheetState === "collapsed" ? "half" : "expanded");
+    } else if (e.deltaY < -16 && sheetState !== "collapsed") {
       if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
-        onSheetStateChange("half");
+        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 280);
+        onSheetStateChange(sheetState === "expanded" ? "half" : "collapsed");
       }
     }
   };
@@ -135,14 +289,28 @@ export function MapScreen({
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (touchStartY.current === null) return;
-    const delta = touchStartY.current - e.touches[0].clientY;
-    if (delta > 12 && sheetState !== "expanded") {
-      onSheetStateChange("expanded");
-      touchStartY.current = null;
-    } else if (delta < -12 && sheetState === "expanded") {
-      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+    const delta = touchStartY.current - e.touches[0].clientY; // > 0: swipe up, < 0: swipe down
+
+    // Swipe UP
+    if (delta > 20) {
+      if (sheetState === "collapsed") {
         onSheetStateChange("half");
         touchStartY.current = null;
+      } else if (sheetState === "half" && sheetRef.current && sheetRef.current.scrollTop + sheetRef.current.clientHeight >= sheetRef.current.scrollHeight - 10) {
+        onSheetStateChange("expanded");
+        touchStartY.current = null;
+      }
+    }
+    // Swipe DOWN ("자연스럽게 내리면")
+    else if (delta < -20) {
+      if (sheetRef.current && sheetRef.current.scrollTop <= 0) {
+        if (sheetState === "expanded") {
+          onSheetStateChange("half");
+          touchStartY.current = null;
+        } else if (sheetState === "half") {
+          onSheetStateChange("collapsed");
+          touchStartY.current = null;
+        }
       }
     }
   };
@@ -242,8 +410,10 @@ export function MapScreen({
         ? restaurantBusinesses.filter((business) => matchesBusinessQuery(business, query))
         : isCongestionMode
           ? []
+        : selectedCategory === "danger"
+          ? (businesses.length > 0 ? businesses : liveDangerSignals).filter((business) => matchesBusinessQuery(business, query))
         : businesses,
-    [businesses, isCongestionMode, query, restaurantBusinesses, selectedCategory],
+    [businesses, isCongestionMode, liveDangerSignals, query, restaurantBusinesses, selectedCategory],
   );
 
   function changeCategory(id: string) {
@@ -257,6 +427,8 @@ export function MapScreen({
       setRestaurantResults([]);
     }
     if (id === "congestion" || id === "food" || id === "subway" || id === "bike") {
+      onSheetStateChange("half");
+    } else if (sheetState === "collapsed") {
       onSheetStateChange("half");
     }
     onCategoryChange(id);
@@ -326,7 +498,7 @@ export function MapScreen({
           selectedCategory={selectedCategory}
           selectedRestaurantId={selectedRestaurantId}
           congestionZones={isCongestionMode ? congestionZones : []}
-          businesses={businesses}
+          businesses={selectedCategory === "danger" && businesses.length === 0 ? liveDangerSignals : businesses}
           renderBusinessMarker={renderDangerMarker}
           onCongestionBoundsChange={handleCongestionBounds}
           transitStops={isTransitMode ? transit.stops : []}
@@ -357,7 +529,7 @@ export function MapScreen({
         </div>
         {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode ? (
           <RealtimeDangerTicker
-            dangerSignals={businesses.filter((b) => b.category === "danger")}
+            dangerSignals={liveDangerSignals}
             onSelectDanger={selectDanger}
           />
         ) : null}
@@ -385,12 +557,28 @@ export function MapScreen({
 
       </div>
 
-      <div className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${isTransitMode ? styles.transitSheet : ""} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`} ref={sheetRef} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
-        <button type="button" className={styles.sheetHandle} aria-label={sheetState === "expanded" ? "지도 목록 접기" : "지도 목록 펼치기"} aria-expanded={sheetState === "expanded"} onClick={(event) => {
-          const panel = event.currentTarget.parentElement;
-          onSheetStateChange(nextState);
-          window.requestAnimationFrame(() => panel?.scrollTo({ top: 0, behavior: "instant" }));
-        }}>
+      <div
+        className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${isTransitMode ? styles.transitSheet : ""} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`}
+        ref={sheetRef}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onPointerDown={handleSheetPointerDown}
+      >
+        <button
+          type="button"
+          className={styles.sheetHandle}
+          aria-label={
+            sheetState === "expanded"
+              ? "지도 목록 반으로 접기"
+              : sheetState === "half"
+                ? "지도 목록 접기"
+                : "지도 목록 펼치기"
+          }
+          aria-expanded={sheetState !== "collapsed"}
+          onPointerDown={handleHandlePointerDown}
+          onClick={handleHandleClick}
+        >
           <span />
         </button>
         {!locationAllowed ? (

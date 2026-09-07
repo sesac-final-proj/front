@@ -596,13 +596,16 @@ export default function GajiMarketApp() {
 
   const businesses = useMemo(() => {
     const bounds = mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
-    return localBusinesses.filter((business) => {
+    const center = NEIGHBORHOOD_COORDS[activeNeighborhood] ?? { lat: 37.5029, lng: 127.1194 };
+    const filtered = localBusinesses.filter((business) => {
       const matchesCategory = business.category === mapCategory;
       const matchesRegion = bounds
         ? business.lat >= bounds.south && business.lat <= bounds.north &&
           business.lng >= bounds.west && business.lng <= bounds.east
-        : matchesNeighborhood(business, activeNeighborhood) ||
-          (secondaryNeighborhood !== null && matchesNeighborhood(business, secondaryNeighborhood));
+        : business.category === "danger"
+          ? true
+          : matchesNeighborhood(business, activeNeighborhood) ||
+            (secondaryNeighborhood !== null && matchesNeighborhood(business, secondaryNeighborhood));
       const matchesQuery =
         mapQuery.trim().length === 0 ||
         business.name.includes(mapQuery.trim()) ||
@@ -612,6 +615,16 @@ export default function GajiMarketApp() {
         (business.riskType?.includes(mapQuery.trim()) ?? false);
       return matchesCategory && matchesRegion && matchesQuery;
     });
+
+    if (mapCategory === "danger") {
+      return [...filtered].sort((a, b) => {
+        const distA = Math.hypot(a.lat - center.lat, a.lng - center.lng);
+        const distB = Math.hypot(b.lat - center.lat, b.lng - center.lng);
+        return distA - distB;
+      });
+    }
+
+    return filtered;
   }, [activeNeighborhood, localBusinesses, mapCategory, mapQuery, secondaryNeighborhood, mapSearchArea]);
 
   const [togetherPosts, setTogetherPosts] = useState<TogetherPost[]>(() => getTogetherPosts("all"));
@@ -1430,6 +1443,7 @@ export default function GajiMarketApp() {
               sheetState={mapSheetState}
               query={mapQuery}
               businesses={businesses}
+              allDangerSignals={dangerSignals}
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
               searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
