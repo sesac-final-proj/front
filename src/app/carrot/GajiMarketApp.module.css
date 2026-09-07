@@ -748,6 +748,12 @@
   cursor: pointer;
 }
 
+.detailActionBar button.detailChatDisabled {
+  background: var(--color-surface-3);
+  color: var(--color-dim);
+  cursor: not-allowed;
+}
+
 .detailScreen,
 .chatRoomScreen {
   min-height: var(--app-height);

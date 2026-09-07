@@ -190,9 +190,21 @@ export function ProductDetailScreen({
           <Heart size={24} fill={product.isFavorite ? "currentColor" : "none"} />
         </button>
         <strong>{formatPrice(product)}</strong>
-        <button type="button" onClick={onChat}>
-          채팅하기
-        </button>
+        {(() => {
+          // 내 글인데 걸린 채팅방이 하나도 없으면(아직 문의한 사람이 없음) 눌러도 볼 게
+          // 없으니 회색으로 비활성화 — 클릭했다가 빈 목록/에러를 마주치지 않게 미리 막는다.
+          const chatDisabled = product.mine && product.chatCount === 0;
+          return (
+            <button
+              type="button"
+              onClick={onChat}
+              disabled={chatDisabled}
+              className={chatDisabled ? styles.detailChatDisabled : undefined}
+            >
+              채팅하기
+            </button>
+          );
+        })()}
       </div>
 
       {/* More Options Action Sheet */}

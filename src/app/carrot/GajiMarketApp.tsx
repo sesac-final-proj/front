@@ -329,6 +329,16 @@ export default function GajiMarketApp() {
     return () => controller.abort();
   }, [me]);
 
+  // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
+  // 컨테이너라 이전 화면의 스크롤 위치가 그대로 남아있어서, 이게 없으면 헤더(뒤로가기)가
+  // 화면 밖으로 밀려나 있어 위로 스크롤해야 뒤로 갈 수 있었다.
+  useEffect(() => {
+    if (!subPage) return;
+    window.requestAnimationFrame(() => {
+      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [subPage]);
+
   // 상품별 채팅방 N:1 목록 — 판매자 본인 글의 "채팅하기"로 chat-room-list에 들어갈 때마다
   // product_id 필터로 새로 받아온다(버그: 예전엔 최초 1회 받은 전체 chats를 클라이언트에서
   // productId로만 걸러서 보여줬는데, 그 이후 새로 생긴 채팅방이 반영이 안 됐다).
