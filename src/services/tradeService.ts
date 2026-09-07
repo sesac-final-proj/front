@@ -53,6 +53,64 @@ function getAuthToken(): string | null {
   }
 }
 
+interface ApiRefreshResponse {
+  access_token: string;
+  refresh_token: string;
+}
+
+// 동시에 여러 요청이 401을 맞아도 refresh 호출은 한 번만 나가게 공유한다 — 백엔드가
+// refresh 성공 시 이전 jti를 즉시 폐기하는 로테이션 구조라, 동시에 두 번 호출하면
+// 뒤에 도착한 쪽이 이미 폐기된 refresh_token으로 실패해 불필요하게 로그아웃될 수 있다.
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+      if (!refreshToken) throw new AuthRequiredError();
+
+      const response = await fetch(apiUrl("/api/v1/auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+        throw new AuthRequiredError();
+      }
+      const payload: ApiRefreshResponse = await response.json();
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, payload.access_token);
+      window.localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, payload.refresh_token);
+      return payload.access_token;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+// 로그인 필요한 API 공통 래퍼 — access token(30분) 만료로 401을 받으면 refresh
+// token으로 한 번 자동 재발급받아 재요청한다. 그마저 401/실패면(refresh token도
+// 만료·폐기됨) AuthRequiredError를 던져서 호출부가 로그인 필요 처리를 하게 한다.
+export async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const withAuth = (t: string): RequestInit => ({
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${t}` },
+  });
+
+  let response = await fetch(apiUrl(path), withAuth(token));
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(apiUrl(path), withAuth(newToken));
+    if (response.status === 401) throw new AuthRequiredError();
+  }
+  return response;
+}
+
 // 설정 > 로그아웃에서 호출. 백엔드 세션(리프레시 토큰) 폐기 요청은 best-effort로만
 // 보내고, 실패하더라도 로컬 토큰은 항상 지워서 클라이언트는 확실히 로그아웃 상태가 되게 한다.
 export async function logout(): Promise<void> {
@@ -150,15 +208,11 @@ export async function listCategories(signal?: AbortSignal): Promise<string[]> {
 // 새로고침(새 세션)하면 항상 빈 목록이었다. 서버가 이미 created_by로
 // 걸러주는 전용 엔드포인트가 있어서 그걸 쓴다. Bearer 토큰이 필요.
 export async function getMyProducts(signal?: AbortSignal): Promise<TradeProductPage> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
   const params = new URLSearchParams({ page: "1", size: "60" });
-  const response = await fetch(apiUrl(`/api/v1/trades/products/mine?${params}`), {
+  const response = await authorizedFetch(`/api/v1/trades/products/mine?${params}`, {
     signal,
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("판매내역을 불러오지 못했습니다.");
 
   const payload: ApiProductPage = await response.json();
@@ -169,15 +223,11 @@ export async function getMyProducts(signal?: AbortSignal): Promise<TradeProductP
 // isFavorite도 실서버 데이터에 대해 항상 false라 새로고침하면 찜한 상품이
 // 안 보였다.
 export async function getMyFavorites(signal?: AbortSignal): Promise<TradeProductPage> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
   const params = new URLSearchParams({ page: "1", size: "60" });
-  const response = await fetch(apiUrl(`/api/v1/trades/products/favorites?${params}`), {
+  const response = await authorizedFetch(`/api/v1/trades/products/favorites?${params}`, {
     signal,
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("찜 목록을 불러오지 못했습니다.");
 
   const payload: ApiProductPage = await response.json();
@@ -187,14 +237,10 @@ export async function getMyFavorites(signal?: AbortSignal): Promise<TradeProduct
 // 최근 본 상품(최대 20개, 계정별). 로그인 계정 기준으로 서버가 관리 —
 // 로그아웃/재로그인해도 유지되고, 다른 계정으로 로그인하면 그 계정 것만 보인다.
 export async function getRecentlyViewed(signal?: AbortSignal): Promise<TradeProductPage> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl("/api/v1/trades/products/recently-viewed"), {
+  const response = await authorizedFetch("/api/v1/trades/products/recently-viewed", {
     signal,
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("최근 본 목록을 불러오지 못했습니다.");
 
   const payload: ApiProductPage = await response.json();
@@ -203,16 +249,10 @@ export async function getRecentlyViewed(signal?: AbortSignal): Promise<TradeProd
 
 // 상품 상세 진입 시 조회 기록 — best-effort. 비로그인(게스트)이면 조용히 무시.
 export async function recordProductView(id: number): Promise<void> {
-  const token = getAuthToken();
-  if (!token) return;
-
   try {
-    await fetch(apiUrl(`/api/v1/trades/products/${id}/view`), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await authorizedFetch(`/api/v1/trades/products/${id}/view`, { method: "POST" });
   } catch {
-    // ponytail: 조회 기록 실패는 화면에 영향 주지 않는다 — 조용히 무시.
+    // ponytail: 비로그인(게스트)이거나 조회 기록 실패해도 화면엔 영향 없다 — 조용히 무시.
   }
 }
 
@@ -252,9 +292,6 @@ export async function createProduct(input: {
   tradeType: TradeProduct["tradeType"];
   tradePlace?: string;
 }): Promise<{ id: number }> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
   const body: ApiProductCreateRequest = {
     title: input.title,
     category: input.category,
@@ -264,16 +301,11 @@ export async function createProduct(input: {
     trade_place: input.tradePlace,
   };
 
-  const response = await fetch(apiUrl("/api/v1/trades/products"), {
+  const response = await authorizedFetch("/api/v1/trades/products", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("글을 등록하지 못했습니다.");
 
   const payload: ApiProductCreated = await response.json();
@@ -291,16 +323,9 @@ export async function updateProduct(
     tradePlace?: string;
   },
 ): Promise<TradeProduct> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/trades/products/${productId}`), {
+  const response = await authorizedFetch(`/api/v1/trades/products/${productId}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       title: input.title,
       category: input.category,
@@ -309,7 +334,6 @@ export async function updateProduct(
       trade_place: input.tradePlace,
     }),
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("글을 수정하지 못했습니다.");
 
   const payload: ApiProductListItem = await response.json();
@@ -319,19 +343,11 @@ export async function updateProduct(
 // 상품 이미지는 1장만 유지(재업로드하면 덮어씀). NCP Object Storage에 서버를 거치지
 // 않고 직접 PUT — presign → 브라우저에서 NCP로 PUT → object_key 등록, 3단계.
 export async function uploadProductImage(productId: number, file: File): Promise<string> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const presignResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images/presign`), {
+  const presignResponse = await authorizedFetch(`/api/v1/trades/products/${productId}/images/presign`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ filename: file.name, content_type: file.type }),
   });
-  if (presignResponse.status === 401) throw new AuthRequiredError();
   if (!presignResponse.ok) throw new Error("이미지 업로드 URL을 받지 못했습니다.");
   const { upload_url, object_key }: { upload_url: string; object_key: string; image_url: string } =
     await presignResponse.json();
@@ -345,16 +361,11 @@ export async function uploadProductImage(productId: number, file: File): Promise
   });
   if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
 
-  const registerResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images`), {
+  const registerResponse = await authorizedFetch(`/api/v1/trades/products/${productId}/images`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ object_key }),
   });
-  if (registerResponse.status === 401) throw new AuthRequiredError();
   if (!registerResponse.ok) throw new Error("이미지 등록에 실패했습니다.");
 
   const payload: { image_url: string } = await registerResponse.json();
@@ -371,14 +382,10 @@ export async function setFavorite(
   productId: number,
   favorited: boolean,
 ): Promise<{ favorited: boolean; favoriteCount: number }> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/trades/products/${productId}/favorite`), {
+  const response = await authorizedFetch(`/api/v1/trades/products/${productId}/favorite`, {
     method: favorited ? "POST" : "DELETE",
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("찜 상태를 바꾸지 못했습니다.");
 
   const payload: ApiFavoriteToggleResponse = await response.json();
