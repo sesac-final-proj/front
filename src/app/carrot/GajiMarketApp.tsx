@@ -1344,14 +1344,12 @@ export default function GajiMarketApp() {
               products={favoriteProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
             />
           ) : subPage?.type === "recently-viewed" ? (
             <FavoriteScreen
               products={recentlyViewedProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
               title="최근 본"
               emptyTitle="최근 본 상품이 없어요"
               emptyBody="상품 상세를 열어보면 여기에 기록돼요."
@@ -1401,7 +1399,6 @@ export default function GajiMarketApp() {
                 setProductFilter(value);
               }}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
               onRetry={() => setHasNetworkError(false)}
               categories={categories}
               filters={productFilters}
@@ -1630,7 +1627,6 @@ function HomeScreen({
   onOpenMenu,
   onFilterChange,
   onProductClick,
-  onFavorite,
   onRetry,
   categories,
   filters,
@@ -1651,7 +1647,6 @@ function HomeScreen({
   onOpenMenu: () => void;
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
-  onFavorite: (id: string) => void;
   onRetry: () => void;
   categories: string[];
   filters: ProductFilters;
@@ -1866,7 +1861,6 @@ function HomeScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => onFavorite(product.id)}
             />
           ))}
           {hasMore && (
@@ -1957,11 +1951,9 @@ function PriceRangeSlider({
 function ProductRow({
   product,
   onClick,
-  onFavorite,
 }: {
   product: ProductListItem;
   onClick: () => void;
-  onFavorite: () => void;
 }) {
   return (
     <article className={styles.productRow}>
@@ -2006,14 +1998,6 @@ function ProductRow({
             )}
           </div>
         </div>
-      </button>
-      <button
-        type="button"
-        className={`${styles.inlineFavorite} ${product.isFavorite ? styles.favoriteActive : ""}`}
-        aria-label="관심 상품 변경"
-        onClick={onFavorite}
-      >
-        <Heart size={22} fill={product.isFavorite ? "currentColor" : "none"} />
       </button>
     </article>
   );
@@ -5437,7 +5421,6 @@ function FavoriteScreen({
   products,
   onBack,
   onProductClick,
-  onFavorite,
   title = "관심목록",
   emptyTitle = "관심 상품이 없어요",
   emptyBody = "마음에 드는 물건의 하트를 눌러 모아보세요.",
@@ -5445,7 +5428,6 @@ function FavoriteScreen({
   products: ProductListItem[];
   onBack: () => void;
   onProductClick: (id: string) => void;
-  onFavorite: (id: string) => void;
   title?: string;
   emptyTitle?: string;
   emptyBody?: string;
@@ -5474,7 +5456,6 @@ function FavoriteScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => onFavorite(product.id)}
             />
           ))}
         </div>
@@ -6294,7 +6275,6 @@ function SearchScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => undefined}
             />
           ))}
           <h2>동네생활</h2>
