@@ -28,7 +28,7 @@ import {
 
   Shirt, ShoppingBag, ShoppingBasket, SlidersHorizontal, Sparkles, SprayCan,
 
-  Store, Sun, Tag, Truck, UserRound, Users, UsersRound, Utensils,
+  Store, Sun, Tag, Truck, UserRound, Users, UsersRound, Utensils, ExternalLink,
 
   WalletCards, X,
 
@@ -8516,7 +8516,7 @@ function MapScreen({
 
                     </span>
 
-                    {category.name}
+                    <span className={styles.localCategoryLabel}>{category.name}</span>
 
                   </button>
 
@@ -10673,6 +10673,28 @@ function DreamFacilityCallout({
         <span style={{ width: `${Math.min(progress, 100)}%` }} />
 
       </div>
+
+      {facility.homepageUrl && (
+
+        <a
+
+          className={styles.dreamFacilityHomepage}
+
+          href={facility.homepageUrl}
+
+          target="_blank"
+
+          rel="noreferrer"
+
+        >
+
+          홈페이지 보기
+
+          <ExternalLink size={15} aria-hidden="true" />
+
+        </a>
+
+      )}
 
       <div className={styles.dreamFacilityCalloutFooter}>
 

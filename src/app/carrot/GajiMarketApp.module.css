@@ -1245,25 +1245,25 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #26313c;
+  background: #181d24;
 }
 
 .naverMapFrame {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: #26313c;
+  background: #181d24;
 }
 
 .naverMapLayer {
   width: 100%;
   height: 100%;
-  background: #26313c;
+  background: #181d24;
 }
 
-.stage:not([data-theme="light"]) .mapScreen .mapCanvas,
-.stage:not([data-theme="light"]) .mapScreen .naverMapFrame,
-.stage:not([data-theme="light"]) .mapScreen .naverMapLayer {
+.stage[data-theme="light"] .mapScreen .mapCanvas,
+.stage[data-theme="light"] .mapScreen .naverMapFrame,
+.stage[data-theme="light"] .mapScreen .naverMapLayer {
   background: #eef1f4;
 }
 
@@ -2166,12 +2166,12 @@
 }
 
 .sheet_collapsed {
-  height: calc(134px + env(safe-area-inset-bottom));
+  height: calc(198px + env(safe-area-inset-bottom));
   overflow-y: hidden;
 }
 
 .sheet_half {
-  height: min(52%, 400px);
+  height: min(52%, 420px);
   overflow-y: auto;
 }
 
@@ -2266,8 +2266,8 @@
 .localCategoryGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 17px 11px;
-  grid-auto-rows: 80px;
+  gap: 14px 8px;
+  grid-auto-rows: auto;
   padding: 4px 0 12px;
 }
 
@@ -2277,11 +2277,26 @@
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 730;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.localCategoryLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .localIcon {
@@ -3634,6 +3649,21 @@
   height: 100%;
   border-radius: inherit;
   background: var(--dream-progress);
+}
+
+.dreamFacilityHomepage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  color: var(--dream-orange);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dreamFacilityHomepage:hover {
+  text-decoration: underline;
 }
 
 .profileAvatar {
@@ -7895,23 +7925,26 @@
 
 /* Pastel-orange cluster marker: visually matches restaurant apricot/orange markers */
 .restaurantClusterMarker {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 12px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
   display: grid;
   place-items: center;
-  border: 1.5px solid #F5A66A;
+  border: 2px solid #F5A66A;
   border-radius: 50%;
   background: #FFD6B0;
   color: #7A3E10;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 2px 6px rgb(255 111 15 / 22%);
+  box-shadow: 0 3px 8px rgb(255 111 15 / 28%);
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
-.restaurantClusterMarker:active { background: #FFC48E; }
+.restaurantClusterMarker:hover { transform: scale(1.08); }
+.restaurantClusterMarker:active { background: #FFC48E; transform: scale(0.95); }
 .restaurantClusterMarker:focus-visible,
 .restaurantClusterRow:focus-visible,
 .restaurantClusterClose:focus-visible {
@@ -7965,10 +7998,4 @@
   overflow-y: auto;
 }
 .transitSheet .localDots { display: none; }
-.transitCanvas .kakaoMapFrame { height: auto; bottom: min(58%, 460px); }
-.transitCanvas[data-sheet="collapsed"] .kakaoMapFrame { bottom: calc(140px + env(safe-area-inset-bottom)); }
-.transitCanvas .mapControls { top: 96px; gap: 8px; }
-.transitCanvas .mapControls button { width: 42px; height: 42px; }
 
-.transitCanvas .mapSearchAgain { top: auto; bottom: calc(min(58%, 460px) + 12px); }
-.transitCanvas[data-sheet="collapsed"] .mapSearchAgain { bottom: calc(152px + env(safe-area-inset-bottom)); }

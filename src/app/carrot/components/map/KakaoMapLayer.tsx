@@ -193,7 +193,7 @@ export function createClusterOverlayElement(
   button.className = styles.restaurantClusterMarker;
   button.dataset.theme = isDark ? "dark" : "light";
   button.setAttribute("aria-label", `이 위치의 음식점 ${count}곳 보기`);
-  button.textContent = `🍽️ ${count}`;
+  button.textContent = String(count);
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     onClick();
@@ -315,9 +315,9 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
   const kakao = (window as any).kakao;
   if (!proj || !kakao?.maps) return stops.map((stop) => [stop]);
 
-  const boxes = stops.map((stop) => {
+  const points = stops.map((stop) => {
     const pos = new kakao.maps.LatLng(stop.lat, stop.lng);
-    return getRestaurantMarkerBox(proj.pointFromCoords(pos), stop.name);
+    return proj.pointFromCoords(pos);
   });
   const parent = stops.map((_, index) => index);
   const find = (index: number): number => {
@@ -331,11 +331,15 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
     if (leftRoot !== rightRoot) parent[leftRoot] = rightRoot;
   };
 
-  for (let left = 0; left < boxes.length; left += 1) {
-    for (let right = left + 1; right < boxes.length; right += 1) {
-      const overlap = calculateMarkerOverlapRatio(boxes[left], boxes[right]);
-      const distance = Math.hypot(boxes[left].cx - boxes[right].cx, boxes[left].cy - boxes[right].cy);
-      if (overlap >= 0.8 || distance <= 14) union(left, right);
+  const CLUSTER_DISTANCE_PX = 56;
+
+  for (let left = 0; left < points.length; left += 1) {
+    for (let right = left + 1; right < points.length; right += 1) {
+      if (!points[left] || !points[right]) continue;
+      const distance = Math.hypot(points[left].x - points[right].x, points[left].y - points[right].y);
+      if (distance <= CLUSTER_DISTANCE_PX) {
+        union(left, right);
+      }
     }
   }
 
@@ -348,12 +352,14 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
   return Array.from(clusters.values());
 }
 
-function createBikeClusterOverlayElement(count: number, onClick: () => void): HTMLButtonElement {
+function createBikeClusterOverlayElement(cluster: TransitStop[], onClick: () => void): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = transitStyles.clusterMarker;
-  button.textContent = `🚲 ${count}`;
-  button.setAttribute("aria-label", `이 위치의 따릉이 대여소 ${count}곳 보기`);
+  const totalBikes = cluster.reduce((sum, item) => sum + (item.bikes_available ?? 0), 0);
+  button.textContent = `🚲 ${totalBikes}`;
+  button.setAttribute("aria-label", `따릉이 대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)`);
+  button.title = `대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)\n${cluster.map((s) => `• ${s.name}: ${s.bikes_available ?? 0}대`).join("\n")}`;
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     onClick();
@@ -768,50 +774,87 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     const kakao = (window as any).kakao;
     const map = mapRef.current;
     if (!map || !kakao?.maps || !canUseKakaoMap || !isTransitMode) return;
-    const bikeClusters = selectedCategory === "bike" ? clusterBikeStopsByOverlap(transitStops, map) : transitStops.map((stop) => [stop]);
-    const overlays = bikeClusters.map((cluster) => {
-      const stop = cluster[0];
-      if (cluster.length > 1) {
-        const position = new kakao.maps.LatLng(
-          cluster.reduce((sum, item) => sum + item.lat, 0) / cluster.length,
-          cluster.reduce((sum, item) => sum + item.lng, 0) / cluster.length,
-        );
-        const button = createBikeClusterOverlayElement(cluster.length, () => onSelectTransit?.(stop));
+
+    let overlays: any[] = [];
+
+    const renderTransitMarkers = () => {
+      overlays.forEach((overlay) => overlay.setMap(null));
+      overlays = [];
+
+      const bikeClusters = selectedCategory === "bike" ? clusterBikeStopsByOverlap(transitStops, map) : transitStops.map((stop) => [stop]);
+      overlays = bikeClusters.map((cluster) => {
+        const stop = cluster[0];
+        if (cluster.length > 1) {
+          const avgLat = cluster.reduce((sum, item) => sum + item.lat, 0) / cluster.length;
+          const avgLng = cluster.reduce((sum, item) => sum + item.lng, 0) / cluster.length;
+          const position = new kakao.maps.LatLng(avgLat, avgLng);
+          const button = createBikeClusterOverlayElement(cluster, () => {
+            const currentLevel = map.getLevel();
+            if (currentLevel > 1) {
+              map.setLevel(Math.max(1, currentLevel - 2));
+              map.panTo(position);
+            }
+            onSelectTransit?.(stop);
+          });
+          const overlay = new kakao.maps.CustomOverlay({
+            position,
+            content: button,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+            zIndex: 120,
+          });
+          overlay.setMap(map);
+          return overlay;
+        }
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = transitStyles.marker;
+        button.dataset.kind = stop.kind;
+        button.dataset.empty = String(stop.kind === "bike" && (stop.bikes_available === 0 || stop.bikes_available === null));
+        button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
+
+        if (stop.kind === "bike") {
+          const countStr = stop.bikes_available !== null ? String(stop.bikes_available) : "-";
+          button.textContent = `🚲 ${countStr}`;
+          button.setAttribute("aria-label", `${stop.name} (대여 가능: ${countStr}대)`);
+          button.title = `${stop.name} (대여 가능: ${countStr}대)`;
+        } else {
+          button.textContent = stop.name;
+          button.setAttribute("aria-label", `${stop.name} ${stop.line ?? ""}`.trim());
+          button.title = `${stop.name} ${stop.line ?? ""}`.trim();
+        }
+
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          kakao.maps.event.preventMap?.();
+          onSelectTransit?.(stop);
+        });
         const overlay = new kakao.maps.CustomOverlay({
-          position,
+          position: new kakao.maps.LatLng(stop.lat, stop.lng),
           content: button,
           yAnchor: 0.5,
           xAnchor: 0.5,
-          zIndex: 120,
+          zIndex: stop.id === selectedTransitId ? 200 : 70,
         });
         overlay.setMap(map);
         return overlay;
-      }
+      });
+    };
 
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = transitStyles.marker;
-      button.dataset.kind = stop.kind;
-      button.dataset.empty = String(stop.kind === "bike" && stop.bikes_available === 0);
-      button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
-      const availability = stop.bikes_available === null ? "확인 불가" : `${stop.bikes_available}대`;
-      button.textContent = stop.name;
-      button.setAttribute("aria-label", `${stop.name} ${stop.kind === "bike" ? availability : stop.line ?? ""}`);
-      button.title = `${stop.name} ${stop.line ?? ""}`.trim();
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        kakao.maps.event.preventMap?.();
-        onSelectTransit?.(stop);
-      });
-      const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(stop.lat, stop.lng), content: button,
-        yAnchor: 1.2, xAnchor: 0.5, zIndex: stop.id === selectedTransitId ? 200 : 70,
-      });
-      overlay.setMap(map);
-      return overlay;
-    });
-    return () => overlays.forEach((overlay) => overlay.setMap(null));
-  }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit]);
+    renderTransitMarkers();
+
+    const onZoomChanged = () => {
+      renderTransitMarkers();
+    };
+
+    kakao.maps.event.addListener(map, "zoom_changed", onZoomChanged);
+
+    return () => {
+      kakao.maps.event.removeListener(map, "zoom_changed", onZoomChanged);
+      overlays.forEach((overlay) => overlay.setMap(null));
+    };
+  }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit, selectedCategory]);
 
   useEffect(() => {
     const kakao = (window as any).kakao;

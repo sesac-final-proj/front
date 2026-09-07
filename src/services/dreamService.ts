@@ -5,6 +5,7 @@ export interface DreamFacility {
   name: string;
   facilityType: string;
   neighborhoodName: string;
+  homepageUrl: string | null;
   lat: number;
   lng: number;
   donationCount: number;
@@ -17,6 +18,7 @@ interface ApiFacility {
   name: string;
   district: string;
   facility_type: string;
+  homepage_url: string | null;
   lat: number | null;
   lng: number | null;
 }
@@ -38,6 +40,7 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
           name: item.name,
           facilityType: item.facility_type,
           neighborhoodName: item.district,
+          homepageUrl: item.homepage_url,
           lat: item.lat,
           lng: item.lng,
           donationCount: 0,
