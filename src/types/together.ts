@@ -31,8 +31,8 @@ export const TOGETHER_CATEGORIES: Record<TogetherCategory, TogetherCategoryMeta>
     icon: "🛒",
     title: "공동구매",
     description: "대용량 상품이나 배송비를 이웃과 함께 나눠요",
-    color: "#4B0090",
-    bgLight: "#F3E8FF",
+    color: "#ff6f0f",
+    bgLight: "#fff0e6",
   },
   hobby: {
     key: "hobby",
