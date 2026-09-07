@@ -261,3 +261,14 @@ export type DangerSignalApiItem = {
 export type DangerSignalApiResponse = { items?: DangerSignalApiItem[] } | DangerSignalApiItem[];
 
 export type ThemeMode = "dark" | "light";
+
+export type ProductSort = "latest" | "price_asc" | "price_desc";
+
+export interface ProductFilters {
+  category?: string;
+  tradeType?: "SALE" | "FREE";
+  priceMin?: number;
+  priceMax?: number;
+  sort: ProductSort;
+  excludeSold?: boolean;
+}

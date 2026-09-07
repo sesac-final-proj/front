@@ -1,0 +1,31 @@
+{
+  "rowCount": 6234,
+  "fileCount": 12,
+  "platforms": [
+    {
+      "name": "elecmart",
+      "rows": 2542,
+      "meanPrice": 133142,
+      "medianPrice": 90000,
+      "duplicateRate": 0,
+      "statuses": {"판매중": 1579, "예약중": 319, "판매완료": 644}
+    },
+    {
+      "name": "joonggonara",
+      "rows": 3692,
+      "meanPrice": 136366,
+      "medianPrice": 88500,
+      "duplicateRate": 3.55,
+      "statuses": {"판매중": 1127, "예약중": 79, "판매완료": 2486}
+    }
+  ],
+  "products": [
+    {"name": "다이슨 청소기", "elecmart": {"count": 658, "mean": 131905, "median": 50000, "q1": 25000, "q3": 165000}, "joonggonara": {"count": 1228, "mean": 128202, "median": 49000, "q1": 20000, "q3": 150000}},
+    {"name": "메디큐브 부스터 프로", "elecmart": {"count": 731, "mean": 165184, "median": 150000, "q1": 90000, "q3": 210000}, "joonggonara": {"count": 601, "mean": 170922, "median": 170000, "q1": 120000, "q3": 200000}},
+    {"name": "미닉스 음식물처리기", "elecmart": {"count": 102, "mean": 300006, "median": 300000, "q1": 257000, "q3": 330000}, "joonggonara": {"count": 179, "mean": 305845, "median": 310000, "q1": 260000, "q3": 350000}},
+    {"name": "브레짜 분유", "elecmart": {"count": 32, "mean": 159406, "median": 165000, "q1": 98500, "q3": 212500}, "joonggonara": {"count": 117, "mean": 156337, "median": 150000, "q1": 80000, "q3": 210000}},
+    {"name": "쿠쿠 밥솥", "elecmart": {"count": 699, "mean": 96747, "median": 69000, "q1": 42000, "q3": 119000}, "joonggonara": {"count": 1140, "mean": 115430, "median": 70000, "q1": 39000, "q3": 130000}},
+    {"name": "풀리오 마사지기", "elecmart": {"count": 320, "mean": 86174, "median": 70000, "q1": 55000, "q3": 95250}, "joonggonara": {"count": 427, "mean": 90584, "median": 75000, "q1": 60000, "q3": 110000}}
+  ],
+  "correlations": {"favorites": {"count": 2542, "rho": 0.2081}, "comments": {"count": 2542, "rho": null}}
+}
