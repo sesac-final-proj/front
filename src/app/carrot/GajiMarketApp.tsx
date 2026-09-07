@@ -286,6 +286,11 @@ export default function GajiMarketApp() {
   const productPageRef = useRef(1);
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
   const [chats, setChats] = useState<ChatRoom[]>([]);
+  // 판매자가 본인 글에서 "채팅하기" → 그 글에 걸린 N:1 채팅방 목록(chat-room-list)용.
+  // 최초 1회 불러온 전체 chats 상태는 그 이후 새로 생긴 방을 못 담을 수 있어서(스테일),
+  // 이 화면에 들어갈 때마다 product_id 필터로 서버에서 새로 받아온다.
+  const [productChatRooms, setProductChatRooms] = useState<ChatRoom[]>([]);
+  const [productChatRoomsLoading, setProductChatRoomsLoading] = useState(false);
   const [albaList, setAlbaList] = useState<AlbaItem[]>(ALBA_MOCK_DATA);
   const [dangerSignals, setDangerSignals] = useState<LocalBusiness[]>([]);
   const [dangerSignalsLoaded, setDangerSignalsLoaded] = useState(false);
@@ -323,6 +328,47 @@ export default function GajiMarketApp() {
       });
     return () => controller.abort();
   }, [me]);
+
+  // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
+  // 컨테이너라 이전 화면의 스크롤 위치가 그대로 남아있어서, 이게 없으면 헤더(뒤로가기)가
+  // 화면 밖으로 밀려나 있어 위로 스크롤해야 뒤로 갈 수 있었다.
+  useEffect(() => {
+    if (!subPage) return;
+    window.requestAnimationFrame(() => {
+      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [subPage]);
+
+  // 상품별 채팅방 N:1 목록 — 판매자 본인 글의 "채팅하기"로 chat-room-list에 들어갈 때마다
+  // product_id 필터로 새로 받아온다(버그: 예전엔 최초 1회 받은 전체 chats를 클라이언트에서
+  // productId로만 걸러서 보여줬는데, 그 이후 새로 생긴 채팅방이 반영이 안 됐다).
+  useEffect(() => {
+    if (subPage?.type !== "chat-room-list") return;
+    const numericProductId = Number(subPage.productId);
+    if (!Number.isFinite(numericProductId)) return;
+    const controller = new AbortController();
+    // productId가 바뀔 때마다 새로 로딩 시작을 알려야 해서(스켈레톤 표시) 불가피하게
+    // effect 본문에서 동기 setState — fetch 시작을 어차피 여기서 트리거하므로 의미상
+    // 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setProductChatRoomsLoading(true);
+    listChatRooms(controller.signal, numericProductId)
+      .then((page) => {
+        const rooms = page.items.map(toChatRoomUi);
+        setProductChatRooms(rooms);
+        // chat-room 화면은 chats 상태에서 room을 찾으므로(selectedChat), 여기서 받은
+        // 최신 정보로 병합해둬야 openChat 이후 헤더/물품카드가 최신 값으로 보인다.
+        setChats((current) => [...rooms, ...current.filter((c) => !rooms.some((r) => r.id === c.id))]);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("상품별 채팅방 목록을 불러오지 못했습니다.", error);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setProductChatRoomsLoading(false);
+      });
+    return () => controller.abort();
+  }, [subPage]);
 
   function recordOtherUserId(chatId: string, items: ChatMessageDto[]) {
     const other = items.find((m) => m.senderId !== me?.id);
@@ -1244,7 +1290,6 @@ export default function GajiMarketApp() {
           ) : subPage?.type === "chat-room" && selectedChat ? (
             <ChatRoomScreen
               room={selectedChat}
-              product={selectedChat.productId ? products.find((product) => product.id === selectedChat.productId) : undefined}
               messages={roomMessages[selectedChat.id] ?? []}
               draft={messageDraft}
               onDraftChange={setMessageDraft}
@@ -1259,9 +1304,9 @@ export default function GajiMarketApp() {
             />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
-              rooms={chats.filter((chat) => chat.productId === subPage.productId)}
+              rooms={productChatRooms}
               activeFilter={chatFilter}
-              isLoading={false}
+              isLoading={productChatRoomsLoading}
               unreadCount={totalUnread}
               onFilterChange={setChatFilter}
               onOpenNotifications={() => setSheet("notifications")}
