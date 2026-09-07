@@ -13,8 +13,7 @@ export async function GET(request: Request) {
   if (!(south >= -90 && south < north && north <= 90 && west >= -180 && west < east && east <= 180)) {
     return NextResponse.json({ error: "지도 범위를 확인해 주세요." }, { status: 400 });
   }
-  const base = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!base) return NextResponse.json({ error: "교통정보 연결을 준비 중이에요." }, { status: 503 });
+  const base = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
   try {
     const url = new URL("/api/v1/local/transit", base);
     if (url.origin === incoming.origin) return NextResponse.json({ error: "교통정보 연결을 확인해 주세요." }, { status: 503 });
