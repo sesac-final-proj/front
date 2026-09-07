@@ -1,19 +1,4 @@
-import { AUTH_TOKEN_STORAGE_KEY, AuthRequiredError } from "@/services/tradeService";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
-function apiUrl(path: string) {
-  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
-}
-
-function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
+import { authorizedFetch } from "@/services/tradeService";
 
 export type ChatRoomType = "TRADE" | "COMMUNITY" | "GROUP" | "SYSTEM";
 export type ChatTradeStatus = "SALE" | "RESERVED" | "SOLD";
@@ -102,14 +87,10 @@ function toChatMessage(item: ApiChatMessage): ChatMessageDto {
 
 // 채팅 관련 API는 전부 로그인이 필요한 엔드포인트라 토큰 없으면 AuthRequiredError.
 export async function listChatRooms(signal?: AbortSignal): Promise<{ items: ChatRoomDto[]; total: number }> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl("/api/v1/chats?size=100"), {
+  const response = await authorizedFetch("/api/v1/chats?size=100", {
     signal,
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("채팅 목록을 불러오지 못했습니다.");
 
   const payload: ApiChatRoomPage = await response.json();
@@ -118,19 +99,11 @@ export async function listChatRooms(signal?: AbortSignal): Promise<{ items: Chat
 
 // 이미 그 상품에 대해 열어둔 방이 있으면 백엔드가 새로 만들지 않고 그 방을 그대로 돌려준다.
 export async function createOrGetChatRoom(productId: number): Promise<ChatRoomDto> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl("/api/v1/chats"), {
+  const response = await authorizedFetch("/api/v1/chats", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ type: "TRADE", product_id: productId }),
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("채팅방을 열지 못했습니다.");
 
   const payload: ApiChatRoom = await response.json();
@@ -141,14 +114,10 @@ export async function listMessages(
   chatRoomId: number,
   signal?: AbortSignal,
 ): Promise<{ items: ChatMessageDto[]; total: number }> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/messages?size=200`), {
+  const response = await authorizedFetch(`/api/v1/chats/${chatRoomId}/messages?size=200`, {
     signal,
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    headers: { Accept: "application/json" },
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("메시지를 불러오지 못했습니다.");
 
   const payload: ApiChatMessagePage = await response.json();
@@ -156,19 +125,11 @@ export async function listMessages(
 }
 
 export async function sendMessage(chatRoomId: number, content: string): Promise<ChatMessageDto> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/messages`), {
+  const response = await authorizedFetch(`/api/v1/chats/${chatRoomId}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ message_type: "TEXT", content }),
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("메시지를 보내지 못했습니다.");
 
   const payload: ApiChatMessage = await response.json();
@@ -178,19 +139,11 @@ export async function sendMessage(chatRoomId: number, content: string): Promise<
 // 채팅 이미지: presign → 브라우저에서 NCP에 직접 PUT → object_key를 메시지로 등록, 3단계.
 // 상품 이미지와 달리 등록 엔드포인트가 따로 없고 메시지 전송 자체가 등록이다.
 export async function sendImageMessage(chatRoomId: number, file: File): Promise<ChatMessageDto> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const presignResponse = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/images/presign`), {
+  const presignResponse = await authorizedFetch(`/api/v1/chats/${chatRoomId}/images/presign`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ filename: file.name, content_type: file.type }),
   });
-  if (presignResponse.status === 401) throw new AuthRequiredError();
   if (!presignResponse.ok) throw new Error("이미지 업로드 URL을 받지 못했습니다.");
   const { upload_url, object_key }: { upload_url: string; object_key: string } = await presignResponse.json();
 
@@ -203,16 +156,11 @@ export async function sendImageMessage(chatRoomId: number, file: File): Promise<
   });
   if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
 
-  const messageResponse = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/messages`), {
+  const messageResponse = await authorizedFetch(`/api/v1/chats/${chatRoomId}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ message_type: "IMAGE", image_object_key: object_key }),
   });
-  if (messageResponse.status === 401) throw new AuthRequiredError();
   if (!messageResponse.ok) throw new Error("이미지 메시지를 보내지 못했습니다.");
 
   const payload: ApiChatMessage = await messageResponse.json();
@@ -220,14 +168,7 @@ export async function sendImageMessage(chatRoomId: number, file: File): Promise<
 }
 
 export async function leaveChatRoom(chatRoomId: number): Promise<void> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}`), {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (response.status === 401) throw new AuthRequiredError();
+  const response = await authorizedFetch(`/api/v1/chats/${chatRoomId}`, { method: "DELETE" });
   if (!response.ok) throw new Error("채팅방을 나가지 못했습니다.");
 }
 
@@ -236,19 +177,11 @@ export async function updateChatTradeStatus(
   chatRoomId: number,
   tradeStatus: ChatTradeStatus,
 ): Promise<ChatMessageDto> {
-  const token = getAuthToken();
-  if (!token) throw new AuthRequiredError();
-
-  const response = await fetch(apiUrl(`/api/v1/chats/${chatRoomId}/status`), {
+  const response = await authorizedFetch(`/api/v1/chats/${chatRoomId}/status`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ trade_status: tradeStatus }),
   });
-  if (response.status === 401) throw new AuthRequiredError();
   if (!response.ok) throw new Error("거래상태를 변경하지 못했습니다.");
 
   const payload: ApiChatMessage = await response.json();

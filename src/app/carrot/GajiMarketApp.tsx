@@ -183,6 +183,9 @@ export default function GajiMarketApp() {
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
   const [me, setMe] = useState<Me | null>(null);
+  // 로그인 필수 게이트: getMe() 응답이 오기 전엔 화면을 그리지 않고, 비로그인/토큰
+  // 만료면 온보딩으로 보낸다 — 게스트 열람 허용하던 이전 동작을 없앤 것.
+  const [authChecked, setAuthChecked] = useState(false);
   const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
   const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<ProductListItem[]>([]);
@@ -199,8 +202,8 @@ export default function GajiMarketApp() {
     writeNeighborhoodCache({ primary: activeNeighborhood, secondary: secondaryNeighborhood });
   }, [activeNeighborhood, secondaryNeighborhood]);
 
-  // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
-  // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
+  // 로그인 필수: 토큰이 없거나 만료됐으면(getMe 실패) 온보딩으로 보낸다.
+  // 네트워크 일시 오류도 신원 확인이 안 된 것이므로 동일하게 처리한다.
   useEffect(() => {
     getMe()
       .then((fetchedMe) => {
@@ -209,9 +212,12 @@ export default function GajiMarketApp() {
         if (fetchedMe.region) {
           setActiveNeighborhood(fetchedMe.region.dongName);
         }
+        setAuthChecked(true);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        router.replace("/onboarding");
+      });
+  }, [router]);
 
   // 판매내역/찜 목록은 일반 목록(products)을 mine/isFavorite로 거르는 방식으로는
   // 못 만든다 — 그 두 값이 실서버 데이터에 대해 항상 false라 새로고침(새 세션)마다
@@ -1137,6 +1143,12 @@ export default function GajiMarketApp() {
 
   const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
+
+  // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
+  // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
+  if (!authChecked) {
+    return <div className={styles.stage} data-theme={theme} />;
+  }
 
   return (
     <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
