@@ -3741,7 +3741,7 @@ function MapScreen({
                     <span className={`${styles.localIcon} ${styles[`local_${category.tone}` as keyof typeof styles] ?? ""}`}>
                       <CategoryIcon size={27} />
                     </span>
-                    {category.name}
+                    <span className={styles.localCategoryLabel}>{category.name}</span>
                   </button>
                 );
               })}

@@ -307,6 +307,66 @@ export function clusterRestaurantsByOverlap(
   return Array.from(clustersMap.values());
 }
 
+export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): TransitStop[][] {
+  if (stops.length === 0) return [];
+  if (!map) return stops.map((stop) => [stop]);
+
+  const proj = map.getProjection ? map.getProjection() : null;
+  const kakao = (window as any).kakao;
+  if (!proj || !kakao?.maps) return stops.map((stop) => [stop]);
+
+  const points = stops.map((stop) => {
+    const pos = new kakao.maps.LatLng(stop.lat, stop.lng);
+    return proj.pointFromCoords(pos);
+  });
+  const parent = stops.map((_, index) => index);
+  const find = (index: number): number => {
+    if (parent[index] === index) return index;
+    parent[index] = find(parent[index]);
+    return parent[index];
+  };
+  const union = (left: number, right: number) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent[leftRoot] = rightRoot;
+  };
+
+  const CLUSTER_DISTANCE_PX = 56;
+
+  for (let left = 0; left < points.length; left += 1) {
+    for (let right = left + 1; right < points.length; right += 1) {
+      if (!points[left] || !points[right]) continue;
+      const distance = Math.hypot(points[left].x - points[right].x, points[left].y - points[right].y);
+      if (distance <= CLUSTER_DISTANCE_PX) {
+        union(left, right);
+      }
+    }
+  }
+
+  const clusters = new Map<number, TransitStop[]>();
+  stops.forEach((stop, index) => {
+    const root = find(index);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root)!.push(stop);
+  });
+  return Array.from(clusters.values());
+}
+
+function createBikeClusterOverlayElement(cluster: TransitStop[], onClick: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = transitStyles.clusterMarker;
+  const totalBikes = cluster.reduce((sum, item) => sum + (item.bikes_available ?? 0), 0);
+  button.textContent = `🚲 ${totalBikes}`;
+  button.setAttribute("aria-label", `따릉이 대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)`);
+  button.title = `대여소 ${cluster.length}곳 (총 ${totalBikes}대 대여 가능)\n${cluster.map((s) => `• ${s.name}: ${s.bikes_available ?? 0}대`).join("\n")}`;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
+}
+
 
 // SEED Design System (seed-design.io) 기반 자연스럽게 녹아드는 파스텔 열지도 및 카토그래픽 텍스트 (박스 없는 자연스러운 지도 융합)
 export function createSeedPastelHeatmapElement(
@@ -714,31 +774,87 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     const kakao = (window as any).kakao;
     const map = mapRef.current;
     if (!map || !kakao?.maps || !canUseKakaoMap || !isTransitMode) return;
-    const overlays = transitStops.map((stop) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = transitStyles.marker;
-      button.dataset.kind = stop.kind;
-      button.dataset.empty = String(stop.kind === "bike" && stop.bikes_available === 0);
-      button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
-      const availability = stop.bikes_available === null ? "확인 불가" : `${stop.bikes_available}대`;
-      button.textContent = stop.kind === "bike" ? `자전거 ${availability}` : stop.name;
-      button.setAttribute("aria-label", `${stop.name} ${stop.kind === "bike" ? availability : stop.line ?? ""}`);
-      button.title = `${stop.name} ${stop.line ?? ""}`.trim();
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        kakao.maps.event.preventMap?.();
-        onSelectTransit?.(stop);
+
+    let overlays: any[] = [];
+
+    const renderTransitMarkers = () => {
+      overlays.forEach((overlay) => overlay.setMap(null));
+      overlays = [];
+
+      const bikeClusters = selectedCategory === "bike" ? clusterBikeStopsByOverlap(transitStops, map) : transitStops.map((stop) => [stop]);
+      overlays = bikeClusters.map((cluster) => {
+        const stop = cluster[0];
+        if (cluster.length > 1) {
+          const avgLat = cluster.reduce((sum, item) => sum + item.lat, 0) / cluster.length;
+          const avgLng = cluster.reduce((sum, item) => sum + item.lng, 0) / cluster.length;
+          const position = new kakao.maps.LatLng(avgLat, avgLng);
+          const button = createBikeClusterOverlayElement(cluster, () => {
+            const currentLevel = map.getLevel();
+            if (currentLevel > 1) {
+              map.setLevel(Math.max(1, currentLevel - 2));
+              map.panTo(position);
+            }
+            onSelectTransit?.(stop);
+          });
+          const overlay = new kakao.maps.CustomOverlay({
+            position,
+            content: button,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+            zIndex: 120,
+          });
+          overlay.setMap(map);
+          return overlay;
+        }
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = transitStyles.marker;
+        button.dataset.kind = stop.kind;
+        button.dataset.empty = String(stop.kind === "bike" && (stop.bikes_available === 0 || stop.bikes_available === null));
+        button.setAttribute("aria-pressed", String(stop.id === selectedTransitId));
+
+        if (stop.kind === "bike") {
+          const countStr = stop.bikes_available !== null ? String(stop.bikes_available) : "-";
+          button.textContent = `🚲 ${countStr}`;
+          button.setAttribute("aria-label", `${stop.name} (대여 가능: ${countStr}대)`);
+          button.title = `${stop.name} (대여 가능: ${countStr}대)`;
+        } else {
+          button.textContent = stop.name;
+          button.setAttribute("aria-label", `${stop.name} ${stop.line ?? ""}`.trim());
+          button.title = `${stop.name} ${stop.line ?? ""}`.trim();
+        }
+
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          kakao.maps.event.preventMap?.();
+          onSelectTransit?.(stop);
+        });
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(stop.lat, stop.lng),
+          content: button,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          zIndex: stop.id === selectedTransitId ? 200 : 70,
+        });
+        overlay.setMap(map);
+        return overlay;
       });
-      const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(stop.lat, stop.lng), content: button,
-        yAnchor: 1.2, xAnchor: 0.5, zIndex: stop.id === selectedTransitId ? 200 : 70,
-      });
-      overlay.setMap(map);
-      return overlay;
-    });
-    return () => overlays.forEach((overlay) => overlay.setMap(null));
-  }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit]);
+    };
+
+    renderTransitMarkers();
+
+    const onZoomChanged = () => {
+      renderTransitMarkers();
+    };
+
+    kakao.maps.event.addListener(map, "zoom_changed", onZoomChanged);
+
+    return () => {
+      kakao.maps.event.removeListener(map, "zoom_changed", onZoomChanged);
+      overlays.forEach((overlay) => overlay.setMap(null));
+    };
+  }, [canUseKakaoMap, isTransitMode, transitStops, selectedTransitId, onSelectTransit, selectedCategory]);
 
   useEffect(() => {
     const kakao = (window as any).kakao;

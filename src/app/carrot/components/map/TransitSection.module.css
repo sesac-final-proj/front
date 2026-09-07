@@ -30,7 +30,84 @@
 .source { margin: 20px 0 0; color: var(--color-muted); font-size: 11px; line-height: 1.8; }
 .source a { color: inherit; text-underline-offset: 3px; }
 .section button:focus-visible, .section a:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-.marker { display: flex; align-items: center; gap: 5px; min-height: 34px; max-width: 160px; padding: 6px 10px; border: 2px solid #2453a0; border-radius: 12px; background: #f8fbff; color: #173f80; font-family: inherit; font-size: 12px; font-weight: 750; box-shadow: 0 3px 10px #14294726; cursor: pointer; white-space: nowrap; }
-.marker[data-kind="bike"] { border-color: #168451; background: #f4fff8; color: #12633e; }
-.marker[data-empty="true"] { border-color: #707780; color: #51565d; background: #f5f6f7; }
-.marker[aria-pressed="true"], .marker:focus-visible { outline: 3px solid #ff8a3d; outline-offset: 2px; }
+.marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 2px solid #2453a0;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #173f80;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.marker[data-kind="subway"] {
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 5px 9px;
+}
+
+.marker[data-kind="bike"] {
+  border-color: #168451;
+  background: #e4f8ec;
+  color: #12633e;
+}
+
+.marker[data-empty="true"] {
+  border-color: #8b95a1;
+  color: #6b7684;
+  background: #f2f4f6;
+  opacity: 0.85;
+}
+
+.clusterMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 2.5px solid #168451;
+  border-radius: 999px;
+  background: #168451;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  box-shadow: 0 4px 12px rgba(22, 132, 81, 0.35);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clusterMarker:hover {
+  transform: scale(1.06);
+}
+
+.clusterMarker:focus-visible {
+  outline: 2px solid #168451;
+  outline-offset: 3px;
+}
+
+.marker[aria-pressed="true"],
+.marker:focus-visible {
+  border-color: #ff6f0f;
+  background: #ff6f0f;
+  color: #ffffff;
+  outline: none;
+  box-shadow: 0 4px 14px rgba(255, 111, 15, 0.45);
+  transform: scale(1.1);
+  z-index: 999;
+}
+

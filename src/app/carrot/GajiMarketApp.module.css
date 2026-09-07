@@ -1261,25 +1261,25 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #26313c;
+  background: #181d24;
 }
 
 .naverMapFrame {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: #26313c;
+  background: #181d24;
 }
 
 .naverMapLayer {
   width: 100%;
   height: 100%;
-  background: #26313c;
+  background: #181d24;
 }
 
-.stage:not([data-theme="light"]) .mapScreen .mapCanvas,
-.stage:not([data-theme="light"]) .mapScreen .naverMapFrame,
-.stage:not([data-theme="light"]) .mapScreen .naverMapLayer {
+.stage[data-theme="light"] .mapScreen .mapCanvas,
+.stage[data-theme="light"] .mapScreen .naverMapFrame,
+.stage[data-theme="light"] .mapScreen .naverMapLayer {
   background: #eef1f4;
 }
 
@@ -2175,28 +2175,20 @@
   border-radius: 24px 24px 0 0;
   background: #17181d;
   padding: 4px 17px calc(100px + env(safe-area-inset-bottom));
-  box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.28);
-  transition: height 380ms cubic-bezier(0.25, 1, 0.5, 1);
+  box-shadow: 0 -16px 42px rgba(0, 0, 0, 0.28);
+  transition: height 360ms cubic-bezier(0.32, 0.72, 0, 1), transform 360ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: height, transform;
   touch-action: pan-y;
 }
 
 .sheet_collapsed {
-  height: calc(186px + env(safe-area-inset-bottom));
+  height: calc(198px + env(safe-area-inset-bottom));
   overflow-y: hidden;
 }
 
 .sheet_half {
-  height: calc(186px + env(safe-area-inset-bottom));
-  overflow-y: hidden;
-}
-
-.sheet_half .localCategoryGrid button:nth-child(n + 6),
-.sheet_half .localDots,
-.sheet_half .localResults,
-.sheet_collapsed .localCategoryGrid button:nth-child(n + 6),
-.sheet_collapsed .localDots,
-.sheet_collapsed .localResults {
-  display: none;
+  height: min(52%, 420px);
+  overflow-y: auto;
 }
 
 .sheet_expanded {
@@ -2205,12 +2197,49 @@
   padding-bottom: calc(164px + env(safe-area-inset-bottom));
 }
 
+.sheet_collapsed .localCategoryGrid button:nth-child(n + 6) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.sheet_half .localCategoryGrid button:nth-child(n + 6),
+.sheet_expanded .localCategoryGrid button:nth-child(n + 6) {
+  opacity: 1;
+  transition: opacity 280ms ease 80ms;
+}
+
+.sheet_collapsed .localDots,
+.sheet_collapsed .localResults {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.sheet_half .localDots,
+.sheet_half .localResults,
+.sheet_expanded .localDots,
+.sheet_expanded .localResults {
+  opacity: 1;
+  transition: opacity 300ms ease 60ms;
+}
+
 .localSheet > .sheetHandle {
   position: sticky;
   top: -4px;
-  z-index: 2;
+  z-index: 10;
   background: inherit;
-  touch-action: manipulation;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0 8px;
+}
+
+.localSheet > .sheetHandle:active {
+  cursor: grabbing;
 }
 
 .localSheet > .sheetHandle:focus:not(:focus-visible) {
@@ -2233,17 +2262,28 @@
 }
 
 .sheetHandle span {
-  width: 48px;
+  width: 44px;
   height: 5px;
   border-radius: 999px;
   background: #6f7480;
+  transition: transform 0.18s ease, background-color 0.18s ease, width 0.18s ease;
+}
+
+.sheetHandle:hover span {
+  background: #8b919d;
+  width: 50px;
+}
+
+.sheetHandle:active span {
+  transform: scale(0.95);
+  background: #a2a8b5;
 }
 
 .localCategoryGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 17px 11px;
-  grid-auto-rows: 80px;
+  gap: 14px 8px;
+  grid-auto-rows: auto;
   padding: 4px 0 12px;
 }
 
@@ -2253,11 +2293,26 @@
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 730;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.localCategoryLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .localIcon {
@@ -3626,6 +3681,21 @@
   background: var(--dream-progress);
 }
 
+.dreamFacilityHomepage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  color: var(--dream-orange);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dreamFacilityHomepage:hover {
+  text-decoration: underline;
+}
+
 .profileAvatar {
   width: 58px;
   height: 58px;
@@ -4046,10 +4116,11 @@
   justify-items: center;
   align-content: center;
   gap: 2px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 15px;
-  font-weight: 400;
+  font-weight: 650;
   cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
 }
 
 .bottomNav button > span {
@@ -4073,9 +4144,10 @@
 }
 
 .bottomNav .navActive {
-  background: rgba(255, 146, 43, 0.22);
+  background: var(--color-primary-container);
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: 800;
+  text-shadow: none;
 }
 
 .toast {
@@ -5605,98 +5677,6 @@
   background: var(--color-surface-2);
 }
 
-.sheet_collapsed {
-  height: calc(140px + env(safe-area-inset-bottom));
-  overflow-y: hidden;
-}
-
-.sheet_half {
-  height: calc(186px + env(safe-area-inset-bottom));
-  overflow-y: hidden;
-}
-
-.sheet_half .localCategoryGrid button:nth-child(n + 6),
-.sheet_half .localDots,
-.sheet_half .localResults,
-.sheet_collapsed .localDots,
-.sheet_collapsed .localResults {
-  display: none;
-}
-
-.sheet_expanded {
-  height: calc(100% - 60px);
-  overflow-y: auto;
-  padding-bottom: calc(164px + env(safe-area-inset-bottom));
-}
-
-.localSheet > .sheetHandle {
-  position: sticky;
-  top: -4px;
-  z-index: 2;
-  background: inherit;
-  touch-action: manipulation;
-}
-
-.localSheet > .sheetHandle:focus:not(:focus-visible) {
-  outline: none;
-}
-
-.localSheet > .sheetHandle:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-  border-radius: 6px;
-}
-
-.sheetHandle {
-  width: 100%;
-  height: 24px;
-  border: 0;
-  background: transparent;
-  display: grid;
-  place-items: center;
-}
-
-.sheetHandle span {
-  width: 44px;
-  height: 4px;
-  border-radius: 999px;
-  background: #6f7480;
-}
-
-.localCategoryGrid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px 6px;
-  grid-auto-rows: auto;
-  padding: 2px 0 6px;
-}
-
-.localCategoryGrid button {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  white-space: nowrap;
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-}
-
-.localIcon {
-  width: 100%;
-  max-width: 48px;
-  aspect-ratio: 1;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  background: #272c34;
-  color: var(--color-primary);
-}
-
 .albaCategoryIconCircle {
   color: var(--color-muted);
   transition: background 140ms ease, color 140ms ease;
@@ -6297,13 +6277,13 @@
   justify-content: space-between;
   gap: 8px;
   height: 22px;
-  animation: slideDownNews 680ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: slideNewsRow 520ms cubic-bezier(0.22, 0.8, 0.3, 1) forwards;
 }
 
-@keyframes slideDownNews {
+@keyframes slideNewsRow {
   from {
     opacity: 0;
-    transform: translateY(-7px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -6313,6 +6293,7 @@
 
 .realtimeNewsText {
   margin: 0;
+  color: inherit;
   font-size: 0.875rem;
   font-weight: 700;
   white-space: nowrap;
@@ -7434,6 +7415,325 @@
   color: var(--color-text);
 }
 
+/* Together screens share the same quiet, utility-first rhythm as the rest of the app. */
+.togetherIntroStack,
+.togetherCategoryList {
+  display: grid;
+  gap: 12px;
+}
+
+.togetherIntroHero {
+  padding: 22px 0 18px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.togetherIntroHero h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+  letter-spacing: -0.7px;
+}
+
+.togetherIntroHero h1 strong {
+  color: var(--color-primary);
+  font-weight: 850;
+}
+
+.togetherIntroHero p {
+  max-width: 29rem;
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.togetherIntroCards {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-line);
+}
+
+.togetherIntroCard {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 11px;
+  padding: 15px;
+  background: var(--color-surface);
+}
+
+.togetherIntroCardIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.togetherIntroCardTitle {
+  margin: 1px 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.togetherIntroCardDesc {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.togetherBox {
+  display: grid;
+  gap: 11px;
+  padding: 15px;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.togetherBox > strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.togetherCategoryList {
+  gap: 8px;
+}
+
+.togetherCategoryCard {
+  width: 100%;
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.togetherCategoryCard:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.togetherCategoryCard:active,
+.togetherPostBtn:active {
+  transform: translateY(1px);
+}
+
+.togetherCategoryCard:focus-visible,
+.togetherPostBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.togetherCategoryEmoji {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--color-surface-2);
+  font-size: 21px;
+}
+
+.togetherCategoryInfo {
+  min-width: 0;
+}
+
+.togetherCategoryName {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.togetherCategoryDesc {
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.togetherCategoryArrow,
+.togetherBannerArrow {
+  color: var(--color-dim);
+}
+
+.togetherPostBtn {
+  min-height: 0 !important;
+  grid-template-columns: minmax(0, 1fr) 20px !important;
+  gap: 10px !important;
+  padding: 17px 0 !important;
+  transition: transform 160ms ease;
+}
+
+.togetherBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.togetherBadgeRow .categoryBadge {
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.togetherStatusActive {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+
+.togetherPostBtn .postText h2 {
+  overflow: hidden;
+  margin: 1px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.togetherPostBtn .postText p {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.togetherPostBtn .postText small {
+  font-size: 11px;
+}
+
+.togetherInlinePrice {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.togetherInlinePrice strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.togetherProgressWrap {
+  padding-top: 2px;
+}
+
+.togetherProgressBar {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+}
+
+.togetherProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 240ms ease;
+}
+
+.detailArticle .togetherBadgeRow {
+  margin-bottom: 12px;
+}
+
+.detailArticle .togetherBox {
+  margin-top: 20px;
+}
+
+.togetherParticipantList {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.togetherParticipantRow,
+.togetherEmptyRow {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 13px;
+}
+
+.togetherParticipantUser {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.togetherMiniAvatar,
+.togetherEmptyAvatar {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.togetherEmptyRow {
+  color: var(--color-dim);
+}
+
+.togetherTagHost,
+.togetherTagMe {
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.togetherTagMe {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+
+.togetherBox label {
+  display: grid;
+  gap: 7px;
+}
+
+.togetherStartButton {
+  width: 100%;
+  grid-column: 1 / -1;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .daangnBannerDots {
   display: flex;
   justify-content: center;
@@ -7825,23 +8125,26 @@
 
 /* Pastel-orange cluster marker: visually matches restaurant apricot/orange markers */
 .restaurantClusterMarker {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 12px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
   display: grid;
   place-items: center;
-  border: 1.5px solid #F5A66A;
+  border: 2px solid #F5A66A;
   border-radius: 50%;
   background: #FFD6B0;
   color: #7A3E10;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 2px 6px rgb(255 111 15 / 22%);
+  box-shadow: 0 3px 8px rgb(255 111 15 / 28%);
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
-.restaurantClusterMarker:active { background: #FFC48E; }
+.restaurantClusterMarker:hover { transform: scale(1.08); }
+.restaurantClusterMarker:active { background: #FFC48E; transform: scale(0.95); }
 .restaurantClusterMarker:focus-visible,
 .restaurantClusterRow:focus-visible,
 .restaurantClusterClose:focus-visible {
@@ -7895,10 +8198,4 @@
   overflow-y: auto;
 }
 .transitSheet .localDots { display: none; }
-.transitCanvas .kakaoMapFrame { height: auto; bottom: min(58%, 460px); }
-.transitCanvas[data-sheet="collapsed"] .kakaoMapFrame { bottom: calc(140px + env(safe-area-inset-bottom)); }
-.transitCanvas .mapControls { top: 96px; gap: 8px; }
-.transitCanvas .mapControls button { width: 42px; height: 42px; }
 
-.transitCanvas .mapSearchAgain { top: auto; bottom: calc(min(58%, 460px) + 12px); }
-.transitCanvas[data-sheet="collapsed"] .mapSearchAgain { bottom: calc(152px + env(safe-area-inset-bottom)); }

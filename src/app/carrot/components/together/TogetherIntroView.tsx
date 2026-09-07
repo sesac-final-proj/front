@@ -91,7 +91,7 @@ export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
         <button
           type="button"
           onClick={onStart}
-          style={{ width: "100%", background: "var(--color-primary)", color: "#ffffff" }}
+          className={styles.togetherStartButton}
         >
           같이해요 시작하기
         </button>
