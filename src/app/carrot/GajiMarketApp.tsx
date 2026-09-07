@@ -182,12 +182,22 @@ export default function GajiMarketApp() {
   const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
   const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<ProductListItem[]>([]);
+  const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
+  const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
 
   // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
   // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
   useEffect(() => {
     getMe()
-      .then(setMe)
+      .then((fetchedMe) => {
+        setMe(fetchedMe);
+        // 이전에 저장해둔 활동동네를 복원 — 안 하면 activeNeighborhood가 항상 기본값("문래동")으로
+        // 시작해서, 아래 region 동기화 effect가 그 기본값을 서버에 다시 덮어써버린다
+        // (골랐던 동네가 새로고침할 때마다 사라지는 버그의 원인).
+        if (fetchedMe.region) {
+          setActiveNeighborhood(fetchedMe.region.dongName);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -217,8 +227,6 @@ export default function GajiMarketApp() {
     return () => controller.abort();
   }, [me]);
 
-  const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
-  const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
   // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
   // 채워져 있어야(빈 문자열이면 곳곳에서 쓰는 NEIGHBORHOOD_COORDS[secondaryNeighborhood] 등이
   // 깨짐) X는 "빈 슬롯"이 아니라 "검색해서 바로 교체"로 이어진다.
