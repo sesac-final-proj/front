@@ -88,7 +88,7 @@ export function BottomSheet({
                 <div className={styles.myRegionRow} key={target}>
                   <button
                     type="button"
-                    className={styles.myRegionRadio}
+                    className={`${styles.myRegionRadio} ${target === "primary" ? styles.myRegionRadioSelected : ""}`}
                     aria-label={`${name}을 대표 동네로 설정`}
                     onClick={() => onSelectPrimary(name)}
                   >

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Heart, X, Navigation, ExternalLink } from "lucide-react";
+import { X, Navigation, ExternalLink } from "lucide-react";
 import { getKakaoPlaceUrl, type Restaurant } from "@/services";
 import styles from "../../GajiMarketApp.module.css";
 
@@ -19,7 +19,6 @@ export function RestaurantDetailSheet({
   onClose,
 }: RestaurantDetailSheetProps) {
   const [activeTab, setActiveTab] = useState<RestaurantDetailTab>("홈");
-  const [isLiked, setIsLiked] = useState(false);
 
   // 카카오맵 길찾기 & 카카오맵 플레이스 직접 연동 URL
   const kakaoNaviUrl = `https://map.kakao.com/link/to/${encodeURIComponent(restaurant.name)},${restaurant.lat},${restaurant.lng}`;
@@ -68,21 +67,13 @@ export function RestaurantDetailSheet({
 
   return (
     <div className={styles.restaurantDetailSheet} data-theme={theme}>
-      {/* 1. 상단 타이틀 & 닫기/찜 (사진 3번) */}
+      {/* 1. 상단 타이틀 & 닫기 */}
       <div className={styles.restaurantDetailHeader}>
         <div className={styles.restaurantDetailTitleBox}>
           <h2 className={styles.restaurantDetailTitle}>{restaurant.name}</h2>
           <span className={styles.restaurantDetailCategory}>{restaurant.category || "돼지고기"}</span>
         </div>
         <div className={styles.restaurantDetailActions}>
-          <button
-            type="button"
-            aria-label="관심 등록"
-            className={styles.restaurantDetailHeartBtn}
-            onClick={() => setIsLiked(!isLiked)}
-          >
-            <Heart size={22} fill={isLiked ? "#ff4d4f" : "none"} color={isLiked ? "#ff4d4f" : "currentColor"} />
-          </button>
           <button
             type="button"
             aria-label="식당 상세 닫기"

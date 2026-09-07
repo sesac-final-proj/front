@@ -1,5 +1,35 @@
 export type TransitKind = "subway" | "bike";
 
+const SUBWAY_LINE_COLORS: Record<string, string> = {
+  "1호선": "#0052a4",
+  "2호선": "#00a84d",
+  "3호선": "#ef7c1c",
+  "4호선": "#00a5de",
+  "5호선": "#996cac",
+  "6호선": "#cd7c2f",
+  "7호선": "#747f00",
+  "8호선": "#e51e25",
+  "9호선": "#bdb092",
+  "경의중앙선": "#77c4a3",
+  "수인분당선": "#fabe00",
+  "신분당선": "#d4003b",
+  "경춘선": "#0c8e72",
+  "공항철도": "#0090d2",
+  "우이신설선": "#b7c452",
+  "의정부경전철": "#fd8100",
+  "김포골드라인": "#ad8605",
+  "인천1호선": "#759cce",
+  "인천2호선": "#f5a251",
+};
+
+export function getSubwayLineNames(line: string | null): string[] {
+  return (line ?? "").split(/[,/·]|\s+(?=(?:경의중앙선|수인분당선|신분당선|공항철도|우이신설선|김포골드라인|\d+호선))/).map((value) => value.trim()).filter(Boolean);
+}
+
+export function getSubwayLineColor(line: string): string {
+  return SUBWAY_LINE_COLORS[line] ?? "#6b7280";
+}
+
 export interface TransitBounds {
   south: number;
   north: number;

@@ -15,6 +15,8 @@
 .name { flex: 1; min-width: 0; }
 .name strong { display: block; font-size: 14px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
 .name small { display: block; margin-top: 4px; color: var(--color-muted); font-size: 12px; }
+.lineBadges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.lineBadge { display: inline-flex; min-height: 20px; align-items: center; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--line-color) 14%, transparent); color: var(--line-color); font-size: 11px; font-weight: 800; }
 .count { flex-shrink: 0; text-align: right; color: var(--color-success); font-size: 12px; }
 .count b { font-size: 23px; margin-right: 2px; font-variant-numeric: tabular-nums; }
 .count small { display: block; margin-top: 2px; font-size: 11px; }
@@ -56,6 +58,9 @@
   font-size: 12px;
   font-weight: 750;
   padding: 5px 9px;
+  border-color: var(--line-color, #2453a0);
+  background: color-mix(in srgb, var(--line-color, #2453a0) 12%, #ffffff);
+  color: var(--line-color, #2453a0);
 }
 
 .marker[data-kind="bike"] {
@@ -89,6 +94,19 @@
   cursor: pointer;
   user-select: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.subwayClusterMarker {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #2453a0;
+  color: #ffffff;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(36, 83, 160, 0.4);
+  cursor: pointer;
 }
 
 .clusterMarker:hover {
