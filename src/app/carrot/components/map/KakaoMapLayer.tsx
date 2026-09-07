@@ -10,7 +10,7 @@ import {
 } from "@/services";
 import styles from "../../GajiMarketApp.module.css";
 import transitStyles from "./TransitSection.module.css";
-import type { TransitBounds, TransitStop } from "@/services/transitService";
+import { getSubwayLineColor, getSubwayLineNames, type TransitBounds, type TransitStop } from "@/services/transitService";
 
 export const KAKAO_MAP_KEY =
   process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
@@ -307,7 +307,7 @@ export function clusterRestaurantsByOverlap(
   return Array.from(clustersMap.values());
 }
 
-export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): TransitStop[][] {
+export function clusterTransitStopsByOverlap(stops: TransitStop[], map: any): TransitStop[][] {
   if (stops.length === 0) return [];
   if (!map) return stops.map((stop) => [stop]);
 
@@ -317,13 +317,15 @@ export function clusterBikeStopsByOverlap(stops: TransitStop[], map: any): Trans
 
   const currentLevel = typeof map.getLevel === "function" ? map.getLevel() : 4;
 
-  // 지도를 확대하면 (레벨 1~2) 클러스터링을 해제하여 모든 따릉이 대여소와 자전거 대수를 개별 표시
+  // 지도를 확대하면 (레벨 1~2) 클러스터링을 해제하여 모든 역과 대여소를 개별 표시
   // 레벨 3에서도 근접(24px 이하)에만 묶고, 레벨 4는 38px, 레벨 5 이상에서만 넓게 클러스터링
   if (currentLevel <= 2) {
     return stops.map((stop) => [stop]);
   }
 
-  const clusterDistancePx = currentLevel === 3 ? 24 : currentLevel === 4 ? 38 : 54;
+  const clusterDistancePx = stops[0]?.kind === "subway"
+    ? currentLevel === 3 ? 28 : currentLevel === 4 ? 44 : 62
+    : currentLevel === 3 ? 24 : currentLevel === 4 ? 38 : 54;
 
   // 화면 컨테이너 기준 픽셀 좌표 사용 (확대 시 픽셀 거리가 벌어지고 축소 시 가까워짐)
   const points = stops.map((stop) => {
@@ -376,6 +378,20 @@ function createBikeClusterOverlayElement(cluster: TransitStop[], onClick: () => 
   return button;
 }
 
+function createSubwayClusterOverlayElement(cluster: TransitStop[], onClick: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = transitStyles.subwayClusterMarker;
+  button.textContent = "🚇";
+  button.setAttribute("aria-label", `지하철역 ${cluster.length}곳 선택`);
+  button.title = cluster.map((stop) => stop.name).join(" · ");
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
+}
+
 
 // SEED Design System (seed-design.io) 기반 자연스럽게 녹아드는 파스텔 열지도 및 카토그래픽 텍스트 (박스 없는 자연스러운 지도 융합)
 export function createSeedPastelHeatmapElement(
@@ -392,11 +408,12 @@ export function createSeedPastelHeatmapElement(
   // Transparent edges and bounded opacity: source-over, never additive light.
   const rgb = theme.tagColor.match(/[a-f0-9]{2}/gi)!.map((hex) => parseInt(hex, 16)).join(", ");
   const opacity = isDark ? 0.20 : 0.30;
+  const centerOpacity = Math.min(1, opacity + 0.08);
   const field = document.createElement("div");
   field.className = styles.congestionHeatmapField;
-  field.style.filter = isDark ? "saturate(1.625) brightness(0.9)" : "none";
+  field.style.filter = isDark ? "saturate(1.725) brightness(0.9)" : "saturate(1.1)";
   field.setAttribute("aria-hidden", "true");
-  field.style.background = `radial-gradient(circle, rgba(${rgb}, ${opacity}) 0%, rgba(${rgb}, ${opacity * 0.75}) 26%, rgba(${rgb}, ${opacity * 0.3}) 52%, rgba(${rgb}, 0) 74%)`;
+  field.style.background = `radial-gradient(circle, rgba(${rgb}, ${centerOpacity}) 0%, rgba(${rgb}, ${opacity}) 24%, rgba(${rgb}, ${opacity * 0.72}) 38%, rgba(${rgb}, ${opacity * 0.3}) 56%, rgba(${rgb}, 0) 76%)`;
 
   const label = document.createElement(onClick ? "button" : "div");
   label.className = styles.congestionMapLabel;
@@ -404,14 +421,25 @@ export function createSeedPastelHeatmapElement(
   label.style.setProperty("--congestion-accent", theme.badgeText);
   label.style.setProperty("--heat-label-color", isDark ? "#E5E5E8" : "#202124");
   label.style.setProperty("--heat-label-halo", isDark ? "#202124" : "#FFFFFF");
-  const statusText = [zone.levelLabel ?? theme.label, getCongestionPopulationLabel(zone)].filter(Boolean).join(" · ");
+  const levelText = zone.levelLabel ?? theme.label;
+  const populationText = getCongestionPopulationLabel(zone);
+  const statusText = [levelText, populationText].filter(Boolean).join(" · ");
   label.setAttribute("aria-label", `${zone.name}, ${statusText}`);
   const title = document.createElement("span");
   title.className = styles.congestionMapTitle;
   title.textContent = zone.name;
   const status = document.createElement("span");
   status.className = styles.congestionMapStatus;
-  status.textContent = statusText;
+  const level = document.createElement("strong");
+  level.className = styles.congestionMapLevel;
+  level.textContent = levelText;
+  status.append(level);
+  if (populationText) {
+    const population = document.createElement("small");
+    population.className = styles.congestionMapPopulation;
+    population.textContent = populationText;
+    status.append(population);
+  }
   label.append(title, status);
   container.append(field, label);
   if (onClick) label.addEventListener("click", (event) => {
@@ -428,6 +456,7 @@ export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   selectedCategory?: string;
   selectedRestaurantId?: string | null;
   congestionZones?: CongestionZone[];
+  onSelectCongestion?: (zone: CongestionZone) => void;
   transitStops?: TransitStop[];
   selectedTransitId?: string | null;
   transitFocus?: TransitStop | null;
@@ -451,6 +480,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   selectedCategory,
   selectedRestaurantId,
   congestionZones = [],
+  onSelectCongestion,
   transitStops = [],
   selectedTransitId,
   transitFocus,
@@ -790,20 +820,25 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
       overlays.forEach((overlay) => overlay.setMap(null));
       overlays = [];
 
-      const bikeClusters = selectedCategory === "bike" ? clusterBikeStopsByOverlap(transitStops, map) : transitStops.map((stop) => [stop]);
-      overlays = bikeClusters.map((cluster) => {
+      const transitClusters = clusterTransitStopsByOverlap(transitStops, map);
+      overlays = transitClusters.map((cluster) => {
         const stop = cluster[0];
         if (cluster.length > 1) {
           const avgLat = cluster.reduce((sum, item) => sum + item.lat, 0) / cluster.length;
           const avgLng = cluster.reduce((sum, item) => sum + item.lng, 0) / cluster.length;
           const position = new kakao.maps.LatLng(avgLat, avgLng);
-          const button = createBikeClusterOverlayElement(cluster, () => {
+          const selectCluster = () => {
             const currentLevel = map.getLevel();
             if (currentLevel > 1) {
               map.setLevel(Math.max(1, currentLevel - 2));
               map.panTo(position);
             }
             onSelectTransit?.(stop);
+          };
+          const button = stop.kind === "subway"
+            ? createSubwayClusterOverlayElement(cluster, selectCluster)
+            : createBikeClusterOverlayElement(cluster, () => {
+              selectCluster();
           });
           const overlay = new kakao.maps.CustomOverlay({
             position,
@@ -832,6 +867,10 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
           button.textContent = stop.name;
           button.setAttribute("aria-label", `${stop.name} ${stop.line ?? ""}`.trim());
           button.title = `${stop.name} ${stop.line ?? ""}`.trim();
+          if (stop.kind === "subway") {
+            const line = getSubwayLineNames(stop.line)[0];
+            if (line) button.style.setProperty("--line-color", getSubwayLineColor(line));
+          }
         }
 
         button.addEventListener("click", (event) => {
@@ -913,6 +952,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     const newOverlays = [...congestionZones].sort((a, b) => b.currentScore - a.currentScore).map((zone) => {
       const el = createSeedPastelHeatmapElement(zone, isDark, () => {
         map.panTo(new kakao.maps.LatLng(zone.lat, zone.lng));
+        onSelectCongestion?.(zone);
       });
       const point = projection.containerPointFromCoords(new kakao.maps.LatLng(zone.lat, zone.lng));
       const label = el.querySelector<HTMLElement>(`.${styles.congestionMapLabel}`)!;
@@ -946,7 +986,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
       congestionOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
       congestionOverlaysRef.current = [];
     };
-  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark]);
+  }, [canUseKakaoMap, congestionZones, isCongestionMode, isDark, onSelectCongestion]);
 
   // Viewport queries never change the map center or the bottom sheet state.
   useEffect(() => {

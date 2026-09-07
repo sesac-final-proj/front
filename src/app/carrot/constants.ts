@@ -48,13 +48,13 @@ export const NEIGHBORHOOD_DISTRICTS: Record<string, string> = {
 };
 
 export const DANGER_VISUALS: Record<DangerTone, DangerVisual> = {
-  fire: { label: "화재", emoji: "🔥", tone: "fire" },
-  accident: { label: "사고", emoji: "⚠️", tone: "accident" },
-  construction: { label: "공사", emoji: "🚧", tone: "construction" },
-  failure: { label: "고장", emoji: "🔧", tone: "failure" },
-  control: { label: "통제", emoji: "⛔", tone: "control" },
-  flood: { label: "침수", emoji: "🌊", tone: "flood" },
-  default: { label: "위험", emoji: "🚨", tone: "default" },
+  fire: { label: "화재 주의", emoji: "🚒", tone: "fire", badgeLabel: "화재", subLabel: "소방 활동·안전 거리", helperEmoji: "🔥" },
+  accident: { label: "사고 주의", emoji: "🚗", tone: "accident", badgeLabel: "사고", subLabel: "전방 주시·안전 서행", helperEmoji: "⚠️" },
+  construction: { label: "도로 공사", emoji: "🚧", tone: "construction", badgeLabel: "공사", subLabel: "차선 통제·우회 권장", helperEmoji: "👷" },
+  failure: { label: "시설 점검", emoji: "🔧", tone: "failure", badgeLabel: "점검", subLabel: "시설 보수·보행 주의", helperEmoji: "⚙️" },
+  control: { label: "차량 통제", emoji: "⛔", tone: "control", badgeLabel: "통제", subLabel: "진입 통제·우회로", helperEmoji: "👮" },
+  flood: { label: "침수 주의", emoji: "🌊", tone: "flood", badgeLabel: "침수", subLabel: "호우 주의·진입 금지", helperEmoji: "☔" },
+  default: { label: "안전 주의", emoji: "🚨", tone: "default", badgeLabel: "주의", subLabel: "실시간 동네 안전", helperEmoji: "🛡️" },
 };
 
 export const THEME_STORAGE_KEY = "carrot-theme";

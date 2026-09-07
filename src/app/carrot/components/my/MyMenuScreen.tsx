@@ -21,11 +21,13 @@ import { MenuCard } from "./MenuCard";
 
 export interface MyMenuScreenProps {
   onBack: () => void;
+  onOpenSettings: () => void;
   onOpenAlba?: (tab: "manage") => void;
 }
 
 export function MyMenuScreen({
   onBack,
+  onOpenSettings,
   onOpenAlba,
 }: MyMenuScreenProps) {
   return (
@@ -38,7 +40,7 @@ export function MyMenuScreen({
           </IconButton>
         }
         actions={
-          <IconButton label="설정">
+          <IconButton label="설정" onClick={onOpenSettings}>
             <Settings size={29} />
           </IconButton>
         }

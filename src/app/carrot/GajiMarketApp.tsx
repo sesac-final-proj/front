@@ -257,11 +257,12 @@ export default function GajiMarketApp() {
   // 동네 검색은 이제 "대표 전환"이 아니라 항상 "2번째 동네 추가"다 — 빈 슬롯이 있을 때만
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
   function addNeighborhood(dongName: string) {
+    const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
     setToastMessage(`'${dongName}'을 동네에 추가했어요.`);
     setSheet(null);
-    setSubPage(null);
+    setSubPage(returnTo ? { type: returnTo } : null);
   }
   const [productFilter, setProductFilter] = useState("전체");
   const [productFilters, setProductFilters] = useState<ProductFilters>(DEFAULT_PRODUCT_FILTERS);
@@ -1142,7 +1143,10 @@ export default function GajiMarketApp() {
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
 
   const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
-  const isDreamPage = subPage?.type === "dream-dashboard" || subPage?.type === "dream-notice";
+  const isDreamPage =
+    subPage?.type === "dream-dashboard" ||
+    subPage?.type === "dream-notice" ||
+    (subPage?.type === "region-search" && subPage.returnTo === "dream-dashboard");
 
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
   // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
@@ -1151,10 +1155,13 @@ export default function GajiMarketApp() {
   }
 
   return (
-    <div className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`} data-theme={theme}>
+    <div
+      className={`${styles.stage} ${isDreamPage ? styles.dreamStage : ""}`}
+      data-theme={isDreamPage ? "light" : theme}
+    >
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -1271,7 +1278,11 @@ export default function GajiMarketApp() {
               onBack={goBack}
             />
           ) : subPage?.type === "my-menu" ? (
-            <MyMenuScreen onBack={goBack} onOpenAlba={(tab) => setSubPage({ type: "alba", tab })} />
+            <MyMenuScreen
+              onBack={goBack}
+              onOpenSettings={() => setSubPage({ type: "settings" })}
+              onOpenAlba={(tab) => setSubPage({ type: "alba", tab })}
+            />
           ) : subPage?.type === "all-services" ? (
             <AllServicesScreen
               onBack={goBack}
@@ -1389,7 +1400,7 @@ export default function GajiMarketApp() {
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
               onBack={() => {
-                setSubPage(null);
+                setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");
               }}
               onPick={addNeighborhood}
@@ -1545,7 +1556,10 @@ export default function GajiMarketApp() {
           }}
           onOpenRegionSearch={() => {
             setSheet(null);
-            setSubPage({ type: "region-search" });
+            setSubPage({
+              type: "region-search",
+              returnTo: subPage?.type === "dream-dashboard" ? "dream-dashboard" : undefined,
+            });
           }}
           onProductWrite={() => {
             setSheet(null);

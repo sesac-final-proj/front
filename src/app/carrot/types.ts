@@ -71,7 +71,7 @@ export type SubPage =
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" }
-  | { type: "region-search" };
+  | { type: "region-search"; returnTo?: "dream-dashboard" };
 
 export type ProductListItem = {
   id: string;
@@ -127,6 +127,7 @@ export type ChatRoom = {
   verified: boolean;
   muted: boolean;
   productId?: string;
+  onClick?: () => void;
 };
 
 export type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
@@ -156,6 +157,9 @@ export type DangerVisual = {
   label: string;
   emoji: string;
   tone: DangerTone;
+  badgeLabel?: string;
+  subLabel?: string;
+  helperEmoji?: string;
 };
 
 export type DonationFacility = DreamFacility;

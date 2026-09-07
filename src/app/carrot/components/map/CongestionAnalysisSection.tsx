@@ -1,4 +1,5 @@
 import React from "react";
+import { Clock3, ShieldCheck } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { CongestionZone } from "@/types";
 import { getSeedPastelTheme, getCongestionPopulationLabel } from "@/services";
@@ -11,6 +12,13 @@ export interface CongestionAnalysisSectionProps {
   error: string;
   onRetry: () => void;
   onClearQuery?: () => void;
+}
+
+function getTradeGuidance(levelLabel?: string) {
+  if (levelLabel === "붐빔") return "사람이 많아요. 약속 장소를 정확히 정해두세요.";
+  if (levelLabel === "약간 붐빔") return "주변을 살피고, 사람이 보이는 곳에서 거래해요.";
+  if (levelLabel === "여유") return "한적할 수 있어요. 밝은 공공장소에서 거래해요.";
+  return "사람이 보이는 공공장소에서 거래하기 좋아요.";
 }
 
 export function CongestionAnalysisSection({
@@ -29,12 +37,13 @@ export function CongestionAnalysisSection({
           <p>서울시 제공 장소의 인구 혼잡 단계예요. 색상은 단계별로 표시해요.</p>
         </div>
       </div>
-      <div className={styles.seedColorBoardPills} aria-label="혼잡 단계 범례">
+      <div className={styles.congestionScale} aria-label="혼잡 단계 범례">
         {[{ score: 22, label: "여유" }, { score: 60, label: "보통" }, { score: 78, label: "약간 붐빔" }, { score: 92, label: "붐빔" }].map(({ score, label }) => {
           const theme = getSeedPastelTheme(score, colorScheme);
           return (
-            <span key={label} className={styles.seedColorBoardPill} style={{ background: theme.badgeBg, borderColor: theme.badgeBorder, color: theme.badgeText }}>
-              <span className={styles.seedPillDot} style={{ background: theme.tagColor }} />{label}
+            <span key={label} className={styles.congestionScaleStep} style={{ color: theme.badgeText }}>
+              <span className={styles.congestionScaleBar} style={{ background: theme.tagColor }} aria-hidden="true" />
+              <span>{label}</span>
             </span>
           );
         })}
@@ -55,20 +64,34 @@ export function CongestionAnalysisSection({
           {zones.map((zone) => {
             const theme = getSeedPastelTheme(zone.currentScore, colorScheme);
             return (
-              <article key={zone.id} className={styles.congestionZoneCard} style={{ borderLeft: `3px solid ${theme.tagColor}`, background: "var(--color-surface)" }}>
-                <div className={styles.congestionZoneTop}>
-                  <div>
-                    <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
-                    <span className={styles.congestionZoneSummary}>{getCongestionPopulationLabel(zone)}</span>
+              <article
+                key={zone.id}
+                className={styles.congestionZoneCard}
+                style={{ "--zone-accent": theme.tagColor } as React.CSSProperties}
+              >
+                <span className={styles.congestionZoneMascot} aria-hidden="true" />
+                <div className={styles.congestionZoneBody}>
+                  <div className={styles.congestionZoneTop}>
+                    <div>
+                      <strong className={styles.congestionZoneTitle}>{zone.name}</strong>
+                      <div className={styles.congestionZoneMeta}>
+                        <span className={styles.congestionZoneSummary}>{getCongestionPopulationLabel(zone)}</span>
+                        <span className={styles.congestionZoneStatus} style={{ color: theme.badgeText }}>
+                          <i style={{ background: theme.tagColor }} aria-hidden="true" />
+                          {zone.levelLabel}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <span className={styles.seedZoneBadge} style={{ background: theme.badgeBg, color: theme.badgeText, borderColor: theme.badgeBorder }}>
-                    {zone.levelLabel}
-                  </span>
+                  <p className={styles.congestionTradeGuide}>
+                    <ShieldCheck size={15} aria-hidden="true" />
+                    <span>{getTradeGuidance(zone.levelLabel)}</span>
+                  </p>
+                  <footer className={styles.congestionZoneFooter}>
+                    <Clock3 size={12} aria-hidden="true" />
+                    <span>서울시 · {zone.updatedAt}</span>
+                  </footer>
                 </div>
-                <p className={styles.congestionZoneSummary}>{zone.summary}</p>
-                <footer className={styles.congestionZoneFooter}>
-                  <span>서울시 · {zone.updatedAt}</span>
-                </footer>
               </article>
             );
           })}
