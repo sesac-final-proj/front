@@ -2209,17 +2209,14 @@
   transition: opacity 280ms ease 80ms;
 }
 
-.sheet_collapsed .localDots,
-.sheet_collapsed .localResults {
+.sheet_collapsed :is(.localDots, .localResults, [class*="TransitSection_section"], [class*="CongestionAnalysisSection"]) {
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
 }
 
-.sheet_half .localDots,
-.sheet_half .localResults,
-.sheet_expanded .localDots,
-.sheet_expanded .localResults {
+.sheet_half :is(.localDots, .localResults, [class*="TransitSection_section"], [class*="CongestionAnalysisSection"]),
+.sheet_expanded :is(.localDots, .localResults, [class*="TransitSection_section"], [class*="CongestionAnalysisSection"]) {
   opacity: 1;
   transition: opacity 300ms ease 60ms;
 }

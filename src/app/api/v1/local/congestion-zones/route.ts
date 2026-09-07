@@ -10,8 +10,7 @@ export async function GET(request: Request) {
   if (south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) {
     return NextResponse.json({ error: "지도 범위를 확인해 주세요." }, { status: 400 });
   }
-  const base = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!base) return NextResponse.json({ error: "혼잡도 서버가 설정되지 않았어요." }, { status: 503 });
+  const base = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
   try {
     const url = new URL("/api/v1/local/congestion-zones", base);
     ["sw_lat", "sw_lng", "ne_lat", "ne_lng"].forEach((key, index) => url.searchParams.set(key, values[index]!));
