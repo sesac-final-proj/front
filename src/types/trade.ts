@@ -16,6 +16,8 @@ export interface TradeProduct {
   tradePlace?: string;
   sellerNickname?: string;
   sellerMannerTemp?: number;
+  isMine?: boolean;
+  thumbnailUrl?: string;
 }
 
 export interface TradeProductPage {
@@ -23,9 +25,16 @@ export interface TradeProductPage {
   total: number;
 }
 
+export type TradeSort = "latest" | "price_asc" | "price_desc";
+
 export interface TradeProductQuery {
   category?: string;
   tradeStatus?: TradeProduct["tradeStatus"];
+  tradeType?: TradeProduct["tradeType"];
+  priceMin?: number;
+  priceMax?: number;
+  sort?: TradeSort;
+  excludeSold?: boolean;
   q?: string;
   regionId?: number;
   page?: number;

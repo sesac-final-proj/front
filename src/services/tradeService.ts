@@ -20,6 +20,8 @@ interface ApiProductListItem {
   trade_place?: string | null;
   seller_nickname?: string | null;
   seller_manner_temp?: number | null;
+  is_mine?: boolean;
+  thumbnail_url?: string | null;
 }
 
 interface ApiProductPage {
@@ -93,6 +95,8 @@ function toTradeProduct(item: ApiProductListItem): TradeProduct {
     tradePlace: item.trade_place ?? undefined,
     sellerNickname: item.seller_nickname ?? undefined,
     sellerMannerTemp: item.seller_manner_temp ?? undefined,
+    isMine: item.is_mine ?? false,
+    thumbnailUrl: item.thumbnail_url ?? undefined,
   };
 }
 
@@ -104,6 +108,11 @@ export async function listProducts(
   const params = new URLSearchParams();
   if (query.category) params.set("category", query.category);
   if (query.tradeStatus) params.set("trade_status", query.tradeStatus);
+  if (query.tradeType) params.set("trade_type", query.tradeType);
+  if (query.priceMin !== undefined) params.set("price_min", String(query.priceMin));
+  if (query.priceMax !== undefined) params.set("price_max", String(query.priceMax));
+  if (query.sort) params.set("sort", query.sort);
+  if (query.excludeSold) params.set("exclude_sold", "true");
   if (query.q) params.set("q", query.q);
   if (query.regionId !== undefined) params.set("region_id", String(query.regionId));
   params.set("page", String(query.page ?? 1));
@@ -119,6 +128,20 @@ export async function listProducts(
 
   const payload: ApiProductPage = await response.json();
   return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 실제 존재하는 카테고리 목록. 프론트에 하드코딩하면 데이터가 바뀔 때마다
+// 같이 배포해야 해서, 서버에서 그때그때 실제 값을 받아온다.
+export async function listCategories(signal?: AbortSignal): Promise<string[]> {
+  const response = await fetch(apiUrl("/api/v1/trades/products/categories"), {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error("카테고리 목록을 불러오지 못했습니다.");
+  }
+  const payload: { items: string[] } = await response.json();
+  return payload.items;
 }
 
 // 내 판매내역. "판매내역에 예전 글이 안 보임" 버그의 원인이 여기 있었다 —
@@ -159,6 +182,38 @@ export async function getMyFavorites(signal?: AbortSignal): Promise<TradeProduct
 
   const payload: ApiProductPage = await response.json();
   return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 최근 본 상품(최대 20개, 계정별). 로그인 계정 기준으로 서버가 관리 —
+// 로그아웃/재로그인해도 유지되고, 다른 계정으로 로그인하면 그 계정 것만 보인다.
+export async function getRecentlyViewed(signal?: AbortSignal): Promise<TradeProductPage> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const response = await fetch(apiUrl("/api/v1/trades/products/recently-viewed"), {
+    signal,
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("최근 본 목록을 불러오지 못했습니다.");
+
+  const payload: ApiProductPage = await response.json();
+  return { items: payload.items.map(toTradeProduct), total: payload.total };
+}
+
+// 상품 상세 진입 시 조회 기록 — best-effort. 비로그인(게스트)이면 조용히 무시.
+export async function recordProductView(id: number): Promise<void> {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    await fetch(apiUrl(`/api/v1/trades/products/${id}/view`), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // ponytail: 조회 기록 실패는 화면에 영향 주지 않는다 — 조용히 무시.
+  }
 }
 
 // 목록 API는 description을 안 내려줘서(상세 API만 채워짐) 상세 화면 진입 시 따로 조회.
@@ -220,6 +275,87 @@ export async function createProduct(input: {
 
   const payload: ApiProductCreated = await response.json();
   return { id: payload.id };
+}
+
+// 글 수정. title/category/description/desiredPrice 등 값이 있는 필드만 부분 갱신된다.
+export async function updateProduct(
+  productId: number,
+  input: {
+    title?: string;
+    category?: string;
+    description?: string;
+    desiredPrice?: number | null;
+    tradePlace?: string;
+  },
+): Promise<TradeProduct> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const response = await fetch(apiUrl(`/api/v1/trades/products/${productId}`), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      title: input.title,
+      category: input.category,
+      description: input.description,
+      desired_price: input.desiredPrice,
+      trade_place: input.tradePlace,
+    }),
+  });
+  if (response.status === 401) throw new AuthRequiredError();
+  if (!response.ok) throw new Error("글을 수정하지 못했습니다.");
+
+  const payload: ApiProductListItem = await response.json();
+  return toTradeProduct(payload);
+}
+
+// 상품 이미지는 1장만 유지(재업로드하면 덮어씀). NCP Object Storage에 서버를 거치지
+// 않고 직접 PUT — presign → 브라우저에서 NCP로 PUT → object_key 등록, 3단계.
+export async function uploadProductImage(productId: number, file: File): Promise<string> {
+  const token = getAuthToken();
+  if (!token) throw new AuthRequiredError();
+
+  const presignResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images/presign`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ filename: file.name, content_type: file.type }),
+  });
+  if (presignResponse.status === 401) throw new AuthRequiredError();
+  if (!presignResponse.ok) throw new Error("이미지 업로드 URL을 받지 못했습니다.");
+  const { upload_url, object_key }: { upload_url: string; object_key: string; image_url: string } =
+    await presignResponse.json();
+
+  const putResponse = await fetch(upload_url, {
+    method: "PUT",
+    // 백엔드 presign이 ACL(public-read)까지 서명에 포함시켜서, 이 헤더가 빠지면
+    // NCP가 SignatureDoesNotMatch(403)로 거부한다 — 반드시 같이 보내야 한다.
+    headers: { "Content-Type": file.type, "x-amz-acl": "public-read" },
+    body: file,
+  });
+  if (!putResponse.ok) throw new Error("이미지를 업로드하지 못했습니다.");
+
+  const registerResponse = await fetch(apiUrl(`/api/v1/trades/products/${productId}/images`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ object_key }),
+  });
+  if (registerResponse.status === 401) throw new AuthRequiredError();
+  if (!registerResponse.ok) throw new Error("이미지 등록에 실패했습니다.");
+
+  const payload: { image_url: string } = await registerResponse.json();
+  return payload.image_url;
 }
 
 interface ApiFavoriteToggleResponse {

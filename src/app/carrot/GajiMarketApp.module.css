@@ -777,6 +777,14 @@
   font-weight: 950;
 }
 
+.detailHeroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .detailHero::after {
   content: "";
   position: absolute;
@@ -1037,6 +1045,14 @@
   gap: 3px;
   background: rgba(255, 146, 43, 0.08);
   font-weight: 850;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.photoPreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .photoUploader small {
@@ -3018,7 +3034,7 @@
   min-height: 76px;
   padding: 10px 17px calc(10px + env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 46px;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
   gap: 10px;
   background: rgba(17, 17, 20, 0.94);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -3027,13 +3043,27 @@
   z-index: 55;
 }
 
-.messageComposer button {
+.messageComposer button,
+.messageImageButton {
   width: 46px;
   height: 46px;
   border: 0;
   border-radius: 999px;
   background: var(--color-primary);
   color: var(--color-on-primary);
+}
+
+.messageImageButton {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.messageImage {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 18px;
+  object-fit: cover;
 }
 
 .promoCard,
@@ -6399,6 +6429,176 @@
 
 .productActionCloseBtn:active {
   opacity: 0.85;
+}
+
+/* Product filter sheet */
+.filterSectionLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  margin: 4px 0 -6px;
+}
+
+.priceSliderValues {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.priceSlider {
+  position: relative;
+  height: 28px;
+  margin: 6px 0 10px;
+}
+
+.priceSliderTrack {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--color-surface-2);
+  border-radius: 999px;
+}
+
+.priceSliderRange {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+.priceSliderInput {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  transform: translateY(-50%);
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.priceSliderInput::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid var(--color-on-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.priceSliderInput::-moz-range-thumb {
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid var(--color-on-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.priceSliderInput::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.priceSliderInput::-moz-range-track {
+  background: transparent;
+}
+
+.filterChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterChip {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterChipActive {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.filterApplyBtn {
+  height: 52px;
+  border-radius: 18px;
+  border: 0;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* HomeScreen(.screen)은 자기 자신이 position:relative라 상품 목록 길이만큼
+   늘어난 자신의 박스 맨 아래에 앵커링돼버린다(화면 밖으로 밀려남) — 다른
+   화면(detailScreen/chatRoomScreen)은 그 own position이 없어서 .phoneShell
+   기준으로 뷰포트에 고정되던 것과 다름. 그래서 이 시트만 position:fixed로
+   고정하고, 폰 목업 가로폭(max-width:480px, 가운데 정렬)에 맞춰 너비만 맞춘다.
+   */
+.filterSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 80;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeInAction 180ms ease forwards;
+}
+
+.filterSheetPanel {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
+  z-index: 85;
+  background: #17181d;
+  border-top: 1px solid var(--color-line);
+  border-radius: 24px 24px 0 0;
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.4);
+  /* slideUpAction은 translateY만 다루는 공용 애니메이션이라 그대로 쓰면 transform이
+     translateY로 덮어써져서 아래의 -50% 가운데 정렬(translateX)이 사라진다 —
+     이 패널 전용으로 두 값을 같이 애니메이션하는 키프레임을 쓴다. */
+  animation: slideUpFilterPanel 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+@keyframes slideUpFilterPanel {
+  from { transform: translate(-50%, 100%); }
+  to { transform: translate(-50%, 0); }
+}
+
+.stage[data-theme="light"] .filterSheetPanel {
+  background: #ffffff;
+  border-top-color: var(--color-line);
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.16);
 }
 
 /* Report Reason Dialog */
