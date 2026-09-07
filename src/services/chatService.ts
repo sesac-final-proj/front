@@ -13,6 +13,14 @@ export interface ChatRoomDto {
   unreadCount: number;
   verified: boolean;
   isSeller: boolean;
+  // 채팅방 헤더/물품카드 UI를 이 응답 하나로 그릴 수 있게 백엔드가 얹어준 필드들.
+  counterpartNickname: string | null;
+  // 실유저 매너온도 시스템이 아직 없어서 항상 null — null이면 배지를 숨긴다.
+  counterpartMannerTemp: number | null;
+  counterpartNeighborhoodName: string | null;
+  productThumbnailUrl: string | null;
+  productPrice: number | null;
+  productTradeStatus: ChatTradeStatus | null;
 }
 
 export type MessageType = "TEXT" | "IMAGE";
@@ -37,6 +45,12 @@ interface ApiChatRoom {
   unread_count: number;
   verified: boolean;
   is_seller: boolean;
+  counterpart_nickname: string | null;
+  counterpart_manner_temp: number | null;
+  counterpart_neighborhood_name: string | null;
+  product_thumbnail_url: string | null;
+  product_price: number | null;
+  product_trade_status: ChatTradeStatus | null;
 }
 
 interface ApiChatRoomPage {
@@ -70,6 +84,12 @@ function toChatRoom(item: ApiChatRoom): ChatRoomDto {
     unreadCount: item.unread_count,
     verified: item.verified,
     isSeller: item.is_seller,
+    counterpartNickname: item.counterpart_nickname,
+    counterpartMannerTemp: item.counterpart_manner_temp,
+    counterpartNeighborhoodName: item.counterpart_neighborhood_name,
+    productThumbnailUrl: item.product_thumbnail_url,
+    productPrice: item.product_price,
+    productTradeStatus: item.product_trade_status,
   };
 }
 
@@ -86,8 +106,15 @@ function toChatMessage(item: ApiChatMessage): ChatMessageDto {
 }
 
 // 채팅 관련 API는 전부 로그인이 필요한 엔드포인트라 토큰 없으면 AuthRequiredError.
-export async function listChatRooms(signal?: AbortSignal): Promise<{ items: ChatRoomDto[]; total: number }> {
-  const response = await authorizedFetch("/api/v1/chats?size=100", {
+// productId를 주면 그 상품에 걸린 채팅방만 걸러서 받는다 — 판매자가 본인 글에서
+// "채팅하기"를 눌렀을 때 그 글에 걸린 N:1 채팅방 목록을 보여주는 용도.
+export async function listChatRooms(
+  signal?: AbortSignal,
+  productId?: number,
+): Promise<{ items: ChatRoomDto[]; total: number }> {
+  const params = new URLSearchParams({ size: "100" });
+  if (productId !== undefined) params.set("product_id", String(productId));
+  const response = await authorizedFetch(`/api/v1/chats?${params}`, {
     signal,
     headers: { Accept: "application/json" },
   });

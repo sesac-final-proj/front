@@ -249,6 +249,12 @@ export function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
     verified: dto.verified,
     muted: false,
     productId: dto.productId !== null ? String(dto.productId) : undefined,
+    counterpartNickname: dto.counterpartNickname ?? undefined,
+    counterpartMannerTemp: dto.counterpartMannerTemp ?? undefined,
+    counterpartNeighborhoodName: dto.counterpartNeighborhoodName ?? undefined,
+    productThumbnailUrl: dto.productThumbnailUrl ?? undefined,
+    productPrice: dto.productPrice,
+    productTradeStatus: dto.productTradeStatus ?? undefined,
   };
 }
 

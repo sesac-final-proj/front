@@ -8,11 +8,11 @@ import {
   CheckCircle2,
   Plus,
   Send,
+  Wallet,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
-import type { ChatRoom, ProductListItem, ChatMessageUi } from "@/types";
+import type { ChatRoom, ChatMessageUi } from "@/types";
 import type { ChatTradeStatus } from "@/services/chatService";
-import { formatPrice } from "../../utils";
 import { ScreenHeader, IconButton } from "../common";
 import { Thumbnail } from "../trade";
 
@@ -25,7 +25,6 @@ export const chatReportReasons = [
 
 export interface ChatRoomScreenProps {
   room: ChatRoom;
-  product?: ProductListItem;
   messages: ChatMessageUi[];
   draft: string;
   onDraftChange: (value: string) => void;
@@ -41,7 +40,6 @@ export interface ChatRoomScreenProps {
 
 export function ChatRoomScreen({
   room,
-  product,
   messages,
   draft,
   onDraftChange,
@@ -58,15 +56,34 @@ export function ChatRoomScreen({
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
 
+  // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
+  // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
+  const priceLabel = room.productPrice == null ? "나눔" : `${room.productPrice.toLocaleString("ko-KR")}원`;
+  const statusLabel =
+    room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
+  const canSend = draft.trim().length > 0;
+
   return (
     <section className={styles.chatRoomScreen}>
       <ScreenHeader
-        title={room.title}
         compact
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
           </IconButton>
+        }
+        title={
+          <span className={styles.chatHeaderTitle}>
+            <span className={styles.chatHeaderName}>
+              {room.counterpartNickname ?? room.title}
+              {room.counterpartMannerTemp != null && (
+                <em className={styles.chatHeaderTemp}>{room.counterpartMannerTemp.toFixed(1)}°C</em>
+              )}
+            </span>
+            {room.counterpartNeighborhoodName && (
+              <span className={styles.chatHeaderSub}>{room.counterpartNeighborhoodName}</span>
+            )}
+          </span>
         }
         actions={
           <IconButton label="채팅 메뉴" onClick={() => setShowMenu(true)}>
@@ -87,7 +104,7 @@ export function ChatRoomScreen({
                   <button
                     type="button"
                     key={status}
-                    className={product?.tradeStatus === status ? styles.segmentActive : ""}
+                    className={room.productTradeStatus === status ? styles.segmentActive : ""}
                     onClick={() => {
                       setShowMenu(false);
                       onUpdateStatus(status);
@@ -181,18 +198,20 @@ export function ChatRoomScreen({
           </div>
         </>
       )}
-      {product && (
-        <div className={styles.chatProductCard}>
-          <Thumbnail tone={product.thumbnailTone} label={product.thumbnailLabel} imageUrl={product.thumbnailUrl} />
-          <div>
-            <h2>{product.title}</h2>
-            <span>
-              {product.tradeStatus === "RESERVED" ? "예약중" : product.tradeStatus === "SOLD" ? "거래완료" : "판매중"} ·{" "}
-              {formatPrice(product)}
-            </span>
-          </div>
+      <div className={styles.chatProductCard}>
+        <Thumbnail tone="product" label={room.title} imageUrl={room.productThumbnailUrl} />
+        <div>
+          <h2>{room.title}</h2>
+          <span>
+            {statusLabel} · {priceLabel}
+          </span>
         </div>
-      )}
+      </div>
+      {/* 당근페이: 결제 로직은 추후 추가 예정 — 지금은 자리만 잡아둔 비활성 버튼. */}
+      <button type="button" className={styles.chatPayButton} disabled title="곧 지원 예정이에요">
+        <Wallet size={18} />
+        당근페이
+      </button>
       <div className={styles.messageStack}>
         {messages.map((message, index) => (
           <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
@@ -225,7 +244,11 @@ export function ChatRoomScreen({
           onChange={(event) => onDraftChange(event.target.value)}
           placeholder="메시지를 입력하세요"
         />
-        <button type="submit" aria-label="보내기">
+        <button
+          type="submit"
+          aria-label="보내기"
+          className={canSend ? styles.messageSendBtnActive : styles.messageSendBtn}
+        >
           <Send size={20} />
         </button>
       </form>
