@@ -117,6 +117,8 @@ import {
   initialProducts,
   LOCAL_BUSINESSES,
   LOCAL_CATEGORIES,
+  NEIGHBORHOOD_COORDS,
+  NEIGHBORHOOD_STORAGE_KEY,
   PRODUCT_FILTERS,
   THEME_STORAGE_KEY,
 } from "./constants";
@@ -124,6 +126,7 @@ import {
   apiUrl,
   matchesNeighborhood,
   matchRegionId,
+  readNeighborhoodCache,
   readTheme,
   setSessionTheme,
   subscribeTheme,
@@ -131,6 +134,7 @@ import {
   toChatRoomUi,
   toDangerBusiness,
   toProductListItem,
+  writeNeighborhoodCache,
 } from "./utils";
 
 type ProductSort = "latest" | "price_asc" | "price_desc";
@@ -182,8 +186,18 @@ export default function GajiMarketApp() {
   const [myProducts, setMyProducts] = useState<ProductListItem[]>([]);
   const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<ProductListItem[]>([]);
-  const [activeNeighborhood, setActiveNeighborhood] = useState("문래동");
-  const [secondaryNeighborhood, setSecondaryNeighborhood] = useState("공릉");
+  // 새로고침해도 유지되도록 로컬 캐시로 초기값을 잡는다 — 로그인 유저는 아래 getMe()
+  // effect가 서버 값(대표 동네)으로 다시 덮어쓰지만, 게스트는 서버에 저장할 데가
+  // 없어서 이 캐시가 유일한 저장소다. 부동네는 로그인 여부와 무관하게 항상 캐시뿐.
+  const [activeNeighborhood, setActiveNeighborhood] = useState(() => readNeighborhoodCache()?.primary ?? "문래동");
+  // 실제 당근처럼 동네는 1개(대표)만 필수고, 2번째는 있을 수도 없을 수도 있다.
+  const [secondaryNeighborhood, setSecondaryNeighborhood] = useState<string | null>(
+    () => readNeighborhoodCache()?.secondary ?? null,
+  );
+
+  useEffect(() => {
+    writeNeighborhoodCache({ primary: activeNeighborhood, secondary: secondaryNeighborhood });
+  }, [activeNeighborhood, secondaryNeighborhood]);
 
   // 로그인된 상태면 내 닉네임/프사를 받아온다 — 비로그인(게스트)이면 조용히 무시하고
   // 기존 플레이스홀더("주황가지님")를 그대로 보여준다.
@@ -191,9 +205,7 @@ export default function GajiMarketApp() {
     getMe()
       .then((fetchedMe) => {
         setMe(fetchedMe);
-        // 이전에 저장해둔 활동동네를 복원 — 안 하면 activeNeighborhood가 항상 기본값("문래동")으로
-        // 시작해서, 아래 region 동기화 effect가 그 기본값을 서버에 다시 덮어써버린다
-        // (골랐던 동네가 새로고침할 때마다 사라지는 버그의 원인).
+        // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
         if (fetchedMe.region) {
           setActiveNeighborhood(fetchedMe.region.dongName);
         }
@@ -227,10 +239,6 @@ export default function GajiMarketApp() {
     return () => controller.abort();
   }, [me]);
 
-  // "내 동네 설정" 화면에서 X 눌러 뺀 슬롯이 primary인지 secondary인지 — 항상 두 슬롯 다
-  // 채워져 있어야(빈 문자열이면 곳곳에서 쓰는 NEIGHBORHOOD_COORDS[secondaryNeighborhood] 등이
-  // 깨짐) X는 "빈 슬롯"이 아니라 "검색해서 바로 교체"로 이어진다.
-  const [regionSearchTarget, setRegionSearchTarget] = useState<"primary" | "secondary">("secondary");
   const [recentNeighborhoods, setRecentNeighborhoods] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -240,15 +248,12 @@ export default function GajiMarketApp() {
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  function pickNeighborhood(dongName: string, target: "primary" | "secondary") {
-    if (target === "primary") {
-      setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
-      setActiveNeighborhood(dongName);
-    } else {
-      setSecondaryNeighborhood(dongName);
-    }
+  // 동네 검색은 이제 "대표 전환"이 아니라 항상 "2번째 동네 추가"다 — 빈 슬롯이 있을 때만
+  // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
+  function addNeighborhood(dongName: string) {
+    setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
-    setToastMessage(`동네를 '${dongName}'으로 변경했어요.`);
+    setToastMessage(`'${dongName}'을 동네에 추가했어요.`);
     setSheet(null);
     setSubPage(null);
   }
@@ -590,14 +595,14 @@ export default function GajiMarketApp() {
   }, [dangerSignals, dangerSignalsLoaded]);
 
   const businesses = useMemo(() => {
-    const bounds = mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
+    const bounds = mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null;
     return localBusinesses.filter((business) => {
       const matchesCategory = business.category === mapCategory;
       const matchesRegion = bounds
         ? business.lat >= bounds.south && business.lat <= bounds.north &&
           business.lng >= bounds.west && business.lng <= bounds.east
         : matchesNeighborhood(business, activeNeighborhood) ||
-          matchesNeighborhood(business, secondaryNeighborhood);
+          (secondaryNeighborhood !== null && matchesNeighborhood(business, secondaryNeighborhood));
       const matchesQuery =
         mapQuery.trim().length === 0 ||
         business.name.includes(mapQuery.trim()) ||
@@ -938,6 +943,7 @@ export default function GajiMarketApp() {
     const category = String(form.get("category") ?? "중고거래");
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
+    const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
 
     if (isGuestMode) {
       setSheet("status");
@@ -950,6 +956,7 @@ export default function GajiMarketApp() {
       description,
       desiredPrice: isFree ? null : Math.max(0, price),
       tradeType: isFree ? "FREE" : "SALE",
+      tradePlace,
     })
       .then(({ id }) => {
         const newProduct: ProductListItem = {
@@ -972,6 +979,7 @@ export default function GajiMarketApp() {
           mine: true,
           category,
           description,
+          tradePlace,
         };
 
         setProducts((current) => [newProduct, ...current]);
@@ -1000,12 +1008,14 @@ export default function GajiMarketApp() {
     const category = String(form.get("category") ?? "중고거래");
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
+    const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
 
     updateProduct(Number(productId), {
       title,
       category,
       description,
       desiredPrice: isFree ? null : Math.max(0, price),
+      tradePlace,
     })
       .then(() => {
         const patch = (p: ProductListItem) =>
@@ -1018,6 +1028,7 @@ export default function GajiMarketApp() {
                 description,
                 price: isFree ? null : Math.max(0, price),
                 tradeType: isFree ? ("FREE" as const) : ("SALE" as const),
+                tradePlace,
               }
             : p;
         setProducts((current) => current.map(patch));
@@ -1167,6 +1178,7 @@ export default function GajiMarketApp() {
             <ProductFormScreen
               onBack={goBack}
               initialProduct={subPage.editId ? findProductById(subPage.editId) : undefined}
+              initialCenter={NEIGHBORHOOD_COORDS[activeNeighborhood]}
               onSubmit={
                 subPage.editId
                   ? (event, imageFile) => submitProductEdit(event, imageFile, subPage.editId!)
@@ -1355,7 +1367,7 @@ export default function GajiMarketApp() {
                 setSubPage(null);
                 setSheet("region");
               }}
-              onPick={(dongName) => pickNeighborhood(dongName, regionSearchTarget)}
+              onPick={addNeighborhood}
             />
           ) : activeTab === "home" ? (
             <HomeScreen
@@ -1419,7 +1431,7 @@ export default function GajiMarketApp() {
               query={mapQuery}
               businesses={businesses}
               hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
-              searchBounds={mapSearchArea?.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
+              searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
               onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
               locationAllowed={locationAllowed}
               theme={theme}
@@ -1496,15 +1508,16 @@ export default function GajiMarketApp() {
             setSheet(null);
           }}
           onRemoveNeighborhood={(target) => {
-            setRegionSearchTarget(target);
-            setSheet(null);
-            setSubPage({ type: "region-search" });
+            // 대표(primary)를 지우면 남은 동네가 자동으로 대표가 된다 — 동네가 0개인
+            // 상태는 없어야 하니, secondary가 있을 때만 primary 삭제 버튼이 보인다(UI 쪽 가드).
+            if (target === "primary" && secondaryNeighborhood) {
+              setActiveNeighborhood(secondaryNeighborhood);
+              setSecondaryNeighborhood(null);
+            } else if (target === "secondary") {
+              setSecondaryNeighborhood(null);
+            }
           }}
           onOpenRegionSearch={() => {
-            // 새로 검색해서 추가하는 동네는 방금 둘러보려는 곳이니 바로 대표(primary)로 —
-            // secondary로 넣으면 홈 상품 목록 필터(activeNeighborhood 기준)엔 반영이 안 돼서
-            // "검색해서 골랐는데 왜 안 뜨지" 버그가 됨.
-            setRegionSearchTarget("primary");
             setSheet(null);
             setSubPage({ type: "region-search" });
           }}
