@@ -115,11 +115,9 @@ export function Thumbnail({ tone, label, imageUrl }: { tone: string; label: stri
 export function ProductRow({
   product,
   onClick,
-  onFavorite,
 }: {
   product: ProductListItem;
   onClick: () => void;
-  onFavorite: () => void;
 }) {
   return (
     <article className={styles.productRow}>
@@ -165,14 +163,6 @@ export function ProductRow({
           </div>
         </div>
       </button>
-      <button
-        type="button"
-        className={`${styles.inlineFavorite} ${product.isFavorite ? styles.favoriteActive : ""}`}
-        aria-label="관심 상품 변경"
-        onClick={onFavorite}
-      >
-        <Heart size={22} fill={product.isFavorite ? "currentColor" : "none"} />
-      </button>
     </article>
   );
 }
@@ -208,7 +198,6 @@ export function HomeScreen({
   onOpenMenu,
   onFilterChange,
   onProductClick,
-  onFavorite,
   onRetry,
   categories,
   filters,
@@ -229,7 +218,6 @@ export function HomeScreen({
   onOpenMenu: () => void;
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
-  onFavorite: (id: string) => void;
   onRetry: () => void;
   categories: string[];
   filters: ProductFilters;
@@ -439,7 +427,6 @@ export function HomeScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => onFavorite(product.id)}
             />
           ))}
           {hasMore && (

@@ -1328,14 +1328,12 @@ export default function GajiMarketApp() {
               products={favoriteProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
             />
           ) : subPage?.type === "recently-viewed" ? (
             <FavoriteScreen
               products={recentlyViewedProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
               title="최근 본"
               emptyTitle="최근 본 상품이 없어요"
               emptyBody="상품 상세를 열어보면 여기에 기록돼요."
@@ -1385,7 +1383,6 @@ export default function GajiMarketApp() {
                 setProductFilter(value);
               }}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onFavorite={toggleFavorite}
               onRetry={() => setHasNetworkError(false)}
               categories={categories}
               filters={productFilters}

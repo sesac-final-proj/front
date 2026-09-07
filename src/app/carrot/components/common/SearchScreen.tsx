@@ -58,7 +58,6 @@ export function SearchScreen({
               key={product.id}
               product={product}
               onClick={() => onProductClick(product.id)}
-              onFavorite={() => undefined}
             />
           ))}
           <h2>동네생활</h2>
