@@ -9,6 +9,7 @@ import type {
   ChatRoom,
   DangerSignalApiItem,
   LocalBusiness,
+  ProductFilters,
   ProductListItem,
   Region,
   ThemeMode,
@@ -278,4 +279,27 @@ export function subscribeTheme(onChange: () => void) {
 // 바인딩 제약) setter로 감싼다 — GajiMarketApp.tsx의 changeTheme이 이걸 호출한다.
 export function setSessionTheme(value: ThemeMode) {
   sessionTheme = value;
+}
+
+export function formatPrice(product: ProductListItem) {
+  if (product.tradeType === "FREE" || product.price === null || product.price === 0) {
+    return "나눔";
+  }
+  return `${product.price.toLocaleString("ko-KR")}원`;
+}
+
+export function formatBadge(count: number) {
+  if (count > 99) return "99+";
+  return String(count);
+}
+
+export function hasActiveProductFilters(filters: ProductFilters): boolean {
+  return (
+    Boolean(filters.category) ||
+    Boolean(filters.tradeType) ||
+    filters.priceMin !== undefined ||
+    filters.priceMax !== undefined ||
+    filters.sort !== "latest" ||
+    Boolean(filters.excludeSold)
+  );
 }

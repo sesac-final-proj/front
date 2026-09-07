@@ -14,7 +14,12 @@ import {
   Truck,
   Utensils,
 } from "lucide-react";
-import type { AlbaItem, ChatMessageUi, CommunityPost, DangerTone, DangerVisual, LocalBusiness, LocalCategory, ProductListItem } from "./types";
+import type { AlbaItem, ChatMessageUi, CommunityPost, DangerTone, DangerVisual, LocalBusiness, LocalCategory, ProductFilters, ProductListItem } from "./types";
+
+export const PRICE_FILTER_MIN = 0;
+export const PRICE_FILTER_MAX = 1000000;
+export const PRICE_FILTER_STEP = 10000;
+export const DEFAULT_PRODUCT_FILTERS: ProductFilters = { sort: "latest" };
 
 export const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부동산", "기타 서비스"];
 export const COMMUNITY_TABS = ["전체", "자유 주제", "같이해요", "질문", "동네 정보"];

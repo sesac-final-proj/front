@@ -1,0 +1,149 @@
+"use client";
+
+import React from "react";
+import {
+  BriefcaseBusiness,
+  Plus,
+  ShoppingBag,
+  Users,
+  UsersRound,
+  X,
+} from "lucide-react";
+import styles from "../../GajiMarketApp.module.css";
+import type { SheetId } from "../../types";
+import { formatBadge } from "../../utils";
+import { StateBlock } from "./StateBlock";
+
+export function BottomSheet({
+  sheet,
+  activeNeighborhood,
+  secondaryNeighborhood,
+  onClose,
+  onSelectPrimary,
+  onRemoveNeighborhood,
+  onOpenRegionSearch,
+  onProductWrite,
+  onCommunityWrite,
+  onTogetherWrite,
+  totalUnread,
+  hasNetworkError,
+  isGuestMode,
+  authRequired,
+  onRetry,
+  onGuestOff,
+}: {
+  sheet: SheetId;
+  activeNeighborhood: string;
+  secondaryNeighborhood: string;
+  onClose: () => void;
+  onSelectPrimary: (dongName: string) => void;
+  onRemoveNeighborhood: (target: "primary" | "secondary") => void;
+  onOpenRegionSearch: () => void;
+  onProductWrite: () => void;
+  onCommunityWrite: () => void;
+  onTogetherWrite?: () => void;
+  totalUnread: number;
+  hasNetworkError: boolean;
+  isGuestMode: boolean;
+  authRequired: boolean;
+  onRetry: () => void;
+  onGuestOff: () => void;
+}) {
+  if (!sheet) return null;
+
+  return (
+    <div className={styles.sheetBackdrop} role="presentation" onClick={onClose}>
+      <section className={styles.modalSheet} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className={styles.sheetHandle} onClick={onClose}>
+          <span />
+        </button>
+        {sheet === "write" && (
+          <>
+            <h2>무엇을 올릴까요?</h2>
+            <div className={styles.sheetOptions}>
+              <button type="button" onClick={onProductWrite}>
+                <ShoppingBag size={28} /> 중고거래
+              </button>
+              <button type="button" onClick={onCommunityWrite}>
+                <UsersRound size={28} /> 동네생활
+              </button>
+              <button type="button" onClick={onTogetherWrite}>
+                <Users size={28} /> 같이해요
+              </button>
+              <button type="button">
+                <BriefcaseBusiness size={28} /> 가지알바
+              </button>
+            </div>
+          </>
+        )}
+        {sheet === "region" && (
+          <>
+            <h2>내 동네 설정</h2>
+            <p className={styles.sheetCopy}>최대 2개의 동네를 선택할 수 있어요.</p>
+            <div className={styles.myRegionList}>
+              {[
+                { name: activeNeighborhood, target: "primary" as const },
+                { name: secondaryNeighborhood, target: "secondary" as const },
+              ].map(({ name, target }) => (
+                <div className={styles.myRegionRow} key={target}>
+                  <button
+                    type="button"
+                    className={styles.myRegionRadio}
+                    aria-label={`${name}을 대표 동네로 설정`}
+                    onClick={() => onSelectPrimary(name)}
+                  >
+                    <span className={target === "primary" ? styles.myRegionRadioOn : ""} />
+                  </button>
+                  <span className={styles.myRegionName}>{name}</span>
+                  <button
+                    type="button"
+                    className={styles.myRegionRemove}
+                    aria-label={`${name} 삭제`}
+                    onClick={() => onRemoveNeighborhood(target)}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className={styles.myRegionAddBtn} onClick={onOpenRegionSearch}>
+              <Plus size={18} /> 동네 추가
+            </button>
+          </>
+        )}
+        {sheet === "notifications" && (
+          <>
+            <h2>알림</h2>
+            <div className={styles.notificationList}>
+              <p>
+                읽지 않은 채팅 <strong>{formatBadge(totalUnread)}</strong>
+              </p>
+              <p>관심 상품과 판매 상태 변경 알림이 여기에 모입니다.</p>
+              <p>상품을 예약중으로 바꾸면 관련 화면에 같은 배지가 표시됩니다.</p>
+            </div>
+          </>
+        )}
+        {sheet === "status" && (
+          <>
+            <h2>상태 안내</h2>
+            {isGuestMode || authRequired ? (
+              <StateBlock
+                title="로그인이 필요해요"
+                body="비로그인 사용자는 탐색만 가능하고 관심, 채팅, 글쓰기는 제한됩니다."
+                actionLabel="로그인 상태로 전환"
+                onAction={onGuestOff}
+              />
+            ) : hasNetworkError ? (
+              <StateBlock
+                title="네트워크 오류"
+                body="화면 데이터는 유지하고 재시도할 수 있게 처리했습니다."
+                actionLabel="재시도"
+                onAction={onRetry}
+              />
+            ) : null}
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
