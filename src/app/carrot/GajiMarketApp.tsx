@@ -473,40 +473,49 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => console.error("활동동네를 저장하지 못했습니다.", error));
   }, [me, regionId]);
 
+  // 홈 피드 1페이지를 다시 받아온다 — 동네/필터가 바뀔 때(effect)와 홈 화면의
+  // 당겨서 새로고침(pull-to-refresh) 둘 다 이걸 그대로 재사용한다.
+  const refreshProducts = useCallback(
+    async (signal?: AbortSignal) => {
+      productPageRef.current = 1;
+      if (noRegionMatch) {
+        setProducts([]);
+        setProductsTotal(0);
+        return;
+      }
+      const page = await listProducts(
+        {
+          page: 1,
+          size: 60,
+          regionId,
+          category: productFilters.category,
+          tradeType: productFilters.tradeType,
+          priceMin: productFilters.priceMin,
+          priceMax: productFilters.priceMax,
+          sort: productFilters.sort,
+          excludeSold: productFilters.excludeSold,
+        },
+        signal,
+      );
+      setProducts(page.items.map(toProductListItem));
+      setProductsTotal(page.total);
+    },
+    [noRegionMatch, regionId, productFilters],
+  );
+
   useEffect(() => {
     if (!regionsLoaded) return; // region 목록 오기 전엔 아직 필터를 확정할 수 없어 대기(부팅 스켈레톤이 가려줌)
-    productPageRef.current = 1;
-    if (noRegionMatch) {
-      setProducts([]);
-      setProductsTotal(0);
-      return;
-    }
     const controller = new AbortController();
-    listProducts(
-      {
-        page: 1,
-        size: 60,
-        regionId,
-        category: productFilters.category,
-        tradeType: productFilters.tradeType,
-        priceMin: productFilters.priceMin,
-        priceMax: productFilters.priceMax,
-        sort: productFilters.sort,
-        excludeSold: productFilters.excludeSold,
-      },
-      controller.signal,
-    )
-      .then((page) => {
-        setProducts(page.items.map(toProductListItem));
-        setProductsTotal(page.total);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        // 실패하면 mock 목록을 그대로 둔다 (화면이 빈 채로 남지 않도록)
-        console.error("상품 목록을 불러오지 못했습니다.", error);
-      });
+    // refreshProducts 내부에서 noRegionMatch면 setProducts([])를 동기 호출한다 —
+    // effect가 동네/필터 변화에 반응해 다시 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshProducts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // 실패하면 mock 목록을 그대로 둔다 (화면이 빈 채로 남지 않도록)
+      console.error("상품 목록을 불러오지 못했습니다.", error);
+    });
     return () => controller.abort();
-  }, [regionsLoaded, noRegionMatch, regionId, productFilters]);
+  }, [regionsLoaded, refreshProducts]);
 
   // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
   const loadMoreProducts = useCallback(() => {
@@ -1458,6 +1467,7 @@ export default function GajiMarketApp() {
               secondaryNeighborhood={secondaryNeighborhood}
               productFilter={productFilter}
               products={filteredProducts}
+              onRefresh={refreshProducts}
               onLoadMore={loadMoreProducts}
               hasMore={products.length < productsTotal}
               isLoadingMore={isLoadingMoreProducts}

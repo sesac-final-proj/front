@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Bell,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   Menu,
   MessageCircle,
   MoreVertical,
+  RefreshCw,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
@@ -189,6 +190,7 @@ export function HomeScreen({
   secondaryNeighborhood,
   productFilter,
   products,
+  onRefresh,
   onLoadMore,
   hasMore,
   isLoadingMore,
@@ -209,6 +211,7 @@ export function HomeScreen({
   secondaryNeighborhood: string | null;
   productFilter: string;
   products: ProductListItem[];
+  onRefresh: () => Promise<void>;
   onLoadMore: () => void;
   hasMore: boolean;
   isLoadingMore: boolean;
@@ -246,8 +249,78 @@ export function HomeScreen({
     return () => observer.disconnect();
   }, [sentinelNode, hasMore, onLoadMore]);
 
+  // 당겨서 새로고침(pull-to-refresh) — PWA(standalone)에서는 브라우저 기본 당겨서
+  // 새로고침이 globals.css의 overscroll-behavior:none에 막혀 있어서(위로 스와이프할 때
+  // 화면이 고무줄처럼 밀리는 것도 같이 막아주는 값이라 이건 유지) 직접 구현한다.
+  // 맨 위(scrollTop 0)에서 아래로 당길 때만 동작하고, 그 외엔 평소처럼 그냥 스크롤된다.
+  const PULL_THRESHOLD = 64;
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartYRef = useRef<number | null>(null);
+
+  function handleTouchStart(event: React.TouchEvent<HTMLElement>) {
+    if (isRefreshing) return;
+    const scrollRoot = event.currentTarget.closest<HTMLElement>("[data-app-scroll]");
+    if (!scrollRoot || scrollRoot.scrollTop > 0) return;
+    touchStartYRef.current = event.touches[0].clientY;
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLElement>) {
+    if (touchStartYRef.current === null) return;
+    const delta = event.touches[0].clientY - touchStartYRef.current;
+    if (delta <= 0) {
+      setIsDragging(false);
+      setPullDistance(0);
+      return;
+    }
+    setIsDragging(true);
+    // 고무줄 저항감 — 손가락 이동량을 그대로 반영하면 너무 쉽게 늘어난다.
+    setPullDistance(Math.min(delta * 0.5, 96));
+  }
+
+  function handleTouchEnd() {
+    touchStartYRef.current = null;
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (pullDistance >= PULL_THRESHOLD) {
+      setIsRefreshing(true);
+      onRefresh().finally(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      });
+    } else {
+      setPullDistance(0);
+    }
+  }
+
+  const pullOffset = isRefreshing ? 48 : pullDistance;
+  // 필터 시트(고정 오버레이)는 이 안에 있으면 안 된다 — transform이 걸린 조상은
+  // position:fixed 자식의 기준점을 바꿔버려서 화면에 고정돼야 할 시트가 같이 밀린다.
+  // 그래서 헤더/필터줄과 상품 목록, 두 구간으로 나눠 감싸고 필터 시트는 그 사이에 둔다.
+  const pullContentStyle: React.CSSProperties = {
+    transform: pullOffset ? `translateY(${pullOffset}px)` : undefined,
+    transition: isDragging ? "none" : "transform 0.2s ease",
+  };
+
   return (
-    <section className={styles.screen}>
+    <section
+      className={styles.screen}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div
+        className={styles.pullToRefreshIndicator}
+        style={{ opacity: Math.min(pullOffset / PULL_THRESHOLD, 1) }}
+      >
+        <RefreshCw
+          size={20}
+          className={isRefreshing ? styles.pullToRefreshSpinning : undefined}
+          style={isRefreshing ? undefined : { transform: `rotate(${(pullOffset / PULL_THRESHOLD) * 180}deg)` }}
+        />
+      </div>
+      <div style={pullContentStyle}>
       <ScreenHeader
         title={
           <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
@@ -283,6 +356,7 @@ export function HomeScreen({
           {hasActiveProductFilters(filters) && <span className={styles.notificationDot} />}
         </button>
         <ChipScroller items={PRODUCT_FILTERS} value={productFilter} onChange={onFilterChange} />
+      </div>
       </div>
 
       {showFilterSheet && (
@@ -405,6 +479,7 @@ export function HomeScreen({
         </>
       )}
 
+      <div style={pullContentStyle}>
       {hasError ? (
         <StateBlock
           title="목록을 불러오지 못했어요"
@@ -437,6 +512,7 @@ export function HomeScreen({
           )}
         </div>
       )}
+      </div>
     </section>
   );
 }
