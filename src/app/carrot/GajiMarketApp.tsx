@@ -214,25 +214,45 @@ export default function GajiMarketApp() {
     writeNeighborhoodCache({ primary: activeNeighborhood, secondary: secondaryNeighborhood });
   }, [activeNeighborhood, secondaryNeighborhood]);
 
-  // 로그인 필수: 토큰이 없거나 만료됐으면(getMe 실패) 온보딩으로 보낸다.
-  // 닉네임 설정 전이면 온보딩 프로필 설정으로 이동.
+  // 이 시점엔 AuthGate가 이미 로그인 여부를 확인한 뒤라 여기서 또 실패한다고
+  // 곧장 로그아웃 취급하면 안 된다 — 네트워크 순단/서버 일시 오류로 여기 getMe()만
+  // 어쩌다 실패해도 (AuthGate 통과 직후라 방금 로그인 확인은 됐는데) 온보딩으로
+  // 튕겨나가던 버그가 있었다. 진짜 인증 실패(AuthRequiredError)일 때만 리다이렉트하고,
+  // 그 외엔 몇 번 재시도한다.
   useEffect(() => {
-    getMe()
-      .then((fetchedMe) => {
-        if (!fetchedMe.nicknameSet) {
-          router.replace("/onboarding/profile");
-          return;
-        }
-        setMe(fetchedMe);
-        // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
-        if (fetchedMe.region) {
-          setActiveNeighborhood(fetchedMe.region.dongName);
-        }
-        setAuthChecked(true);
-      })
-      .catch(() => {
-        router.replace("/onboarding");
-      });
+    let cancelled = false;
+    function run(attempt: number) {
+      getMe()
+        .then((fetchedMe) => {
+          if (cancelled) return;
+          if (!fetchedMe.nicknameSet) {
+            router.replace("/onboarding/profile");
+            return;
+          }
+          setMe(fetchedMe);
+          // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
+          if (fetchedMe.region) {
+            setActiveNeighborhood(fetchedMe.region.dongName);
+          }
+          setAuthChecked(true);
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          if (error instanceof AuthRequiredError) {
+            router.replace("/onboarding");
+            return;
+          }
+          if (attempt + 1 < 3) {
+            window.setTimeout(() => run(attempt + 1), 1200);
+          } else {
+            console.error("내 정보를 불러오지 못했습니다.", error);
+          }
+        });
+    }
+    run(0);
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   // 판매내역/찜 목록은 일반 목록(products)을 mine/isFavorite로 거르는 방식으로는
@@ -1012,8 +1032,7 @@ export default function GajiMarketApp() {
       .then(setWalletBalance)
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("잔액을 불러오지 못했습니다.", error);
         }
@@ -1060,8 +1079,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("송금하지 못했습니다.", error);
           alert(error instanceof Error ? error.message : "송금하지 못했습니다.");
