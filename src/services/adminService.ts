@@ -37,6 +37,19 @@ export interface AdminDataStatus {
   recent_errors: { source: string; message: string; occurred_at: string }[];
 }
 
+export interface AdminAudienceInsights {
+  asOf: string;
+  population: { rows: number; platforms: number; items: number; completedRows: number };
+  readerGuide: { question: string; answer: string }[];
+  selectionReasons: string[];
+  distributions: { item: string; count: number; q1: number; median: number; q3: number; outlierRate: number; interpretation: string }[];
+  keywords: { keyword: string; count: number; medianPrice: number; medianIndex: number; completionRate: number }[];
+  examples: { item: string; title: string; platform: string; price: number; status: string; model: string; reason: string; url: string }[];
+  llmCategories: { name: string; definition: string; signals: string[]; adminUse: string; caution: string }[];
+  llm: { mode: string; provider: string; model: string; generatedAt: string; scope: string; guardrail: string };
+  interpretation: { finding: string; action: string; caveat: string };
+}
+
 async function errorMessage(response: Response, fallback: string) {
   try {
     const payload = await response.json();
@@ -71,6 +84,14 @@ export async function getAdminDataStatus(): Promise<AdminDataStatus> {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error(await errorMessage(response, "운영 데이터를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getAdminAudienceInsights(): Promise<AdminAudienceInsights> {
+  const response = await authorizedFetch("/api/v1/admin/audience-insights", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "독자 관점 분석을 불러오지 못했습니다."));
   return response.json();
 }
 
