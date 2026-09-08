@@ -15,20 +15,31 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = typeof window !== "undefined" ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
     if (!token) {
-      router.replace("/onboarding");
+      window.location.replace("/onboarding");
       return;
     }
     getMe()
       .then((me) => {
         if (!me.nicknameSet) {
-          router.replace("/onboarding/profile");
+          window.location.replace("/onboarding/profile");
           return;
         }
         setChecked(true);
       })
-      .catch(() => router.replace("/onboarding"));
+      .catch(() => {
+        try {
+          window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        } catch {}
+        window.location.replace("/onboarding");
+      });
   }, [router]);
 
-  if (!checked) return <p style={{ padding: 24 }}>로그인 확인 중...</p>;
+  if (!checked) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f8f9fa" }}>
+        <p style={{ color: "#868b94", fontSize: "15px", fontWeight: 500 }}>로그인 확인 중...</p>
+      </div>
+    );
+  }
   return <>{children}</>;
 }
