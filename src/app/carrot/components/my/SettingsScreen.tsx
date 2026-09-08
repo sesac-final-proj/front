@@ -26,11 +26,7 @@ export interface SettingsScreenProps {
   onThemeChange: (theme: ThemeMode) => void;
   onBack: () => void;
   locationAllowed: boolean;
-  isGuestMode: boolean;
-  hasNetworkError: boolean;
   onLocationToggle: () => void;
-  onGuestToggle: () => void;
-  onNetworkErrorToggle: () => void;
   onLogout: () => void;
   onWithdraw: () => void;
 }
@@ -40,11 +36,7 @@ export function SettingsScreen({
   onThemeChange,
   onBack,
   locationAllowed,
-  isGuestMode,
-  hasNetworkError,
   onLocationToggle,
-  onGuestToggle,
-  onNetworkErrorToggle,
   onLogout,
   onWithdraw,
 }: SettingsScreenProps) {
@@ -84,14 +76,6 @@ export function SettingsScreen({
         <button type="button" onClick={onLocationToggle}>
           위치 권한
           <span className={locationAllowed ? styles.switchOn : ""} />
-        </button>
-        <button type="button" onClick={onGuestToggle}>
-          비로그인 모드
-          <span className={isGuestMode ? styles.switchOn : ""} />
-        </button>
-        <button type="button" onClick={onNetworkErrorToggle}>
-          네트워크 오류 상태
-          <span className={hasNetworkError ? styles.switchOn : ""} />
         </button>
       </section>
       <MenuCard

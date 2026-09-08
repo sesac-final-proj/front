@@ -185,7 +185,7 @@ export function ProductSkeletonList() {
 
 export function HomeScreen({
   isLoading,
-  hasError,
+  hasError = false,
   activeNeighborhood,
   secondaryNeighborhood,
   productFilter,
@@ -206,7 +206,7 @@ export function HomeScreen({
   onApplyFilters,
 }: {
   isLoading: boolean;
-  hasError: boolean;
+  hasError?: boolean;
   activeNeighborhood: string;
   secondaryNeighborhood: string | null;
   productFilter: string;
@@ -221,7 +221,7 @@ export function HomeScreen({
   onOpenMenu: () => void;
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   categories: string[];
   filters: ProductFilters;
   onApplyFilters: (filters: ProductFilters) => void;
