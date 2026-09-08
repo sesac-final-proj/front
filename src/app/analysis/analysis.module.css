@@ -184,6 +184,47 @@
 .significant { color: #9d3d25; background: #fbe1d8; }
 .uncertain { color: #56645c; background: #e3e9e3; }
 
+.distributionGrid { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 24px; }
+.distributionCard { padding: 20px; background: #f9fbf7; border: 1px solid #cbd5cd; }
+.distChartWrap { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.distRow { display: grid; grid-template-columns: 85px 1fr 95px; align-items: center; gap: 12px; font-size: 11px; }
+.distLabel { color: #56645c; font-family: 'DM Mono', monospace; font-size: 10px; }
+.distBarTrack { position: relative; height: 22px; background: #e8eee8; border-radius: 4px; overflow: hidden; display: flex; }
+.distBarElec { height: 100%; background: #df5a33; opacity: 0.88; transition: width 0.3s ease; }
+.distBarJoong { height: 100%; background: #2f855a; opacity: 0.88; transition: width 0.3s ease; }
+.distValue { text-align: right; color: #18221e; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; }
+.distLegend { display: flex; gap: 16px; margin-top: 14px; font-size: 11px; color: #56645c; }
+.distLegendItem { display: flex; align-items: center; gap: 6px; }
+.distDotElec { width: 10px; height: 10px; border-radius: 2px; background: #df5a33; }
+.distDotJoong { width: 10px; height: 10px; border-radius: 2px; background: #2f855a; }
+
+.boxplotGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.boxplotCard { padding: 16px; background: #ffffff; border: 1px solid #dfe6df; border-radius: 6px; }
+.boxplotCardTop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.boxplotCardTop h4 { margin: 0; font-size: 14px; color: #18221e; }
+.boxplotCardTop span { font-size: 10px; color: #7c8981; font-family: 'DM Mono', monospace; }
+.boxplotVisual { position: relative; height: 32px; background: #f0f4f0; border-radius: 4px; margin: 14px 0 10px; }
+.boxplotIqr { position: absolute; top: 6px; bottom: 6px; background: #d7e4dc; border: 1px solid #6b8f79; border-radius: 2px; }
+.boxplotMedian { position: absolute; top: 2px; bottom: 2px; width: 3px; background: #df5a33; z-index: 2; }
+.boxplotWhisker { position: absolute; top: 15px; height: 2px; background: #7c8981; }
+.boxplotMetrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10px; color: #56645c; }
+.boxplotMetrics strong { display: block; color: #18221e; font-family: 'DM Mono', monospace; font-size: 11px; }
+
+.funnelGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+.funnelCard { padding: 18px; background: #18221e; color: #f3f0e9; border-radius: 4px; }
+.funnelCard span { display: block; font-size: 10px; color: #91a097; font-family: 'DM Mono', monospace; }
+.funnelCard strong { display: block; margin: 8px 0 4px; font-size: 22px; color: #ffffff; }
+.funnelCard small { display: block; font-size: 10px; color: #afbbb2; }
+.funnelCard i { display: block; height: 4px; border-radius: 2px; margin-top: 10px; background: #df5a33; }
+
+.elasticityGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.elasticityCard { padding: 18px; background: #f9fbf7; border: 1px solid #cbd5cd; border-radius: 6px; }
+.elasticityCard h4 { margin: 0 0 6px; font-size: 14px; }
+.elasticityCard p { margin: 0 0 12px; font-size: 11px; color: #68756e; line-height: 1.5; }
+.elasticityRate { font-size: 24px; font-weight: 700; color: #0d694d; }
+.elasticityRateWarning { font-size: 24px; font-weight: 700; color: #b74424; }
+.elasticityMeta { margin-top: 8px; font-size: 10px; color: #7c8981; font-family: 'DM Mono', monospace; }
+
 @media (max-width: 680px) {
 	.page { padding: 14px 14px 48px; }
 	.headerCopy { display: block; padding-top: 24px; }
@@ -214,6 +255,10 @@
 	.qualityGrid { grid-template-columns: repeat(2, 1fr); }
 	.qualityGrid > div:nth-child(2) { border-right: 0; }
 	.qualityGrid > div:nth-child(-n+2) { border-bottom: 1px solid #d8e0d9; }
+	.distributionGrid { grid-template-columns: 1fr; }
+	.boxplotGrid { grid-template-columns: 1fr; }
+	.funnelGrid { grid-template-columns: repeat(2, 1fr); }
+	.elasticityGrid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 1024px) {

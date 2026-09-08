@@ -10,8 +10,33 @@ type ProductStats = { count: number; mean: number | null; trimmedMean: number | 
 type Quarter = { label: string; platform: string; product: string; item: string; model: string; count: number; mean: number | null; median: number | null; selling: number; reserved: number; sold: number };
 type Product = { name: string; item: string; model: string; referencePrice: number | null; elecmartVsJoonggonaraPct: number | null; elecmart: ProductStats; joonggonara: ProductStats };
 type Comparison = { item: string; elecmartCount: number; joonggonaraCount: number; elecmartMean: number | null; joonggonaraMean: number | null; elecmartTrimmedMean: number | null; joonggonaraTrimmedMean: number | null; elecmartStandardDeviation: number | null; joonggonaraStandardDeviation: number | null; elecmartMedian: number | null; joonggonaraMedian: number | null; medianDifference: number | null; elecmartPremiumPct: number | null; meanDifference: number | null; confidenceInterval95: [number, number] | null; tStatistic: number | null; pValue: number | null; cohensD: number | null };
-type AnalysisData = { rowCount: number; fileCount: number; overallStats: ProductStats; overallComparison: Pick<Comparison, "elecmartCount" | "joonggonaraCount" | "meanDifference" | "confidenceInterval95" | "tStatistic" | "pValue" | "cohensD">; platforms: Platform[]; products: Product[]; quarters: Quarter[]; comparison: Comparison[]; expensive: { product: string | null; platform: string | null; mean: number | null }; preprocessing: { rawRowCount: number; excludedRowCount: number; excludedByReason: Record<string, number> }; correlations: { favorites: { count: number; rho: number }; comments: { count: number; rho: number | null } }; coverage: { datedRowCount: number; datedRowRate: number; from: string | null; to: string | null } };
-type DashboardView = "decision" | "models" | "quarters" | "comparison" | "method";
+type PriceBin = { rangeLabel: string; min: number; max: number; total: number; elecmart: number; joonggonara: number; selling: number; completed: number; sellThroughRate: number; pct: number; cumulativePct: number };
+type BoxPlotData = { min: number | null; q1: number | null; median: number | null; q3: number | null; max: number | null; iqr: number | null; lowerFence: number | null; upperFence: number | null; outliersCount: number };
+type FunnelZone = { total: number; completed: number; sellThroughRate: number };
+type AnalyticsFunnel = { totalListings: number; activeListings: number; reservedListings: number; soldListings: number; overallSellThroughRate: number; zones: { discountZone: FunnelZone; marketFairZone: FunnelZone; premiumZone: FunnelZone } };
+type CapacitySummary = { capacity: string; count: number; median: number | null; q1: number | null; q3: number | null };
+type ClusterProfile = { cluster: string; item: string; capacity: string; yearBucket: string; count: number; median: number | null; q1: number | null; q3: number | null; platforms: Record<string, number> };
+type AnalysisData = { rowCount: number; fileCount: number; overallStats: ProductStats; overallComparison: Pick<Comparison, "elecmartCount" | "joonggonaraCount" | "meanDifference" | "confidenceInterval95" | "tStatistic" | "pValue" | "cohensD">; platforms: Platform[]; products: Product[]; quarters: Quarter[]; comparison: Comparison[]; capacitySummary: CapacitySummary[]; clusterProfiles: ClusterProfile[]; expensive: { product: string | null; platform: string | null; mean: number | null }; preprocessing: { rawRowCount: number; excludedRowCount: number; excludedByReason: Record<string, number>; unknownAfter?: number; detailSuccess?: number }; correlations: { favorites: { count: number; rho: number }; comments: { count: number; rho: number | null } }; coverage: { datedRowCount: number; datedRowRate: number; from: string | null; to: string | null }; distribution: PriceBin[]; itemDistributions: Record<string, PriceBin[]>; boxPlot: BoxPlotData; itemBoxPlots: Record<string, BoxPlotData>; analyticsFunnel: AnalyticsFunnel };
+type ValidationModel = { name: string; trainR2: number; cvR2Mean: number; cvR2Std: number; testR2: number; testMAE: number; testMedianAE: number; overfitGap: number; overfitRisk: "낮음" | "보통" | "높음" };
+type ModelValidation = { rows: number; selectedModel: string; split: { method: string; trainRows: number; testRows: number; trainUntil: string; testFrom: string }; baseline: { name: string; testR2: number; testMAE: number }; models: ValidationModel[]; selectedCategoryMetrics: { item: string; count: number; r2: number; mae: number }[]; leakageGuard: string; clusterSummary: { count: number; cuckoo10Rows: number; productYearRows: number; unknownRows: number; duplicateIds: number } };
+type DashboardView = "decision" | "distribution" | "funnel" | "models" | "quarters" | "comparison" | "method";
+
+declare global {
+  interface Window {
+    gtag?: (command: string, action: string, params?: Record<string, unknown>) => void;
+    dataLayer?: unknown[];
+  }
+}
+
+function trackEvent(action: string, params?: Record<string, unknown>) {
+  if (typeof window !== "undefined") {
+    if (window.gtag) {
+      window.gtag("event", action, params);
+    } else if (window.dataLayer) {
+      window.dataLayer.push({ event: action, ...params });
+    }
+  }
+}
 
 const won = new Intl.NumberFormat("ko-KR");
 const number = new Intl.NumberFormat("ko-KR");
@@ -22,6 +47,7 @@ const significanceLabel = (value: number | null) => value !== null && value < 0.
 
 export default function AnalysisPage() {
   const [data, setData] = useState<AnalysisData | null>(null);
+  const [validation, setValidation] = useState<ModelValidation | null>(null);
   const [error, setError] = useState(false);
   const [selectedItem, setSelectedItem] = useState("전체");
   const [query, setQuery] = useState("");
@@ -32,14 +58,17 @@ export default function AnalysisPage() {
   const [dashboardView, setDashboardView] = useState<DashboardView>("decision");
 
   useEffect(() => {
-    fetch("/analysis-data.json")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("load"))))
-      .then(setData)
+    Promise.all([fetch("/analysis-data.json"), fetch("/model-validation.json")])
+      .then(async ([analysisResponse, validationResponse]) => {
+        if (!analysisResponse.ok || !validationResponse.ok) throw new Error("load");
+        return Promise.all([analysisResponse.json(), validationResponse.json()]);
+      })
+      .then(([analysisData, validationData]) => { setData(analysisData); setValidation(validationData); })
       .catch(() => setError(true));
   }, []);
 
   if (error) return <main className={styles.state}>분석 데이터를 불러오지 못했습니다.</main>;
-  if (!data) return <main className={styles.state}>분석 데이터를 불러오는 중입니다.</main>;
+  if (!data || !validation) return <main className={styles.state}>분석 데이터를 불러오는 중입니다.</main>;
 
   const items = ["전체", ...Array.from(new Set(data.products.map((product) => product.item)))];
   const products = ["전체", ...Array.from(new Set(data.products.filter((product) => selectedItem === "전체" || product.item === selectedItem).map((product) => product.model)))];
@@ -129,6 +158,43 @@ export default function AnalysisPage() {
           <article><span>02 · 주의가 필요한 품목</span><strong>{largestGap ? largestGap.item : "표본 부족"}</strong><p>{largestGap ? `플랫폼 중앙값이 ${Math.abs(largestGap.elecmartPremiumPct ?? 0).toFixed(1)}% 벌어집니다. 단일 플랫폼 가격을 그대로 적용하지 말고 상태·모델을 추가 확인하세요.` : "비교 가능한 품목이 없습니다."}</p></article>
           <article><span>03 · 통계적 차이</span><strong>{significantComparisons.length}개 품목</strong><p>{significantComparisons.length ? `${significantComparisons.map((item) => item.item).join(", ")}에서 평균가 차이가 유의했습니다(p<0.05). 다만 효과크기와 모델 구성을 함께 봐야 합니다.` : "현재 표본에서는 유의한 평균가 차이가 확인되지 않았습니다."}</p></article>
         </div>
+      </section>
+
+      <section className={`${styles.section} ${styles.validationSection}`} aria-label="가격 예측 모델과 클러스터 검증">
+        <div className={styles.sectionHeading}><div><p className={styles.kicker}>MODEL & CLUSTER VALIDATION</p><h2>비교 기준의 정합성을 검증했습니다</h2></div><span className={styles.sectionHint}>Optuna 20회 × 2모델 · 시간순 홀드아웃</span></div>
+        <div className={styles.validationGrid}>
+          {validation.models.map((model) => <article className={styles.validationCard} key={model.name}>
+            <div className={styles.validationCardTop}><div><span>{model.name === validation.selectedModel ? "선택 모델" : "비교 모델"}</span><h3>{model.name}</h3></div><b className={`${styles.confidence} ${styles[`confidence${model.overfitRisk}`]}`}>과적합 {model.overfitRisk}</b></div>
+            <strong className={styles.r2Value}>R² {model.testR2.toFixed(3)}</strong>
+            <p>테스트 MAE {money(model.testMAE)} · 중앙절대오차 {money(model.testMedianAE)}</p>
+            <div className={styles.r2Track}><i style={{ width: `${Math.max(0, Math.min(100, model.testR2 * 100))}%` }} /></div>
+            <div className={styles.validationSignals}><span>학습 R² <b>{model.trainR2.toFixed(3)}</b></span><span>CV R² <b>{model.cvR2Mean.toFixed(3)} ± {model.cvR2Std.toFixed(3)}</b></span><span>학습-테스트 <b>{model.overfitGap > 0 ? "+" : ""}{model.overfitGap.toFixed(3)}</b></span></div>
+          </article>)}
+          <article className={`${styles.validationCard} ${styles.baselineCard}`}>
+            <div className={styles.validationCardTop}><div><span>가격 기준선</span><h3>{validation.baseline.name}</h3></div><b>비교 기준</b></div>
+            <strong className={styles.r2Value}>R² {validation.baseline.testR2.toFixed(3)}</strong>
+            <p>테스트 MAE {money(validation.baseline.testMAE)}</p>
+            <div className={styles.baselineDelta}><span>LightGBM 오차 개선</span><strong>{Math.round((1 - validation.models[0].testMAE / validation.baseline.testMAE) * 100)}%</strong></div>
+          </article>
+        </div>
+        <div className={styles.clusterGrid}>
+          <article className={styles.clusterPanel}>
+            <div className={styles.clusterPanelHead}><div><span>쿠쿠 용량 정규화</span><h3>“10인분”과 “10인용”을 같은 기준으로</h3></div><strong>{number.format(validation.clusterSummary.cuckoo10Rows)}건</strong></div>
+            <div className={styles.capacityList}>{data.capacitySummary.slice(0, 6).map((group) => <div key={group.capacity}><span>{group.capacity}</span><b>{number.format(group.count)}건</b><strong>{money(group.median)}</strong></div>)}</div>
+          </article>
+          <article className={styles.clusterPanel}>
+            <div className={styles.clusterPanelHead}><div><span>비교 클러스터</span><h3>용량·연식·가격이 가까운 매물 묶음</h3></div><strong>{number.format(validation.clusterSummary.count)}개</strong></div>
+            <div className={styles.clusterFacts}><span>상세 회수 <b>{number.format(data.preprocessing.detailSuccess ?? 0)}건</b></span><span>미상 잔여 <b>{number.format(validation.clusterSummary.unknownRows)}건</b></span><span>중복 ID <b>{number.format(validation.clusterSummary.duplicateIds)}건</b></span><span>연식 근거 <b>{number.format(validation.clusterSummary.productYearRows)}건</b></span></div>
+            <p>연식은 제목·상세에서 명시된 경우만 사용했습니다. 근거가 없는 연식은 추정하지 않고 별도 군집으로 유지했습니다.</p>
+          </article>
+        </div>
+        <div className={styles.categoryValidationWrap}>
+          <table className={styles.categoryValidation}>
+            <thead><tr><th>품목</th><th>테스트 표본</th><th>선택 모델 R²</th><th>MAE</th><th>활용 판정</th></tr></thead>
+            <tbody>{validation.selectedCategoryMetrics.map((metric) => <tr key={metric.item}><td><strong>{metric.item}</strong></td><td>{number.format(metric.count)}건</td><td className={metric.r2 >= 0.2 ? styles.positive : styles.negative}>{metric.r2.toFixed(3)}</td><td>{money(metric.mae)}</td><td>{metric.r2 >= 0.2 ? "모델+중앙값 교차 사용" : "클러스터 중앙값 우선"}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <p className={styles.analysisNote}><b>판정:</b> 전체 테스트에서는 LightGBM R² {validation.models.find((model) => model.name === "LightGBM")?.testR2.toFixed(3)}로 기준선보다 낫습니다. 하지만 쿠쿠와 미닉스는 품목별 설명력이 낮아 ML 단독 가격을 쓰지 않고, 용량·모델·연식·가격 클러스터 중앙값을 우선 사용합니다. {validation.leakageGuard}로 검증 누수를 막았습니다.</p>
       </section>
 
       <section className={styles.section} aria-label="평균 가격 진단">
@@ -256,7 +322,27 @@ export default function AnalysisPage() {
       </section>
 
       <nav className={styles.dashboardTabs} aria-label="상세 분석 섹션">
-        {([["decision", "등록가 가이드"], ["models", "모델 가격"], ["quarters", "분기 추이"], ["comparison", "플랫폼 차이"], ["method", "상관·방법론"]] as [DashboardView, string][]).map(([value, label]) => <button type="button" className={dashboardView === value ? styles.dashboardTabActive : styles.dashboardTab} key={value} onClick={() => setDashboardView(value)}>{label}</button>)}
+        {([
+          ["decision", "등록가 가이드"],
+          ["distribution", "가격 분포도"],
+          ["funnel", "마켓 퍼널 & 전환율"],
+          ["models", "모델 가격"],
+          ["quarters", "분기 추이"],
+          ["comparison", "플랫폼 차이"],
+          ["method", "품질 & 방법론"],
+        ] as [DashboardView, string][]).map(([value, label]) => (
+          <button
+            type="button"
+            className={dashboardView === value ? styles.dashboardTabActive : styles.dashboardTab}
+            key={value}
+            onClick={() => {
+              setDashboardView(value);
+              trackEvent("analysis_tab_switch", { tab: value });
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
       {dashboardView === "decision" && <section className={styles.section}>
@@ -267,6 +353,185 @@ export default function AnalysisPage() {
           <div className={styles.decisionPrice}><div><small>빠른 판매 기준</small><strong>{money(row.quickPrice)}</strong></div><div><small>균형 가격 기준</small><strong>{money(row.balancedPrice)}</strong></div></div>
           <div className={styles.decisionSignals}><span>플랫폼 간극 <b>{row.spread === null ? "N/A" : `${row.spread.toFixed(1)}%`}</b></span><span>비교 표본 <b>{number.format(row.sampleCount)}건</b></span></div>
         </article>)}</div>
+      </section>}
+
+      {dashboardView === "distribution" && <section className={styles.section}>
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.kicker}>DISTRIBUTION & DENSITY</p>
+            <h2>가격 분포도 및 플랫폼 점유율</h2>
+          </div>
+          <span className={styles.sectionHint}>
+            {selectedItem === "전체" ? `전체 ${number.format(data.rowCount)}건 표본` : `${selectedItem} 구간별 분포`}
+          </span>
+        </div>
+        <p className={styles.disclaimer}>
+          각 가격 구간(Bin)별로 번개장터와 중고나라의 매물 비중 및 누적 백분율(CDF)과 거래완료율을 실시간 대조합니다.
+        </p>
+
+        <div className={styles.distributionGrid}>
+          <div className={styles.distributionCard}>
+            <h3 style={{ margin: "0 0 14px", fontSize: "16px" }}>
+              {selectedItem === "전체" ? "전체 품목 가격대별 분포 히스토그램" : `${selectedItem} 가격 구간별 매물 분포`}
+            </h3>
+            <div className={styles.distChartWrap}>
+              {(selectedItem === "전체" ? data.distribution : (data.itemDistributions?.[selectedItem] || data.distribution)).map((bin) => {
+                const currentBins = selectedItem === "전체" ? data.distribution : (data.itemDistributions?.[selectedItem] || data.distribution);
+                const maxBinTotal = Math.max(...currentBins.map((b) => b.total), 1);
+                const elecWidth = bin.total ? (bin.elecmart / bin.total) * 100 : 0;
+                const joongWidth = bin.total ? (bin.joonggonara / bin.total) * 100 : 0;
+                const trackWidth = (bin.total / maxBinTotal) * 100;
+                return (
+                  <div className={styles.distRow} key={bin.rangeLabel}>
+                    <span className={styles.distLabel}>{bin.rangeLabel}</span>
+                    <div className={styles.distBarTrack} style={{ width: `${Math.max(trackWidth, 6)}%` }}>
+                      <div className={styles.distBarElec} style={{ width: `${elecWidth}%` }} title={`번개장터 ${bin.elecmart}건`} />
+                      <div className={styles.distBarJoong} style={{ width: `${joongWidth}%` }} title={`중고나라 ${bin.joonggonara}건`} />
+                    </div>
+                    <span className={styles.distValue}>
+                      {number.format(bin.total)}건 <small style={{ color: "#7c8981", fontSize: "10px", fontWeight: "normal" }}>({bin.pct}%)</small>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.distLegend}>
+              <div className={styles.distLegendItem}><span className={styles.distDotElec} /><span>번개장터 매물 비중</span></div>
+              <div className={styles.distLegendItem}><span className={styles.distDotJoong} /><span>중고나라 매물 비중</span></div>
+            </div>
+          </div>
+
+          <div className={styles.distributionCard}>
+            <h3 style={{ margin: "0 0 14px", fontSize: "16px" }}>분포 요약 통계</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <article>
+                <span style={{ fontSize: "11px", color: "#68756e" }}>사분위 범위 (IQR)</span>
+                <strong style={{ display: "block", fontSize: "19px", marginTop: "4px" }}>
+                  {money(data.boxPlot.iqr)}
+                </strong>
+                <small style={{ color: "#7c8981", fontSize: "10px" }}>중간 50% 매물이 밀집된 가격 폭</small>
+              </article>
+              <article>
+                <span style={{ fontSize: "11px", color: "#68756e" }}>정상 가격 범위 (Fences)</span>
+                <strong style={{ display: "block", fontSize: "15px", marginTop: "4px" }}>
+                  {money(data.boxPlot.lowerFence)} ~ {money(data.boxPlot.upperFence)}
+                </strong>
+                <small style={{ color: "#7c8981", fontSize: "10px" }}>Q1 - 1.5*IQR ~ Q3 + 1.5*IQR 기준</small>
+              </article>
+              <article>
+                <span style={{ fontSize: "11px", color: "#68756e" }}>통계적 극단치 (Outliers)</span>
+                <strong style={{ display: "block", fontSize: "19px", color: "#df5a33", marginTop: "4px" }}>
+                  {number.format(data.boxPlot.outliersCount)}건
+                </strong>
+                <small style={{ color: "#7c8981", fontSize: "10px" }}>정상 범위를 벗어난 초고가/초저가 매물</small>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.sectionHeading} style={{ marginTop: "28px" }}>
+          <h2>품목별 사분위 박스플롯 (Box Plot) 범위</h2>
+        </div>
+        <div className={styles.boxplotGrid}>
+          {Object.entries(data.itemBoxPlots || {}).map(([itemName, box]) => {
+            const maxItemVal = box.max ?? 1;
+            const q1Pos = box.q1 !== null ? (box.q1 / maxItemVal) * 100 : 25;
+            const q3Pos = box.q3 !== null ? (box.q3 / maxItemVal) * 100 : 75;
+            const medPos = box.median !== null ? (box.median / maxItemVal) * 100 : 50;
+            return (
+              <div className={styles.boxplotCard} key={itemName}>
+                <div className={styles.boxplotCardTop}>
+                  <h4>{itemName}</h4>
+                  <span>극단값 {box.outliersCount}건 제외</span>
+                </div>
+                <div className={styles.boxplotVisual}>
+                  <div className={styles.boxplotWhisker} style={{ left: "4%", width: "92%" }} />
+                  <div className={styles.boxplotIqr} style={{ left: `${q1Pos}%`, width: `${Math.max(q3Pos - q1Pos, 4)}%` }} />
+                  <div className={styles.boxplotMedian} style={{ left: `${medPos}%` }} />
+                </div>
+                <div className={styles.boxplotMetrics}>
+                  <div><span>최저</span><strong>{money(box.min)}</strong></div>
+                  <div><span>Q1(25%)</span><strong>{money(box.q1)}</strong></div>
+                  <div><span>중앙값</span><strong style={{ color: "#df5a33" }}>{money(box.median)}</strong></div>
+                  <div><span>Q3(75%)</span><strong>{money(box.q3)}</strong></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>}
+
+      {dashboardView === "funnel" && <section className={styles.section}>
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.kicker}>CONVERSION & LIQUIDITY</p>
+            <h2>구글 애널리틱스 & 마켓 전환 퍼널 분석</h2>
+          </div>
+          <span className={styles.sectionHint}>마켓 유동성 및 전환율 진단</span>
+        </div>
+        <p className={styles.disclaimer}>
+          매물 등록부터 활성 판매, 예약, 거래 완료까지의 퍼널 전환율(Sell-Through Rate)과 가격 구간별 거래 탄력성을 진단합니다.
+        </p>
+
+        <div className={styles.funnelGrid}>
+          <div className={styles.funnelCard}>
+            <span>01 · 전체 수집 매물</span>
+            <strong>{number.format(data.analyticsFunnel.totalListings)}건</strong>
+            <small>전체 등록 기준 (100%)</small>
+            <i style={{ width: "100%" }} />
+          </div>
+          <div className={styles.funnelCard}>
+            <span>02 · 활성 판매중 매물</span>
+            <strong>{number.format(data.analyticsFunnel.activeListings)}건</strong>
+            <small>현재 구매 가능 ({(data.analyticsFunnel.activeListings / data.analyticsFunnel.totalListings * 100).toFixed(1)}%)</small>
+            <i style={{ width: `${(data.analyticsFunnel.activeListings / data.analyticsFunnel.totalListings * 100)}%` }} />
+          </div>
+          <div className={styles.funnelCard}>
+            <span>03 · 거래 예약중 매물</span>
+            <strong>{number.format(data.analyticsFunnel.reservedListings)}건</strong>
+            <small>거래 협상 단계 ({(data.analyticsFunnel.reservedListings / data.analyticsFunnel.totalListings * 100).toFixed(1)}%)</small>
+            <i style={{ width: `${(data.analyticsFunnel.reservedListings / data.analyticsFunnel.totalListings * 100)}%` }} />
+          </div>
+          <div className={styles.funnelCard} style={{ background: "#0d694d" }}>
+            <span>04 · 거래 완료 매물</span>
+            <strong>{number.format(data.analyticsFunnel.soldListings)}건</strong>
+            <small>전체 회전율: {data.analyticsFunnel.overallSellThroughRate}%</small>
+            <i style={{ width: `${data.analyticsFunnel.overallSellThroughRate}%`, background: "#f5a47f" }} />
+          </div>
+        </div>
+
+        <div className={styles.sectionHeading} style={{ marginTop: "28px" }}>
+          <h2>가격 포지셔닝별 거래 탄력성 (Price Elasticity)</h2>
+        </div>
+        <p className={styles.disclaimer}>
+          시장 중앙값 대비 가격을 어떻게 책정하느냐에 따라 판매 완료 전환율(Sell-Through Rate)이 어떻게 달라지는지 분석한 결과입니다.
+        </p>
+        <div className={styles.elasticityGrid}>
+          <div className={styles.elasticityCard}>
+            <h4>1. 할인 포지션 (중앙값 -12% 이하)</h4>
+            <p>시세보다 저렴하게 책정하여 가장 빠른 판매 회전을 목표로 하는 구간입니다.</p>
+            <div className={styles.elasticityRate}>{data.analyticsFunnel.zones.discountZone.sellThroughRate}% 전환</div>
+            <div className={styles.elasticityMeta}>
+              표본 {number.format(data.analyticsFunnel.zones.discountZone.total)}건 중 {number.format(data.analyticsFunnel.zones.discountZone.completed)}건 완료
+            </div>
+          </div>
+          <div className={styles.elasticityCard}>
+            <h4>2. 적정 균형 포지션 (중앙값 ±12% 이내)</h4>
+            <p>시장 기준선에 근접하여 가격 손실 없이 안정적인 거래 성사를 기대할 수 있는 구간입니다.</p>
+            <div className={styles.elasticityRate}>{data.analyticsFunnel.zones.marketFairZone.sellThroughRate}% 전환</div>
+            <div className={styles.elasticityMeta}>
+              표본 {number.format(data.analyticsFunnel.zones.marketFairZone.total)}건 중 {number.format(data.analyticsFunnel.zones.marketFairZone.completed)}건 완료
+            </div>
+          </div>
+          <div className={styles.elasticityCard}>
+            <h4>3. 프리미엄 포지션 (중앙값 +12% 초과)</h4>
+            <p>상태가 매우 좋거나 고가 매물로, 거래 완료 전환율이 저하되고 체류 기간이 길어지는 구간입니다.</p>
+            <div className={styles.elasticityRateWarning}>{data.analyticsFunnel.zones.premiumZone.sellThroughRate}% 전환</div>
+            <div className={styles.elasticityMeta}>
+              표본 {number.format(data.analyticsFunnel.zones.premiumZone.total)}건 중 {number.format(data.analyticsFunnel.zones.premiumZone.completed)}건 완료 (회전율 저하)
+            </div>
+          </div>
+        </div>
       </section>}
 
       {dashboardView === "models" && <section className={styles.section}>
