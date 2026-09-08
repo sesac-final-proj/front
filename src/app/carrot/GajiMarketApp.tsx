@@ -1087,8 +1087,13 @@ export default function GajiMarketApp() {
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
         attachImageIfAny(String(id), imageFile);
-        setActiveTab("my");
-        setSubPage({ type: "sales" });
+        if (isFree) {
+          setActiveTab("my");
+          setSubPage({ type: "sales" });
+        } else {
+          const params = new URLSearchParams({ title, price: String(Math.max(0, price)), productId: String(id) });
+          router.push(`/analysis?${params.toString()}`);
+        }
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {

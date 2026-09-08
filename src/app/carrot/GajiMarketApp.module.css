@@ -1210,6 +1210,27 @@
   width: 100%;
 }
 
+.marketAnalysisButton {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.marketAnalysisButton:active {
+  transform: translateY(1px);
+}
+
+.marketAnalysisButton:focus-visible {
+  outline: 3px solid rgba(255, 146, 43, 0.28);
+  outline-offset: 2px;
+}
+
 .topTabs {
   display: flex;
   gap: 25px;

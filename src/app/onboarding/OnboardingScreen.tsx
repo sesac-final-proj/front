@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Heart, MapPin } from "lucide-react";
+import { AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
 import styles from "./OnboardingScreen.module.css";
 
 // carrot/GajiMarketApp.tsx와 동일한 패턴 (NEXT_PUBLIC_API_BASE_URL 비어있으면 상대경로).
@@ -11,10 +13,17 @@ function apiUrl(path: string) {
 }
 
 async function startSocialLogin(provider: "kakao" | "naver") {
-  const res = await fetch(apiUrl(`/api/v1/auth/login/${provider}`));
-  if (!res.ok) return; // ponytail: 에러 토스트는 로그인 실패 처리 붙일 때 추가
-  const { auth_url: authUrl } = (await res.json()) as { auth_url: string };
-  window.location.href = authUrl;
+  try {
+    const res = await fetch(apiUrl(`/api/v1/auth/login/${provider}`));
+    if (!res.ok) {
+      alert(`${provider} 로그인 URL 생성 실패. 백엔드 설정을 확인해주세요.`);
+      return;
+    }
+    const { auth_url: authUrl } = (await res.json()) as { auth_url: string };
+    window.location.href = authUrl;
+  } catch (err) {
+    alert("백엔드 서버(8000포트) 연결에 실패했습니다.");
+  }
 }
 
 type AccentIcon = "face" | "map" | "heart";
@@ -32,31 +41,31 @@ type Feature = {
 // same 5x4 grid positions reused across slides for a consistent rhythm
 const FEATURES: Feature[] = [
   {
-    key: "gaji",
-    line1: "동네 거래, 이제 가볍게",
-    highlight: "가지마켓",
-    line2Suffix: "으로 한 번에",
-    avatarBg: "#f0e6ff",
+    key: "market-start",
+    line1: "중고거래의 시작",
+    highlight: "당근",
+    line2Suffix: "으로 가볍게",
+    avatarBg: "#fff1df",
     icon: "face",
-    accents: { 4: "#ffc870", 8: "#ffa7a8", 10: "#7537c5", 17: "#5cc9ff" },
+    accents: { 4: "#ffb347", 8: "#ff8a5b", 10: "#ff6f0f", 17: "#ffc870" },
   },
   {
-    key: "gatgaji",
+    key: "neighborhood-info",
     line1: "동네 정보, 이제 든든하게",
-    highlight: "갖가지",
-    line2Suffix: "로 한눈에",
-    avatarBg: "#fdeaea",
+    highlight: "우리 동네",
+    line2Suffix: "를 한눈에",
+    avatarBg: "#ffe9d8",
     icon: "map",
-    accents: { 4: "#078452", 8: "#ff6265", 10: "#a45a08", 17: "#7537c5" },
+    accents: { 4: "#ff9d4d", 8: "#ff7b54", 10: "#ff6f0f", 17: "#f2c14d" },
   },
   {
-    key: "kkumgaji",
-    line1: "작은 나눔, 이제 가깝게",
+    key: "dream-gaji",
+    line1: "기부는 함께",
     highlight: "꿈가지",
-    line2Suffix: "로 모아모아",
-    avatarBg: "#eaf3ff",
+    line2Suffix: "로 이어져요",
+    avatarBg: "#fff3eb",
     icon: "heart",
-    accents: { 4: "#145fcc", 8: "#d7a94c", 10: "#7537c5", 17: "#078452" },
+    accents: { 4: "#ff8e45", 8: "#ff6f0f", 10: "#ffb056", 17: "#ffc36a" },
   },
 ];
 
@@ -182,6 +191,28 @@ function FeatureCarousel() {
 }
 
 export default function OnboardingScreen() {
+  const router = useRouter();
+
+  const handleDevLogin = async () => {
+    try {
+      const res = await fetch(apiUrl("/api/v1/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "test@test.com", password: "test1234" }),
+      });
+      if (!res.ok) {
+        alert("테스트 계정 로그인 실패: 백엔드 응답 오류");
+        return;
+      }
+      const data = await res.json();
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refresh_token);
+      router.push("/carrot");
+    } catch {
+      alert("백엔드 서버(8000포트) 연결에 실패했습니다.");
+    }
+  };
+
   return (
     <div className={styles.stage}>
       <div className={styles.phoneShell}>
@@ -206,6 +237,14 @@ export default function OnboardingScreen() {
             >
               <span className={styles.naverMark}>N</span>
               <span>3초만에 네이버로 시작하기</span>
+            </button>
+            <button
+              type="button"
+              className={styles.socialButton}
+              style={{ background: "#4B5563", color: "#ffffff", marginTop: "4px" }}
+              onClick={handleDevLogin}
+            >
+              ⚡ 개발용 테스트 계정 1초 로그인
             </button>
           </div>
 

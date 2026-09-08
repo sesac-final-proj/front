@@ -2,7 +2,7 @@
   min-height: 100dvh;
   display: grid;
   place-items: start center;
-  background: #efe9f7;
+  background: #fff5ee;
   overflow: hidden;
 }
 
@@ -73,7 +73,7 @@
 }
 
 .highlight {
-  color: #7537c5;
+  color: #ff6f0f;
 }
 
 .illustration {
@@ -111,7 +111,7 @@
 }
 
 .dotActive {
-  background: #717680;
+  background: #ff6f0f;
 }
 
 .actions {
