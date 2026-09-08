@@ -51,6 +51,8 @@ export type SubPage =
   | { type: "community-form" }
   | { type: "chat-room"; id: string }
   | { type: "chat-room-list"; productId: string; productTitle: string }
+  | { type: "payment-amount"; chatRoomId: string }
+  | { type: "payment-detail"; chatRoomId: string; transactionId: string }
   | { type: "my-menu" }
   | { type: "all-services" }
   | { type: "merge-game" }
@@ -99,7 +101,14 @@ export type ProductListItem = {
   thumbnailUrl?: string;
 };
 
-export type ChatMessageUi = { mine: boolean; text: string; time: string; imageUrl?: string };
+export type ChatMessageUi = {
+  mine: boolean;
+  text: string;
+  time: string;
+  imageUrl?: string;
+  // 당근페이 송금 메시지에만 실린다 — 채팅방 버블/상세내역 화면 둘 다 이 값 하나로 그린다.
+  payment?: { transactionId: string; amount: number; balanceAfter: number; createdAt: string };
+};
 
 export type CommunityPost = {
   id: string;

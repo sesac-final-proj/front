@@ -28,6 +28,8 @@ export interface MyScreenProps {
   unreadCount: number;
   favoriteCount: number;
   myProducts: ProductListItem[];
+  // null이면 아직 로딩 중 — 그동안은 이전처럼 "0원"으로 보여준다.
+  walletBalance?: number | null;
   onOpenSettings: () => void;
   onOpenMenu: () => void;
   onOpenAllServices: () => void;
@@ -45,6 +47,7 @@ export function MyScreen({
   unreadCount,
   favoriteCount,
   myProducts,
+  walletBalance,
   onOpenSettings,
   onOpenMenu,
   onOpenAllServices,
@@ -115,7 +118,7 @@ export function MyScreen({
         </div>
         <div className={styles.payBalance}>
           <button type="button">
-            머니 <strong>0원</strong> <ChevronRight size={18} />
+            머니 <strong>{(walletBalance ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
           <button type="button">
             포인트 <strong>44원</strong> <ChevronRight size={18} />

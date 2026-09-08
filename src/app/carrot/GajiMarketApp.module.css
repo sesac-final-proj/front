@@ -3524,6 +3524,164 @@
   object-fit: cover;
 }
 
+/* 당근페이 송금 카드(채팅 메시지 버블 자리) */
+.paymentMessageCard {
+  justify-self: start;
+  max-width: 78%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 18px;
+  border-bottom-left-radius: 5px;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.paymentMessageCard strong {
+  color: var(--color-primary);
+}
+
+.paymentMessageCardMine {
+  justify-self: end;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 5px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.paymentMessageCardMine strong {
+  color: var(--color-on-primary);
+}
+
+/* 당근페이 송금 금액 입력 화면 */
+.paymentAmountBody {
+  padding: 24px 8px;
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+}
+
+.paymentRecipient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.paymentAmountField {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.paymentAmountField input {
+  width: 220px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 40px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.paymentAmountField span {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.paymentBalance,
+.paymentBalanceWarn {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.paymentBalance {
+  color: var(--color-muted);
+}
+
+.paymentBalanceWarn {
+  color: #ff5b5b;
+}
+
+.paymentSubmitBtn {
+  position: absolute;
+  left: 17px;
+  right: 17px;
+  bottom: calc(17px + env(safe-area-inset-bottom));
+  height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.paymentSubmitBtn:disabled {
+  opacity: 0.4;
+}
+
+/* 당근페이 상세 내역 화면 */
+.paymentDetailBody {
+  padding: 4px 17px 32px;
+  display: grid;
+  gap: 4px;
+}
+
+.paymentDetailLabel {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.paymentDetailAmount {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.paymentDetailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+}
+
+.paymentDetailRow span {
+  color: var(--color-muted);
+}
+
+.paymentDetailSection {
+  margin-top: 18px;
+}
+
+.paymentReceiptBtn {
+  margin-top: 24px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.paymentReceiptBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .promoCard,
 .profileCard,
 .payCard,
