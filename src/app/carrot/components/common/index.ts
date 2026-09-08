@@ -11,3 +11,4 @@ export * from "./PullToRefreshIndicator";
 export * from "./AllServicesScreen";
 export * from "./RegionSearchScreen";
 export * from "./SearchScreen";
+export * from "./DaangnSplash";

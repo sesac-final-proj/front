@@ -14,6 +14,7 @@ import {
   AllServicesScreen,
   RegionSearchScreen,
   SearchScreen,
+  DaangnSplash,
   // trade
   HomeScreen,
   ProductDetailScreen,
@@ -1212,7 +1213,7 @@ export default function GajiMarketApp() {
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
   // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
   if (!authChecked) {
-    return <div className={styles.stage} data-theme={theme} />;
+    return <DaangnSplash theme={theme} message="당근을 시작하는 중..." subMessage="동네 이웃들과 따뜻한 이야기를 나눠요" />;
   }
 
   return (
