@@ -165,7 +165,7 @@ export default function AnalysisPage() {
         <div className={styles.sectionHeading}><div><p className={styles.kicker}>MODEL & CLUSTER VALIDATION</p><h2>비교 기준의 정합성을 검증했습니다</h2></div><span className={styles.sectionHint}>Optuna 20회 × 2모델 · 시간순 홀드아웃</span></div>
         <div className={styles.validationGrid}>
           {validation.models.map((model) => <article className={styles.validationCard} key={model.name}>
-            <div className={styles.validationCardTop}><div><span>{model.name === validation.selectedModel ? "선택 모델" : "비교 모델"}</span><h3>{model.name}</h3></div><b className={`${styles.confidence} ${styles[`confidence${model.overfitRisk}`]}`}>과적합 {model.overfitRisk}</b></div>
+            <div className={styles.validationCardTop}><div><span>{model.name === validation.selectedModel ? "선택 모델" : "비교 모델"}</span><h3>{model.name}</h3></div><b className={`${styles.confidence} ${styles[`confidence${model.overfitRisk}`]}`}>검증 위험 {model.overfitRisk}</b></div>
             <strong className={styles.r2Value}>R² {model.testR2.toFixed(3)}</strong>
             <p>테스트 MAE {money(model.testMAE)} · 중앙절대오차 {money(model.testMedianAE)}</p>
             <div className={styles.r2Track}><i style={{ width: `${Math.max(0, Math.min(100, model.testR2 * 100))}%` }} /></div>
@@ -643,7 +643,7 @@ export default function AnalysisPage() {
           </table>
         </div>
 
-        <div className={styles.sectionHeading} style={{ marginTop: "32px" }}><h2>품목별 통계적 가설검정 (Welch's t-test)</h2></div>
+        <div className={styles.sectionHeading} style={{ marginTop: "32px" }}><h2>품목별 통계적 가설검정 (Welch t-test)</h2></div>
         <div className={styles.tableWrap}>
           <table>
             <thead>
