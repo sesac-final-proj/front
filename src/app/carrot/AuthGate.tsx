@@ -19,7 +19,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     getMe()
-      .then(() => setChecked(true))
+      .then((me) => {
+        if (!me.nicknameSet) {
+          router.replace("/onboarding/profile");
+          return;
+        }
+        setChecked(true);
+      })
       .catch(() => router.replace("/onboarding"));
   }, [router]);
 

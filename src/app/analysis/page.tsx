@@ -122,6 +122,7 @@ export default function AnalysisPage() {
   const unknownModelRows = data.products.filter((product) => product.model === "모델 미상").reduce((sum, product) => sum + product.elecmart.count + product.joonggonara.count, 0);
   const identifiedModelRate = data.rowCount ? (data.rowCount - unknownModelRows) / data.rowCount * 100 : 0;
   const exclusionRate = data.preprocessing.rawRowCount ? data.preprocessing.excludedRowCount / data.preprocessing.rawRowCount * 100 : 0;
+  const selectedValidationModel = validation.models.find((model) => model.name === validation.selectedModel) ?? validation.models[0];
   const decisionRows = filteredProducts.map((product) => {
     const medians = [product.elecmart.median, product.joonggonara.median].filter((value): value is number => value !== null);
     const marketMedian = medians.length ? medians.reduce((sum, value) => sum + value, 0) / medians.length : null;
@@ -174,7 +175,7 @@ export default function AnalysisPage() {
             <div className={styles.validationCardTop}><div><span>가격 기준선</span><h3>{validation.baseline.name}</h3></div><b>비교 기준</b></div>
             <strong className={styles.r2Value}>R² {validation.baseline.testR2.toFixed(3)}</strong>
             <p>테스트 MAE {money(validation.baseline.testMAE)}</p>
-            <div className={styles.baselineDelta}><span>LightGBM 오차 개선</span><strong>{Math.round((1 - validation.models[0].testMAE / validation.baseline.testMAE) * 100)}%</strong></div>
+            <div className={styles.baselineDelta}><span>{validation.selectedModel} 오차 개선</span><strong>{Math.round((1 - selectedValidationModel.testMAE / validation.baseline.testMAE) * 100)}%</strong></div>
           </article>
         </div>
         <div className={styles.clusterGrid}>
@@ -194,7 +195,16 @@ export default function AnalysisPage() {
             <tbody>{validation.selectedCategoryMetrics.map((metric) => <tr key={metric.item}><td><strong>{metric.item}</strong></td><td>{number.format(metric.count)}건</td><td className={metric.r2 >= 0.2 ? styles.positive : styles.negative}>{metric.r2.toFixed(3)}</td><td>{money(metric.mae)}</td><td>{metric.r2 >= 0.2 ? "모델+중앙값 교차 사용" : "클러스터 중앙값 우선"}</td></tr>)}</tbody>
           </table>
         </div>
-        <p className={styles.analysisNote}><b>판정:</b> 전체 테스트에서는 LightGBM R² {validation.models.find((model) => model.name === "LightGBM")?.testR2.toFixed(3)}로 기준선보다 낫습니다. 하지만 쿠쿠와 미닉스는 품목별 설명력이 낮아 ML 단독 가격을 쓰지 않고, 용량·모델·연식·가격 클러스터 중앙값을 우선 사용합니다. {validation.leakageGuard}로 검증 누수를 막았습니다.</p>
+        <details className={styles.clusterDetails}>
+          <summary>대표 비교 클러스터 보기</summary>
+          <div className={styles.categoryValidationWrap}>
+            <table className={styles.categoryValidation}>
+              <thead><tr><th>클러스터</th><th>용량</th><th>연식 구간</th><th>표본</th><th>중앙값 (Q1-Q3)</th><th>플랫폼 구성</th></tr></thead>
+              <tbody>{data.clusterProfiles.map((cluster) => <tr key={cluster.cluster}><td><strong>{cluster.cluster}</strong></td><td>{cluster.capacity}</td><td>{cluster.yearBucket}</td><td>{number.format(cluster.count)}건</td><td>{money(cluster.median)} <small>{money(cluster.q1)}-{money(cluster.q3)}</small></td><td>{Object.entries(cluster.platforms).map(([platform, count]) => `${platformName(platform)} ${number.format(count)}`).join(" · ")}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </details>
+        <p className={styles.analysisNote}><b>판정:</b> 전체 테스트에서는 {validation.selectedModel} R² {selectedValidationModel.testR2.toFixed(3)}로 기준선보다 낫습니다. 하지만 쿠쿠와 미닉스는 품목별 설명력이 낮아 ML 단독 가격을 쓰지 않고, 용량·모델·연식·가격 클러스터 중앙값을 우선 사용합니다. {validation.leakageGuard}로 검증 누수를 막았습니다.</p>
       </section>
 
       <section className={styles.section} aria-label="평균 가격 진단">

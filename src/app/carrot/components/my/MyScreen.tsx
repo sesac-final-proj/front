@@ -25,6 +25,7 @@ import { PromoCard, IconGrid, MenuCard } from "./MenuCard";
 export interface MyScreenProps {
   nickname?: string;
   activeNeighborhood: string;
+  temperature?: number;
   unreadCount: number;
   favoriteCount: number;
   myProducts: ProductListItem[];
@@ -42,6 +43,7 @@ export interface MyScreenProps {
 export function MyScreen({
   nickname,
   activeNeighborhood,
+  temperature = 36.5,
   unreadCount,
   favoriteCount,
   myProducts,
@@ -98,10 +100,10 @@ export function MyScreen({
           <UserRound size={42} fill="currentColor" />
         </div>
         <div>
-          <strong>{nickname ? `${nickname}님` : "주황가지님"}</strong>
+          <strong>{nickname ? `${nickname}님` : "로그인 필요"}</strong>
           <span>{activeNeighborhood} · 신뢰온도</span>
         </div>
-        <span className={styles.temperature}>40.1°C</span>
+        <span className={styles.temperature}>{temperature.toFixed(1)}°C</span>
         <ChevronRight size={26} />
       </button>
       <section className={styles.payCard}>
