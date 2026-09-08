@@ -136,8 +136,12 @@ export default function AnalysisPage() {
         <div className={styles.meanSummary}>
           <article><span>통합 표본평균</span><strong>{money(data.overallStats.mean)}</strong><small>모평균 95% CI* {data.overallStats.meanConfidenceInterval95 ? `${money(data.overallStats.meanConfidenceInterval95[0])}-${money(data.overallStats.meanConfidenceInterval95[1])}` : "N/A"}</small></article>
           <article><span>10% 절사평균</span><strong>{money(data.overallStats.trimmedMean)}</strong><small>상·하위 극단값 각 10% 제외</small></article>
-          <article><span>전체 중앙값</span><strong>{money(data.overallStats.median)}</strong><small>관측값의 가운데 가격</small></article>
-          <article className={styles.meanWarning}><span>평균-중앙값 간극</span><strong>{meanMedianGap === null ? "N/A" : `${meanMedianGap.toFixed(1)}%`}</strong><small>{meanMedianGap !== null && Math.abs(meanMedianGap) >= 20 ? "고가 매물이 평균을 끌어올림" : "평균 왜곡이 비교적 제한적"}</small></article>
+          <article><span>전체 중앙값</span><strong>{money(data.overallStats.median)}</strong><small>관측값의 정가운데(50%) 가격</small></article>
+          <article className={styles.meanWarning}>
+            <span>평균-중앙값 왜곡률</span>
+            <strong>{meanMedianGap === null ? "N/A" : `${meanMedianGap > 0 ? "+" : ""}${meanMedianGap.toFixed(1)}%`}</strong>
+            <small>{meanMedianGap !== null && meanMedianGap >= 15 ? "고가 매물이 평균을 끌어올림 (중앙값 권장)" : meanMedianGap !== null && meanMedianGap <= -15 ? "저가 매물이 평균을 낮춤 (중앙값 권장)" : "평균 왜곡이 비교적 제한적"}</small>
+          </article>
         </div>
         <div className={styles.meanPanels}>
           {data.platforms.map((platform) => <article className={styles.meanPanel} key={`mean-${platform.name}`}>
@@ -150,14 +154,73 @@ export default function AnalysisPage() {
             <p>변동계수 {platform.coefficientOfVariation === null ? "N/A" : `${platform.coefficientOfVariation.toFixed(1)}%`} · 평균 신뢰구간 {platform.meanConfidenceInterval95 ? `${money(platform.meanConfidenceInterval95[0])}-${money(platform.meanConfidenceInterval95[1])}` : "N/A"}</p>
           </article>)}
         </div>
-        <div className={styles.hypothesisCallout}><span>표본평균 기반 모평균 비교 · Welch t-test</span><strong>번개장터가 {money(Math.abs(data.overallComparison.meanDifference ?? 0))} 낮음</strong><p>95% CI {data.overallComparison.confidenceInterval95 ? `${money(data.overallComparison.confidenceInterval95[0])}-${money(data.overallComparison.confidenceInterval95[1])}` : "N/A"} · p={data.overallComparison.pValue?.toFixed(4) ?? "N/A"} · d={data.overallComparison.cohensD?.toFixed(2) ?? "N/A"} ({effectLabel(data.overallComparison.cohensD)})</p><em>{data.overallComparison.pValue !== null && data.overallComparison.pValue < 0.05 ? "통계적 차이는 확인되지만 효과크기가 매우 작아, 플랫폼 자체보다 품목·모델 구성이 가격을 더 크게 설명할 가능성이 있습니다." : "현재 표본만으로 플랫폼 모평균 차이를 확인하기 어렵습니다."}</em></div>
+        <div className={styles.hypothesisCallout}>
+          <span>표본평균 기반 플랫폼 모평균 차이 검정 · Welch t-test</span>
+          <strong>
+            {(data.overallComparison.meanDifference ?? 0) < 0
+              ? `번개장터 평균이 ${money(Math.abs(data.overallComparison.meanDifference ?? 0))} 더 낮음`
+              : `번개장터 평균이 ${money(data.overallComparison.meanDifference ?? 0)} 더 높음`}
+          </strong>
+          <p>
+            95% 신뢰구간 {data.overallComparison.confidenceInterval95 ? `${money(data.overallComparison.confidenceInterval95[0])} ~ ${money(data.overallComparison.confidenceInterval95[1])}` : "N/A"} · 
+            p-value={data.overallComparison.pValue?.toFixed(4) ?? "N/A"} · 
+            효과크기 d={data.overallComparison.cohensD?.toFixed(2) ?? "N/A"} ({effectLabel(data.overallComparison.cohensD)})
+          </p>
+          <em>
+            {data.overallComparison.pValue !== null && data.overallComparison.pValue < 0.05
+              ? "통계적으로 두 플랫폼의 평균가 차이가 유의하나, 효과크기가 매우 작아 플랫폼 자체보다 품목·모델 구성 차이가 가격을 더 크게 설명합니다."
+              : "현재 표본만으로 플랫폼 모평균 차이를 확인하기 어렵습니다."}
+          </em>
+        </div>
         <p className={styles.analysisNote}><b>해석:</b> 평균은 고가 매물에 민감합니다. 평균과 절사평균·중앙값의 간격이 클수록 당근 등록가 기준에는 중앙값 또는 절사평균을 우선 사용하세요. *모평균 신뢰구간과 검정은 수집 매물이 각 플랫폼 시장을 대표하는 확률표본이라는 가정하의 참고 추론입니다.</p>
       </section>
 
       <section className={styles.section} aria-label="품목별 비교 요약">
-        <div className={styles.sectionHeading}><div><h2>품목별 플랫폼 비교 한눈에 보기</h2></div><span className={styles.sectionHint}>평균 차이 = 번개장터 - 중고나라</span></div>
-        <div className={styles.comparisonTableWrap}><table className={styles.comparisonTable}><thead><tr><th>품목</th><th>번개장터 평균</th><th>중고나라 평균</th><th>평균 차이</th><th>95% CI</th><th>효과크기</th><th>판정</th></tr></thead><tbody>{categoryComparisons.map((item) => <tr key={`matrix-${item.item}`}><td><strong>{item.item}</strong><small>n={number.format(item.elecmartCount)} / {number.format(item.joonggonaraCount)}</small></td><td>{money(item.elecmartMean)}</td><td>{money(item.joonggonaraMean)}</td><td className={(item.meanDifference ?? 0) >= 0 ? styles.positive : styles.negative}>{money(item.meanDifference)}</td><td>{item.confidenceInterval95 ? `${money(item.confidenceInterval95[0])}-${money(item.confidenceInterval95[1])}` : "N/A"}</td><td>{item.cohensD === null ? "N/A" : `${item.cohensD.toFixed(2)} · ${effectLabel(item.cohensD)}`}</td><td><span className={item.pValue !== null && item.pValue < 0.05 ? styles.significant : styles.uncertain}>{significanceLabel(item.pValue)}</span><small>p={item.pValue === null ? "N/A" : item.pValue.toFixed(4)}</small></td></tr>)}</tbody></table></div>
-        <p className={styles.analysisNote}><b>읽는 법:</b> 신뢰구간이 0을 포함하지 않고 p&lt;0.05일 때 평균 차이를 유의하다고 표시합니다. 효과크기가 매우 작으면 통계적으로 유의해도 실무 가격 차이는 제한적일 수 있습니다.</p>
+        <div className={styles.sectionHeading}><div><h2>품목별 플랫폼 비교 한눈에 보기</h2></div><span className={styles.sectionHint}>번개장터 vs 중고나라 플랫폼 비교</span></div>
+        <div className={styles.comparisonTableWrap}>
+          <table className={styles.comparisonTable}>
+            <thead>
+              <tr>
+                <th>품목</th>
+                <th>번개장터 (표본 / 평균 / 중앙값)</th>
+                <th>중고나라 (표본 / 평균 / 중앙값)</th>
+                <th>평균 차이</th>
+                <th>중앙값 차이 (격차%)</th>
+                <th>95% CI</th>
+                <th>효과크기</th>
+                <th>판정</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categoryComparisons.map((item) => (
+                <tr key={`matrix-${item.item}`}>
+                  <td><strong>{item.item}</strong></td>
+                  <td>
+                    <span>{money(item.elecmartMedian)} (중앙)</span>
+                    <small>평균 {money(item.elecmartMean)} · n={number.format(item.elecmartCount)}</small>
+                  </td>
+                  <td>
+                    <span>{money(item.joonggonaraMedian)} (중앙)</span>
+                    <small>평균 {money(item.joonggonaraMean)} · n={number.format(item.joonggonaraCount)}</small>
+                  </td>
+                  <td className={(item.meanDifference ?? 0) >= 0 ? styles.positive : styles.negative}>
+                    {item.meanDifference === null ? "N/A" : money(item.meanDifference)}
+                  </td>
+                  <td className={(item.medianDifference ?? 0) >= 0 ? styles.positive : styles.negative}>
+                    {item.medianDifference === null ? "N/A" : `${money(item.medianDifference)} (${item.elecmartPremiumPct !== null ? `${item.elecmartPremiumPct > 0 ? "+" : ""}${item.elecmartPremiumPct.toFixed(1)}%` : "N/A"})`}
+                  </td>
+                  <td>{item.confidenceInterval95 ? `${money(item.confidenceInterval95[0])} ~ ${money(item.confidenceInterval95[1])}` : "N/A"}</td>
+                  <td>{item.cohensD === null ? "N/A" : `${item.cohensD.toFixed(2)} · ${effectLabel(item.cohensD)}`}</td>
+                  <td>
+                    <span className={item.pValue !== null && item.pValue < 0.05 ? styles.significant : styles.uncertain}>{significanceLabel(item.pValue)}</span>
+                    <small>p={item.pValue === null ? "N/A" : item.pValue.toFixed(4)}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className={styles.analysisNote}><b>읽는 법:</b> 평균 차이 = 번개장터 평균 - 중고나라 평균입니다. 신뢰구간이 0을 포함하지 않고 p&lt;0.05일 때 평균 차이를 유의하다고 표시합니다.</p>
       </section>
 
       <section className={styles.section}>
@@ -227,14 +290,117 @@ export default function AnalysisPage() {
       {dashboardView === "comparison" && <section className={styles.section}>
         <div className={styles.sectionHeading}><div><h2>대분류 품목별 플랫폼 차이</h2></div><span className={styles.sectionHint}>{categoryComparisons.length}개 품목</span></div>
         <p className={styles.disclaimer}>대분류 품목 단위로 두 플랫폼의 관측 중앙값과 평균가격 차이를 비교합니다. 품목 안의 모델 구성 차이는 별도로 보정하지 않았습니다.</p>
-        <div className={styles.categoryGrid}>{categoryComparisons.map((comparison, index) => <article className={styles.categoryCard} key={comparison.item}><div className={styles.categoryTop}><span>{String(index + 1).padStart(2, "0")}</span><h3>{comparison.item}</h3></div><div className={styles.categoryPrices}><div><small>번개장터 중앙값</small><strong>{money(comparison.elecmartMedian)}</strong></div><div><small>중고나라 중앙값</small><strong>{money(comparison.joonggonaraMedian)}</strong></div></div><div className={styles.categoryResult}><span>번개장터 평균 차이</span><b>{money(comparison.meanDifference)}</b><em>{comparison.elecmartPremiumPct === null ? "N/A" : `${comparison.elecmartPremiumPct.toFixed(2)}%`}</em></div><p className={styles.categoryMeta}>표본 {number.format(comparison.elecmartCount)}건 / {number.format(comparison.joonggonaraCount)}건 · p-value {comparison.pValue === null ? "N/A" : comparison.pValue.toFixed(4)}</p></article>)}</div>
+        <div className={styles.categoryGrid}>
+          {categoryComparisons.map((comparison, index) => (
+            <article className={styles.categoryCard} key={comparison.item}>
+              <div className={styles.categoryTop}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{comparison.item}</h3>
+              </div>
+              <div className={styles.categoryPrices}>
+                <div>
+                  <small>번개장터 (표본 {number.format(comparison.elecmartCount)}건)</small>
+                  <strong>{money(comparison.elecmartMedian)} (중앙)</strong>
+                  <small>평균 {money(comparison.elecmartMean)}</small>
+                </div>
+                <div>
+                  <small>중고나라 (표본 {number.format(comparison.joonggonaraCount)}건)</small>
+                  <strong>{money(comparison.joonggonaraMedian)} (중앙)</strong>
+                  <small>평균 {money(comparison.joonggonaraMean)}</small>
+                </div>
+              </div>
+              <div className={styles.categoryResult}>
+                <div>
+                  <span>평균 차이 </span>
+                  <b>{money(comparison.meanDifference)}</b>
+                </div>
+                <div>
+                  <span>중앙값 차이 </span>
+                  <b>{money(comparison.medianDifference)}</b>
+                  <small>({comparison.elecmartPremiumPct === null ? "N/A" : `${comparison.elecmartPremiumPct > 0 ? "+" : ""}${comparison.elecmartPremiumPct.toFixed(1)}%`})</small>
+                </div>
+              </div>
+              <p className={styles.categoryMeta}>
+                Welch 검정 p-value: <b>{comparison.pValue === null ? "N/A" : comparison.pValue.toFixed(4)}</b> ({significanceLabel(comparison.pValue)})
+              </p>
+            </article>
+          ))}
+        </div>
       </section>}
 
       {dashboardView === "comparison" && <section className={styles.section}>
-        <div className={styles.sectionHeading}><h2>참고 적정가와 모델별 차이</h2></div>
-        <p className={styles.disclaimer}>참고 적정가는 모델의 양 플랫폼 관측 중앙값입니다. 미래 가격을 예측하거나 공식 적정가를 정한 값이 아닙니다. 최고 평균가는 플랫폼별 표본 10건 이상 모델만 비교했습니다.</p>
-        <div className={styles.tableWrap}><table><thead><tr><th>No.</th><th>대분류</th><th>모델</th><th>참고 적정가</th><th>일렉트로마트 중앙값</th><th>중고나라 중앙값</th><th>일렉트로마트 차이</th></tr></thead><tbody>{filteredProducts.filter((product) => product.referencePrice !== null).slice(0, 20).map((product, index) => <tr key={`decision-${product.name}`}><td>{String(index + 1).padStart(2, "0")}</td><td>{product.item}</td><td>{product.model}</td><td>{money(product.referencePrice)}</td><td>{money(product.elecmart.median)}</td><td>{money(product.joonggonara.median)}</td><td>{product.elecmartVsJoonggonaraPct === null ? "N/A" : `${product.elecmartVsJoonggonaraPct.toFixed(2)}%`}</td></tr>)}</tbody></table></div>
-        <div className={styles.tableWrap}><table><thead><tr><th>No.</th><th>품목</th><th>일렉트로마트 표본</th><th>중고나라 표본</th><th>평균 차이</th><th>95% 신뢰구간</th><th>효과크기 d</th><th>p-value</th></tr></thead><tbody>{data.comparison.filter((item) => selectedItem === "전체" || item.item === selectedItem).map((item, index) => <tr key={`test-${item.item}`}><td>{String(index + 1).padStart(2, "0")}</td><td>{item.item}</td><td>{number.format(item.elecmartCount)}</td><td>{number.format(item.joonggonaraCount)}</td><td>{item.meanDifference === null ? "N/A" : money(item.meanDifference)}</td><td>{item.confidenceInterval95 === null ? "N/A" : `${money(item.confidenceInterval95[0])} ~ ${money(item.confidenceInterval95[1])}`}</td><td>{item.cohensD === null ? "N/A" : item.cohensD.toFixed(2)}</td><td>{item.pValue === null ? "N/A" : item.pValue.toFixed(4)}</td></tr>)}</tbody></table></div>
+        <div className={styles.sectionHeading}><h2>참고 적정가와 모델별 플랫폼 상세 비교</h2><span className={styles.sectionHint}>선택된 {filteredProducts.length}개 모델</span></div>
+        <p className={styles.disclaimer}>참고 적정가는 각 모델의 양 플랫폼 관측 통합 중앙값입니다. 번개장터와 중고나라의 표본수, 평균, 중앙값을 대조하여 플랫폼 간 시세 격차를 확인할 수 있습니다.</p>
+        <div className={styles.tableWrap}>
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>대분류</th>
+                <th>모델</th>
+                <th>참고 적정가</th>
+                <th>번개장터 (표본 / 평균 / 중앙값)</th>
+                <th>중고나라 (표본 / 평균 / 중앙값)</th>
+                <th>플랫폼 격차 (중앙값 기준)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.filter((product) => product.referencePrice !== null).map((product, index) => (
+                <tr key={`decision-${product.name}`}>
+                  <td>{String(index + 1).padStart(2, "0")}</td>
+                  <td>{product.item}</td>
+                  <td><strong>{product.model}</strong></td>
+                  <td><strong>{money(product.referencePrice)}</strong></td>
+                  <td>
+                    <span>{money(product.elecmart.median)}</span>
+                    <small>평균 {money(product.elecmart.mean)} · n={number.format(product.elecmart.count)}</small>
+                  </td>
+                  <td>
+                    <span>{money(product.joonggonara.median)}</span>
+                    <small>평균 {money(product.joonggonara.mean)} · n={number.format(product.joonggonara.count)}</small>
+                  </td>
+                  <td className={(product.elecmartVsJoonggonaraPct ?? 0) >= 0 ? styles.positive : styles.negative}>
+                    {product.elecmartVsJoonggonaraPct === null ? "N/A" : `${product.elecmartVsJoonggonaraPct > 0 ? "+" : ""}${product.elecmartVsJoonggonaraPct.toFixed(1)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className={styles.sectionHeading} style={{ marginTop: "32px" }}><h2>품목별 통계적 가설검정 (Welch's t-test)</h2></div>
+        <div className={styles.tableWrap}>
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>품목</th>
+                <th>번개장터 표본</th>
+                <th>중고나라 표본</th>
+                <th>평균 차이</th>
+                <th>95% 신뢰구간</th>
+                <th>효과크기 d</th>
+                <th>p-value</th>
+                <th>판정</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.comparison.filter((item) => selectedItem === "전체" || item.item === selectedItem).map((item, index) => (
+                <tr key={`test-${item.item}`}>
+                  <td>{String(index + 1).padStart(2, "0")}</td>
+                  <td><strong>{item.item}</strong></td>
+                  <td>{number.format(item.elecmartCount)}</td>
+                  <td>{number.format(item.joonggonaraCount)}</td>
+                  <td className={(item.meanDifference ?? 0) >= 0 ? styles.positive : styles.negative}>{item.meanDifference === null ? "N/A" : money(item.meanDifference)}</td>
+                  <td>{item.confidenceInterval95 === null ? "N/A" : `${money(item.confidenceInterval95[0])} ~ ${money(item.confidenceInterval95[1])}`}</td>
+                  <td>{item.cohensD === null ? "N/A" : `${item.cohensD.toFixed(2)} (${effectLabel(item.cohensD)})`}</td>
+                  <td>{item.pValue === null ? "N/A" : item.pValue.toFixed(4)}</td>
+                  <td><span className={item.pValue !== null && item.pValue < 0.05 ? styles.significant : styles.uncertain}>{significanceLabel(item.pValue)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className={styles.disclaimer}>Welch t-검정은 품목별 두 플랫폼의 평균가격 차이를 검토합니다. p-value만으로 차이의 원인이나 미래 가격을 확정할 수 없고, 모든 결과는 현재 수집 표본에 한정됩니다.</p>
       </section>}
 
