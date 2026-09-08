@@ -11,6 +11,11 @@ export interface DreamFacility {
   donationCount: number;
   currentAmount: number;
   targetAmount: number;
+  totalScore: number | null;
+  districtRank: number | null;
+  isRepresentative: boolean;
+  isSelected: boolean;
+  checklist: Record<string, string> | null;
 }
 
 interface ApiFacility {
@@ -21,6 +26,11 @@ interface ApiFacility {
   homepage_url: string | null;
   lat: number | null;
   lng: number | null;
+  total_score: number | null;
+  district_rank: number | null;
+  is_representative: boolean;
+  is_selected: boolean;
+  checklist: Record<string, string> | null;
 }
 
 export async function getDreamFacilities(district: string, signal?: AbortSignal): Promise<DreamFacility[]> {
@@ -46,6 +56,11 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
           donationCount: 0,
           currentAmount: 0,
           targetAmount: 0,
+          totalScore: item.total_score,
+          districtRank: item.district_rank,
+          isRepresentative: item.is_representative,
+          isSelected: item.is_selected,
+          checklist: item.checklist,
         }],
   );
 }

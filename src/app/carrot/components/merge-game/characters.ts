@@ -43,6 +43,6 @@ export const VEGETABLES = [
   { name: "옥수수", radius: 34, score: 18, color: "#f8d450" },
   { name: "파프리카", radius: 42, score: 30, color: "#8acb69" },
   { name: "호박", radius: 51, score: 50, color: "#f6ad59" },
-  { name: "꿈가지", radius: 62, score: 80, color: "#9570b8" },
+  { name: "꿈가지", radius: 62, score: 80, color: "#ff8a45" },
   { name: "황금가지", radius: 75, score: 130, color: "#f4cd4e" },
 ].map((vegetable, index) => ({ ...vegetable, image: svg(art[index]) }));

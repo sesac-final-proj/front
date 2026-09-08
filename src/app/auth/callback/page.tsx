@@ -4,6 +4,7 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
 import { getMe } from "@/services/authService";
+import { DaangnSplash } from "@/app/carrot/components/common/DaangnSplash";
 
 // 백엔드 /auth/callback/{provider}(app/api/v1/auth/router.py)가 소셜 로그인
 // 완료 후 토큰을 쿼리스트링에 담아 여기로 리다이렉트한다.
@@ -29,12 +30,12 @@ function AuthCallbackInner() {
       .catch(() => router.replace("/onboarding/profile"));
   }, [params, router]);
 
-  return <p style={{ padding: 24 }}>로그인 처리 중...</p>;
+  return <DaangnSplash message="로그인 처리 중..." subMessage="당근 계정 정보를 안전하게 연결하고 있어요" />;
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<p style={{ padding: 24 }}>로그인 처리 중...</p>}>
+    <Suspense fallback={<DaangnSplash message="로그인 처리 중..." subMessage="당근 계정 정보를 안전하게 연결하고 있어요" />}>
       <AuthCallbackInner />
     </Suspense>
   );

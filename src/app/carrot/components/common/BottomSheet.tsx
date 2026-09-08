@@ -12,7 +12,6 @@ import {
 import styles from "../../GajiMarketApp.module.css";
 import type { SheetId } from "../../types";
 import { formatBadge } from "../../utils";
-import { StateBlock } from "./StateBlock";
 
 export function BottomSheet({
   sheet,
@@ -26,11 +25,6 @@ export function BottomSheet({
   onCommunityWrite,
   onTogetherWrite,
   totalUnread,
-  hasNetworkError,
-  isGuestMode,
-  authRequired,
-  onRetry,
-  onGuestOff,
 }: {
   sheet: SheetId;
   activeNeighborhood: string;
@@ -43,11 +37,6 @@ export function BottomSheet({
   onCommunityWrite: () => void;
   onTogetherWrite?: () => void;
   totalUnread: number;
-  hasNetworkError: boolean;
-  isGuestMode: boolean;
-  authRequired: boolean;
-  onRetry: () => void;
-  onGuestOff: () => void;
 }) {
   if (!sheet) return null;
 
@@ -141,26 +130,6 @@ export function BottomSheet({
               <p>관심 상품과 판매 상태 변경 알림이 여기에 모입니다.</p>
               <p>상품을 예약중으로 바꾸면 관련 화면에 같은 배지가 표시됩니다.</p>
             </div>
-          </>
-        )}
-        {sheet === "status" && (
-          <>
-            <h2>상태 안내</h2>
-            {isGuestMode || authRequired ? (
-              <StateBlock
-                title="로그인이 필요해요"
-                body="비로그인 사용자는 탐색만 가능하고 관심, 채팅, 글쓰기는 제한됩니다."
-                actionLabel="로그인 상태로 전환"
-                onAction={onGuestOff}
-              />
-            ) : hasNetworkError ? (
-              <StateBlock
-                title="네트워크 오류"
-                body="화면 데이터는 유지하고 재시도할 수 있게 처리했습니다."
-                actionLabel="재시도"
-                onAction={onRetry}
-              />
-            ) : null}
           </>
         )}
       </section>

@@ -14,6 +14,7 @@ import {
   AllServicesScreen,
   RegionSearchScreen,
   SearchScreen,
+  DaangnSplash,
   // trade
   HomeScreen,
   ProductDetailScreen,
@@ -214,10 +215,14 @@ export default function GajiMarketApp() {
   }, [activeNeighborhood, secondaryNeighborhood]);
 
   // 로그인 필수: 토큰이 없거나 만료됐으면(getMe 실패) 온보딩으로 보낸다.
-  // 네트워크 일시 오류도 신원 확인이 안 된 것이므로 동일하게 처리한다.
+  // 닉네임 설정 전이면 온보딩 프로필 설정으로 이동.
   useEffect(() => {
     getMe()
       .then((fetchedMe) => {
+        if (!fetchedMe.nicknameSet) {
+          router.replace("/onboarding/profile");
+          return;
+        }
         setMe(fetchedMe);
         // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
         if (fetchedMe.region) {
@@ -327,11 +332,6 @@ export default function GajiMarketApp() {
   // 써버렸을 수 있어서 캐시하지 않음). null이면 아직 로딩 중.
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
-  const [hasNetworkError, setHasNetworkError] = useState(false);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  // 찜 API가 401(로그인 필요)을 돌려줬을 때만 true — isGuestMode 스위치와 별개로,
-  // 지금은 실제 로그인 세션이 없어서 찜을 시도하면 항상 여기로 떨어진다.
-  const [authRequired, setAuthRequired] = useState(false);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
 
   const openApartmentFlow = useCallback(() => {
@@ -606,8 +606,7 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("최근 본 목록을 불러오지 못했습니다.", error);
         }
@@ -656,9 +655,6 @@ export default function GajiMarketApp() {
   );
 
   const filteredProducts = useMemo(() => {
-    if (hasNetworkError) {
-      return [];
-    }
     return products.filter((product) => {
       // ponytail: 실거래 API엔 동네 검색/지역ID 조회 엔드포인트가 아직 없어서
       // activeNeighborhood로 실서버 데이터를 거를 방법이 없음 — 백엔드에 지역 조회가
@@ -666,7 +662,7 @@ export default function GajiMarketApp() {
       // 판매중/예약중/거래완료 전부 홈 피드에 그대로 노출한다(상태로 숨기지 않음).
       return productFilter === "전체" || product.category === productFilter;
     });
-  }, [hasNetworkError, productFilter, products]);
+  }, [productFilter, products]);
 
   const filteredPosts = useMemo(() => {
     const scopedPosts = posts.filter(
@@ -830,10 +826,6 @@ export default function GajiMarketApp() {
   }
 
   function toggleFavorite(productId: string) {
-    if (isGuestMode) {
-      setSheet("status");
-      return;
-    }
     const product = products.find((p) => p.id === productId);
     if (!product) return;
     const nextFavorited = !product.isFavorite;
@@ -872,8 +864,7 @@ export default function GajiMarketApp() {
           ),
         );
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("찜 상태를 바꾸지 못했습니다.", error);
         }
@@ -904,8 +895,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("메시지를 불러오지 못했습니다.", error);
         }
@@ -934,8 +924,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("메시지를 보내지 못했습니다.", error);
         }
@@ -959,8 +948,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("이미지를 보내지 못했습니다.", error);
         }
@@ -977,8 +965,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("채팅방을 나가지 못했습니다.", error);
           alert("채팅방을 나가지 못했습니다.");
@@ -1009,8 +996,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("거래상태를 변경하지 못했습니다.", error);
           alert("거래상태를 변경하지 못했습니다.");
@@ -1088,8 +1074,7 @@ export default function GajiMarketApp() {
       .then(() => alert("차단했습니다. 이제 이 사람과는 채팅을 주고받을 수 없어요."))
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("차단하지 못했습니다.", error);
           alert("차단하지 못했습니다.");
@@ -1102,8 +1087,7 @@ export default function GajiMarketApp() {
       .then(() => alert(`신고가 접수되었습니다. (${reason})\n운영팀에서 확인 후 처리하겠습니다.`))
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("신고 접수에 실패했습니다.", error);
           alert("신고 접수에 실패했습니다.");
@@ -1133,11 +1117,6 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
-
-    if (isGuestMode) {
-      setSheet("status");
-      return;
-    }
 
     createProduct({
       title,
@@ -1176,16 +1155,20 @@ export default function GajiMarketApp() {
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
         attachImageIfAny(String(id), imageFile);
-        setActiveTab("my");
-        setSubPage({ type: "sales" });
+        if (isFree) {
+          setActiveTab("my");
+          setSubPage({ type: "sales" });
+        } else {
+          const params = new URLSearchParams({ title, price: String(Math.max(0, price)), productId: String(id) });
+          router.push(`/analysis?${params.toString()}`);
+        }
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
+          router.replace("/onboarding");
         } else {
           console.error("글을 등록하지 못했습니다.", error);
         }
-        setSheet("status");
       });
   }
 
@@ -1227,11 +1210,10 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
+          router.replace("/onboarding");
         } else {
           console.error("글을 수정하지 못했습니다.", error);
         }
-        setSheet("status");
       });
   }
 
@@ -1328,7 +1310,7 @@ export default function GajiMarketApp() {
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
   // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
   if (!authChecked) {
-    return <div className={styles.stage} data-theme={theme} />;
+    return <DaangnSplash theme={theme} message="당근을 시작하는 중..." subMessage="동네 이웃들과 따뜻한 이야기를 나눠요" />;
   }
 
   return (
@@ -1368,8 +1350,7 @@ export default function GajiMarketApp() {
                   })
                   .catch((error: unknown) => {
                     if (error instanceof AuthRequiredError) {
-                      setAuthRequired(true);
-                      setSheet("status");
+                      router.replace("/onboarding");
                     } else {
                       console.error("채팅방을 열지 못했습니다.", error);
                     }
@@ -1548,11 +1529,7 @@ export default function GajiMarketApp() {
               onThemeChange={changeTheme}
               onBack={goBack}
               locationAllowed={locationAllowed}
-              isGuestMode={isGuestMode}
               onLocationToggle={() => setLocationAllowed((value) => !value)}
-              onGuestToggle={() => setIsGuestMode((value) => !value)}
-              onNetworkErrorToggle={() => setHasNetworkError((value) => !value)}
-              hasNetworkError={hasNetworkError}
               onLogout={handleLogout}
               onWithdraw={handleWithdraw}
             />
@@ -1604,7 +1581,6 @@ export default function GajiMarketApp() {
           ) : activeTab === "home" ? (
             <HomeScreen
               isLoading={isBooting}
-              hasError={hasNetworkError}
               activeNeighborhood={activeNeighborhood}
               secondaryNeighborhood={secondaryNeighborhood}
               productFilter={productFilter}
@@ -1628,7 +1604,6 @@ export default function GajiMarketApp() {
                 setProductFilter(value);
               }}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onRetry={() => setHasNetworkError(false)}
               categories={categories}
               filters={productFilters}
               onApplyFilters={setProductFilters}
@@ -1773,18 +1748,6 @@ export default function GajiMarketApp() {
             setSubPage({ type: "together-intro" });
           }}
           totalUnread={totalUnread}
-          hasNetworkError={hasNetworkError}
-          isGuestMode={isGuestMode}
-          authRequired={authRequired}
-          onRetry={() => {
-            setHasNetworkError(false);
-            setSheet(null);
-          }}
-          onGuestOff={() => {
-            setIsGuestMode(false);
-            setAuthRequired(false);
-            setSheet(null);
-          }}
         />
         {toastMessage && <div className={styles.toast}>{toastMessage}</div>}
       </div>

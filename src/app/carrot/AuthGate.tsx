@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMe } from "@/services/authService";
 import { AUTH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
+import { DaangnSplash } from "./components/common/DaangnSplash";
 
 // 서비스 전체를 로그인해야만 쓸 수 있게 막는 게이트. 토큰이 없거나(비로그인)
 // 만료/폐기됐으면(getMe 실패) 온보딩(로그인) 화면으로 보낸다 — 게스트 모드는
@@ -15,14 +16,27 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = typeof window !== "undefined" ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
     if (!token) {
-      router.replace("/onboarding");
+      window.location.replace("/onboarding");
       return;
     }
     getMe()
-      .then(() => setChecked(true))
-      .catch(() => router.replace("/onboarding"));
+      .then((me) => {
+        if (!me.nicknameSet) {
+          window.location.replace("/onboarding/profile");
+          return;
+        }
+        setChecked(true);
+      })
+      .catch(() => {
+        try {
+          window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        } catch {}
+        window.location.replace("/onboarding");
+      });
   }, [router]);
 
-  if (!checked) return <p style={{ padding: 24 }}>로그인 확인 중...</p>;
+  if (!checked) {
+    return <DaangnSplash message="로그인 확인 중..." subMessage="당근과 함께 따뜻한 동네를 만들어요" />;
+  }
   return <>{children}</>;
 }
