@@ -8,19 +8,23 @@ import type { Region } from "../../types";
 export function RegionSearchScreen({
   regions,
   recentNeighborhoods,
+  excludedNeighborhoods = [],
   onBack,
   onPick,
 }: {
   regions: Region[];
   recentNeighborhoods: string[];
+  // 이미 등록된 동네(최대 2개) — 중복 등록을 막으려고 검색 결과/최근 목록에서 뺀다.
+  excludedNeighborhoods?: string[];
   onBack: () => void;
   onPick: (dongName: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const normalized = query.trim();
-  const matched = normalized
-    ? regions.filter((r) => r.dongName.includes(normalized) || r.guName.includes(normalized))
-    : regions;
+  const visibleRecent = recentNeighborhoods.filter((name) => !excludedNeighborhoods.includes(name));
+  const matched = (
+    normalized ? regions.filter((r) => r.dongName.includes(normalized) || r.guName.includes(normalized)) : regions
+  ).filter((r) => !excludedNeighborhoods.includes(r.dongName));
 
   return (
     <section className={styles.screen}>
@@ -40,11 +44,11 @@ export function RegionSearchScreen({
         </button>
       </div>
 
-      {!normalized && recentNeighborhoods.length > 0 && (
+      {!normalized && visibleRecent.length > 0 && (
         <section className={styles.regionSearchSection}>
           <h2>최근 설정한 동네</h2>
           <div className={styles.regionRecentChips}>
-            {recentNeighborhoods.map((name) => (
+            {visibleRecent.map((name) => (
               <button type="button" key={name} className={styles.regionRecentChip} onClick={() => onPick(name)}>
                 {name}
               </button>
