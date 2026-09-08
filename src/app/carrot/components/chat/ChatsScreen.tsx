@@ -114,7 +114,12 @@ export function ChatsScreen({
         <div className={styles.chatList}>
           {rooms.map((room) => (
             <button type="button" key={room.id} className={styles.chatRow} onClick={() => onOpenChat(room.id)}>
-              <Avatar tone={room.avatarTone} />
+              {room.productThumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
+                <img src={room.productThumbnailUrl} alt={room.title} className={styles.chatThumbnail} />
+              ) : (
+                <Avatar tone={room.avatarTone} />
+              )}
               <div>
                 <h2 className={room.unreadCount > 0 ? styles.unreadTitle : ""}>
                   {room.title}
