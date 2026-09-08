@@ -272,7 +272,10 @@ export default function GajiMarketApp() {
 
   // 동네 검색은 이제 "대표 전환"이 아니라 항상 "2번째 동네 추가"다 — 빈 슬롯이 있을 때만
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
+  // RegionSearchScreen이 이미 등록된 동네를 목록에서 빼주지만, 최근 동네 칩 등으로
+  // 우회해서 들어올 수도 있어 여기서도 한 번 더 막는다(중복 등록 방지의 최종 관문).
   function addNeighborhood(dongName: string) {
+    if (dongName === activeNeighborhood) return;
     const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
@@ -1483,6 +1486,7 @@ export default function GajiMarketApp() {
             <RegionSearchScreen
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
+              excludedNeighborhoods={[activeNeighborhood]}
               onBack={() => {
                 setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");

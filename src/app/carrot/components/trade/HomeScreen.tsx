@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Eye,
   Heart,
-  MapPin,
   Menu,
   MessageCircle,
   MoreVertical,
@@ -269,7 +268,6 @@ export function HomeScreen({
             <ChevronDown size={16} />
           </button>
         }
-        leading={<MapPin className={styles.titlePin} size={28} fill="currentColor" />}
         actions={
           <>
             <IconButton label="검색" onClick={onOpenSearch}>

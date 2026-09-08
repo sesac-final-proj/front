@@ -356,11 +356,6 @@
   flex-shrink: 0;
 }
 
-.titlePin {
-  color: var(--color-success);
-  flex-shrink: 0;
-}
-
 .iconButton {
   width: 44px;
   height: 44px;
@@ -4707,11 +4702,19 @@
 }
 
 .myRegionRow {
+  width: 100%;
   min-height: 56px;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) 28px;
   align-items: center;
   gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .myRegionRadio {
@@ -4722,7 +4725,6 @@
   background: transparent;
   display: grid;
   place-items: center;
-  appearance: none;
   overflow: hidden;
 }
 
@@ -4761,6 +4763,7 @@
   color: var(--color-muted);
   display: grid;
   place-items: center;
+  cursor: pointer;
 }
 
 .myRegionAddBtn {
