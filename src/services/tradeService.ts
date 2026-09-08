@@ -132,6 +132,20 @@ export async function logout(): Promise<void> {
   }
 }
 
+// 설정 > 탈퇴하기. 실패하면(네트워크 오류 등) 로컬 토큰은 그대로 둬서 로그인 상태를 유지한다 —
+// 탈퇴는 로그아웃과 달리 되돌릴 수 없으니 서버가 실제로 처리했을 때만 로컬 세션을 지운다.
+export async function withdrawAccount(): Promise<void> {
+  const refreshToken = typeof window !== "undefined" ? window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) : null;
+  const response = await authorizedFetch("/api/v1/auth/me", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!response.ok) throw new Error("회원 탈퇴에 실패했습니다.");
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+}
+
 function toTradeProduct(item: ApiProductListItem): TradeProduct {
   return {
     id: item.id,
