@@ -3,7 +3,8 @@ import { ChevronLeft } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem, TradeStatus } from "@/types";
 import { formatPrice } from "../../utils";
-import { ScreenHeader, IconButton, StateBlock } from "../common";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
+import { ScreenHeader, IconButton, StateBlock, PullToRefreshIndicator } from "../common";
 import { Thumbnail } from "../trade";
 
 export interface ManagementScreenProps {
@@ -12,6 +13,7 @@ export interface ManagementScreenProps {
   onBack: () => void;
   onProductClick: (id: string) => void;
   onStatusChange: (id: string, status: TradeStatus) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 export function ManagementScreen({
@@ -20,9 +22,13 @@ export function ManagementScreen({
   onBack,
   onProductClick,
   onStatusChange,
+  onRefresh,
 }: ManagementScreenProps) {
+  const { pullOffset, isRefreshing, contentStyle, handlers } = usePullToRefresh(onRefresh);
   return (
-    <section className={styles.screen}>
+    <section className={styles.screen} {...handlers}>
+      <PullToRefreshIndicator pullOffset={pullOffset} isRefreshing={isRefreshing} />
+      <div style={contentStyle}>
       <ScreenHeader
         title={title}
         leading={
@@ -70,6 +76,7 @@ export function ManagementScreen({
           ))}
         </div>
       )}
+      </div>
     </section>
   );
 }

@@ -4,7 +4,8 @@ import styles from "../../GajiMarketApp.module.css";
 import type { ChatRoom } from "@/types";
 import { CHAT_FILTERS } from "../../constants";
 import { formatBadge } from "../../utils";
-import { ScreenHeader, IconButton, StateBlock, Avatar } from "../common";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
+import { ScreenHeader, IconButton, StateBlock, Avatar, PullToRefreshIndicator } from "../common";
 import { ChipScroller } from "../trade";
 
 export function ChatSkeletonList() {
@@ -32,6 +33,7 @@ export interface ChatsScreenProps {
   onOpenChat: (id: string) => void;
   title?: string;
   onBack?: () => void;
+  onRefresh?: () => Promise<void>;
 }
 
 export function ChatsScreen({
@@ -45,13 +47,18 @@ export function ChatsScreen({
   onOpenChat,
   title = "채팅",
   onBack,
+  onRefresh,
 }: ChatsScreenProps) {
   // onBack이 있으면 "내 상품에 걸린 채팅만" 보는 필터링된 화면 —
   // 하단탭의 전체 채팅 목록과 헷갈리지 않게 뒤로가기와 전용 타이틀을 보여주고,
-  // 여기선 의미 없는 필터/프로모 배너는 생략한다.
+  // 여기선 의미 없는 필터/프로모 배너는 생략한다. 그 화면은 들어갈 때마다 새로
+  // 받아오는 목록이라 당겨서 새로고침도 필요 없다(onRefresh 미전달).
   const scoped = Boolean(onBack);
+  const { pullOffset, isRefreshing, contentStyle, handlers } = usePullToRefresh(onRefresh);
   return (
-    <section className={styles.screen}>
+    <section className={styles.screen} {...handlers}>
+      <PullToRefreshIndicator pullOffset={pullOffset} isRefreshing={isRefreshing} />
+      <div style={contentStyle}>
       <ScreenHeader
         title={title}
         compact={scoped}
@@ -121,6 +128,7 @@ export function ChatsScreen({
           ))}
         </div>
       )}
+      </div>
     </section>
   );
 }
