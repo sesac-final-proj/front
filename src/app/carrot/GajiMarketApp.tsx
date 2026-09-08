@@ -29,6 +29,8 @@ import {
   // chat
   ChatsScreen,
   ChatRoomScreen,
+  PaymentAmountScreen,
+  PaymentDetailScreen,
   // my
   MyScreen,
   MyMenuScreen,
@@ -86,6 +88,7 @@ import {
   type ChatTradeStatus,
 } from "@/services/chatService";
 import { blockUser, reportUser } from "@/services/safetyService";
+import { getWalletBalance, sendPayment as sendWalletPayment } from "@/services/walletService";
 
 // Types
 import type {
@@ -320,6 +323,9 @@ export default function GajiMarketApp() {
   // 차단/신고엔 상대방 user id가 필요한데 채팅방 응답엔 없어서, 메시지에 실려오는
   // sender_id로부터 알아낸다 — 아직 메시지가 하나도 없으면 모르는 채로 남는다.
   const [roomOtherUserId, setRoomOtherUserId] = useState<Record<string, number>>({});
+  // 당근페이 잔액 — 송금 화면 진입할 때마다 새로 받아온다(다른 채팅방에서 이미
+  // 써버렸을 수 있어서 캐시하지 않음). null이면 아직 로딩 중.
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
@@ -354,6 +360,20 @@ export default function GajiMarketApp() {
     });
     return () => controller.abort();
   }, [me, refreshChats]);
+
+  // 당근머니 잔액 — My탭 배지랑 당근페이 송금 화면이 같은 값을 쓴다. 로그인 시점에
+  // 한 번 받아두고, 송금 화면을 열 때마다(openPayment) 백그라운드로 다시 받아온다.
+  useEffect(() => {
+    if (!me) return;
+    const controller = new AbortController();
+    getWalletBalance(controller.signal)
+      .then(setWalletBalance)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("잔액을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [me]);
 
   // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
   // 컨테이너라 이전 화면의 스크롤 위치가 그대로 남아있어서, 이게 없으면 헤더(뒤로가기)가
@@ -785,6 +805,10 @@ export default function GajiMarketApp() {
       setSubPage({ type: "product-detail", id: subPage.productId });
       return;
     }
+    if (subPage?.type === "payment-amount" || subPage?.type === "payment-detail") {
+      setSubPage({ type: "chat-room", id: subPage.chatRoomId });
+      return;
+    }
     if (subPage?.type === "product-form" && subPage.editId) {
       setSubPage({ type: "product-detail", id: subPage.editId });
       return;
@@ -990,6 +1014,71 @@ export default function GajiMarketApp() {
         } else {
           console.error("거래상태를 변경하지 못했습니다.", error);
           alert("거래상태를 변경하지 못했습니다.");
+        }
+      });
+  }
+
+  function openPayment(chatId: string) {
+    setSubPage({ type: "payment-amount", chatRoomId: chatId });
+    // 이전에 연 값이 있으면 그대로 보여준 채로 백그라운드에서 새로 받아온다 —
+    // My탭 잔액 배지랑 같은 state라 매번 null로 밀면 그쪽도 깜빡인다.
+    getWalletBalance()
+      .then(setWalletBalance)
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("잔액을 불러오지 못했습니다.", error);
+        }
+      });
+  }
+
+  function viewPayment(chatId: string, transactionId: string) {
+    setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId });
+  }
+
+  function submitPayment(chatId: string, amount: number) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    sendWalletPayment(numericId, amount)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: `${amount.toLocaleString("ko-KR")}원을 보냈어요`,
+                  lastMessageAt: "방금 전",
+                  // 백엔드가 송금 시점에 거래완료로 바꿔주므로(계획 문서 3-2절) 프론트도
+                  // 곧장 반영 — 안 그러면 새로고침 전까진 여전히 "판매중"으로 보인다.
+                  productTradeStatus: "SOLD",
+                }
+              : chat,
+          ),
+        );
+        const room = chats.find((chat) => chat.id === chatId);
+        if (room?.productId) {
+          setProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
+          setMyProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
+        }
+        if (message.payment) {
+          setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId: String(message.payment.transactionId) });
+        } else {
+          setSubPage({ type: "chat-room", id: chatId });
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          setAuthRequired(true);
+          setSheet("status");
+        } else {
+          console.error("송금하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "송금하지 못했습니다.");
         }
       });
   }
@@ -1221,6 +1310,14 @@ export default function GajiMarketApp() {
     subPage?.type === "community-detail" ? posts.find((post) => post.id === subPage.id) : undefined;
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
+  const paymentRoom =
+    subPage?.type === "payment-amount" || subPage?.type === "payment-detail"
+      ? chats.find((chat) => chat.id === subPage.chatRoomId)
+      : undefined;
+  const paymentMessage =
+    subPage?.type === "payment-detail"
+      ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
+      : undefined;
 
   const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
@@ -1342,6 +1439,22 @@ export default function GajiMarketApp() {
               onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
               onBlock={blockChatPartner}
               onReport={reportChatPartner}
+              onOpenPayment={() => openPayment(selectedChat.id)}
+              onViewPayment={(transactionId) => viewPayment(selectedChat.id, transactionId)}
+            />
+          ) : subPage?.type === "payment-amount" && paymentRoom ? (
+            <PaymentAmountScreen
+              room={paymentRoom}
+              balance={walletBalance}
+              onBack={goBack}
+              onSubmit={(amount) => submitPayment(subPage.chatRoomId, amount)}
+            />
+          ) : subPage?.type === "payment-detail" && paymentRoom && paymentMessage?.payment ? (
+            <PaymentDetailScreen
+              room={paymentRoom}
+              payment={paymentMessage.payment}
+              mine={paymentMessage.mine}
+              onBack={goBack}
             />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
@@ -1584,6 +1697,7 @@ export default function GajiMarketApp() {
               unreadCount={totalUnread}
               favoriteCount={favoriteProducts.length}
               myProducts={myProducts}
+              walletBalance={walletBalance}
               onOpenSettings={() => setSubPage({ type: "settings" })}
               onOpenMenu={() => setSubPage({ type: "my-menu" })}
               onOpenAllServices={() => setSubPage({ type: "all-services" })}
