@@ -90,7 +90,7 @@ export function DreamDashboardScreen({
         />
         <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
           <span className={styles.dreamMapTitleCopy}>
-            <span>우리 동네 모금가지</span>
+            <span>우리 동네 모금기지</span>
             <strong>{district}</strong>
             <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 - 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
           </span>

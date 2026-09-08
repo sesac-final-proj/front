@@ -92,8 +92,8 @@ export function ChatsScreen({
             <ChipScroller items={CHAT_FILTERS} value={activeFilter} onChange={onFilterChange} />
           </div>
           <div className={styles.chatPromo}>
-            <strong>가지마켓 동네 혜택</strong>
-            <span>위례에서 이번 주 사용할 수 있는 쿠폰을 확인하세요</span>
+            <strong>우리 동네 지도 혜택</strong>
+            <span>이번 주 우리 동네에서 사용할 수 있는 쿠폰을 확인하세요</span>
           </div>
         </>
       )}

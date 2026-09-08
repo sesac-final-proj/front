@@ -38,7 +38,7 @@ export function SearchScreen({
         </IconButton>
         <div className={styles.searchField}>
           <Search size={22} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="가지마켓 통합 검색" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="우리 동네 지도 통합 검색" />
         </div>
       </div>
       {normalized.length === 0 ? (

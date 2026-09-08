@@ -22,7 +22,7 @@ export function BottomNav({
     { id: "community", label: "커뮤니티", icon: UsersRound },
     { id: "map", label: "동네지도", icon: MapPin },
     { id: "chats", label: "채팅", icon: MessageCircle },
-    { id: "my", label: "나의 가지", icon: UserRound },
+    { id: "my", label: "나의 당근", icon: UserRound },
   ];
 
   return (

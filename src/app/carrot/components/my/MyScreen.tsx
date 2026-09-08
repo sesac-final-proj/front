@@ -69,7 +69,7 @@ export function MyScreen({
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="나의 가지"
+        title="나의 당근"
         titleAccessory={
           <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream} aria-label="꿈가지">
             <span className={styles.dreamEntryLabel} aria-hidden="true">

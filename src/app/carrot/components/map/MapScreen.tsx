@@ -121,23 +121,12 @@ export function MapScreen({
   const originStateRef = useRef<"collapsed" | "half" | "expanded">(sheetState);
   const currentDeltaYRef = useRef(0);
   const hasMovedSignificantRef = useRef(false);
-  const touchStartY = useRef<number | null>(null);
-  const touchStartX = useRef<number | null>(null);
   const wheelTimeoutRef = useRef<number | null>(null);
   const animationTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     originStateRef.current = sheetState;
   }, [sheetState]);
-
-  const getSnapHeights = useCallback(() => {
-    const parent = sheetRef.current?.parentElement;
-    const parentH = parent ? parent.clientHeight : (typeof window !== "undefined" ? window.innerHeight : 800);
-    const expandedH = Math.max(200, parentH - 60);
-    const halfH = Math.min(parentH * 0.52, 420);
-    const collapsedH = 198;
-    return { expanded: expandedH, half: halfH, collapsed: collapsedH };
-  }, []);
 
   const transitionToState = useCallback((targetState: "collapsed" | "half" | "expanded") => {
     const sheetEl = sheetRef.current;
@@ -151,35 +140,19 @@ export function MapScreen({
       animationTimeoutRef.current = null;
     }
 
-    const origin = originStateRef.current;
-    if (targetState === origin) {
-      sheetEl.style.transition = "transform 260ms cubic-bezier(0.25, 1, 0.5, 1)";
-      sheetEl.style.transform = "translate3d(0, 0, 0)";
-      animationTimeoutRef.current = window.setTimeout(() => {
-        sheetEl.style.transition = "";
-        sheetEl.style.transform = "";
-      }, 260);
-      return;
-    }
+    onSheetStateChange(targetState);
 
-    const heights = getSnapHeights();
-    const currentH = heights[origin];
-    const targetH = heights[targetState];
-    const targetDeltaY = currentH - targetH;
-
-    sheetEl.style.transition = "transform 280ms cubic-bezier(0.25, 1, 0.5, 1)";
-    sheetEl.style.transform = `translate3d(0, ${targetDeltaY}px, 0)`;
+    sheetEl.style.transition = "transform 320ms cubic-bezier(0.25, 1, 0.5, 1)";
+    sheetEl.style.transform = "translate3d(0, 0, 0)";
 
     animationTimeoutRef.current = window.setTimeout(() => {
-      sheetEl.style.transition = "none";
-      sheetEl.style.transform = "translate3d(0, 0, 0)";
-      onSheetStateChange(targetState);
-      window.requestAnimationFrame(() => {
+      if (sheetEl) {
         sheetEl.style.transition = "";
         sheetEl.style.transform = "";
-      });
-    }, 280);
-  }, [getSnapHeights, onSheetStateChange]);
+      }
+      animationTimeoutRef.current = null;
+    }, 320);
+  }, [onSheetStateChange]);
 
   const handleSelectTransit = useCallback((stop: TransitStop) => {
     setSelectedTransitId(stop.id);
@@ -252,18 +225,18 @@ export function MapScreen({
 
     let targetState: "collapsed" | "half" | "expanded" = origin;
 
-    // Fast flick or clear drag threshold
-    if (velocity < -0.28 || deltaY < -40) {
-      // Dragged UP ("올리면")
+    // 위로 올리기: deltaY < -35 또는 플릭 velocity < -0.25
+    if (velocity < -0.25 || deltaY < -35) {
       if (origin === "collapsed") {
-        targetState = (velocity < -0.7 || deltaY < -130) ? "expanded" : "half";
+        targetState = (velocity < -0.65 || deltaY < -120) ? "expanded" : "half";
       } else if (origin === "half") {
         targetState = "expanded";
       }
-    } else if (velocity > 0.28 || deltaY > 40) {
-      // Dragged DOWN ("자연스럽게 내리면")
+    }
+    // 아래로 내리기: deltaY > 35 또는 플릭 velocity > 0.25
+    else if (velocity > 0.25 || deltaY > 35) {
       if (origin === "expanded") {
-        targetState = (velocity > 0.7 || deltaY > 130) ? "collapsed" : "half";
+        targetState = (velocity > 0.65 || deltaY > 120) ? "collapsed" : "half";
       } else if (origin === "half") {
         targetState = "collapsed";
       }
@@ -271,7 +244,9 @@ export function MapScreen({
 
     transitionToState(targetState);
     currentDeltaYRef.current = 0;
-    hasMovedSignificantRef.current = false;
+    window.setTimeout(() => {
+      hasMovedSignificantRef.current = false;
+    }, 80);
   }, [cleanupDragListeners, transitionToState]);
 
   useEffect(() => {
@@ -295,8 +270,7 @@ export function MapScreen({
 
   const handleHandleClick = () => {
     if (hasMovedSignificantRef.current) return;
-    // 클릭 시: 펼쳐져 있으면 자연스럽게 아래로 내려가고, 닫혀 있으면 절반으로 올라옴
-    const target = sheetState === "expanded" ? "half" : sheetState === "half" ? "collapsed" : "half";
+    const target = sheetState === "expanded" ? "half" : sheetState === "half" ? "expanded" : "half";
     transitionToState(target);
     window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: "smooth" }));
   };
@@ -304,11 +278,13 @@ export function MapScreen({
   const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const isHandle = target.closest(`.${styles.sheetHandle}`) !== null;
-    const isTopHeaderArea = e.clientY - (sheetRef.current?.getBoundingClientRect().top ?? 0) < 44;
+    const isTopHeaderArea = e.clientY - (sheetRef.current?.getBoundingClientRect().top ?? 0) < 56;
     const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
+    const isCollapsed = sheetState === "collapsed";
 
-    // 핸들이나 맨 위 빈 영역이 아니면 본문 정상 스크롤 허용
-    if (!isHandle && (!isTopHeaderArea || !isAtTop)) {
+    // collapsed 상태에서는 대화형 요소가 아니면 시트 전체 드래그 가능
+    // half / expanded 상태에서는 핸들이거나 최상단 헤더 영역일 때만 시트 드래그 허용 (내부 스크롤과 공존)
+    if (!isHandle && !isCollapsed && (!isTopHeaderArea || !isAtTop)) {
       return;
     }
     if (target.closest("button, a, input, textarea, select, [role='button']")) {
@@ -347,62 +323,20 @@ export function MapScreen({
     const isOverHandle = (e.target as HTMLElement).closest(`.${styles.sheetHandle}`) !== null;
     const isAtTop = sheetEl.scrollTop <= 2;
 
-    // 핸들 위에서 휠을 돌리거나, 맨 위에서 아래로 내릴 때 언더바가 자연스럽게 내려감
-    if (isOverHandle || (isAtTop && e.deltaY < -18)) {
-      if (e.deltaY > 16 || (isAtTop && e.deltaY < -18)) {
-        // Lower sheet naturally
-        if (sheetState !== "collapsed") {
-          wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
-          transitionToState(sheetState === "expanded" ? "half" : "collapsed");
-        }
-      } else if (e.deltaY < -16 && isOverHandle) {
-        // Raise sheet
-        if (sheetState !== "expanded") {
-          wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
-          transitionToState(sheetState === "collapsed" ? "half" : "expanded");
-        }
+    // 위로 스크롤 (deltaY < -15): 시트 올리기 (확장)
+    if (e.deltaY < -15 && (isOverHandle || sheetState === "collapsed" || (sheetState === "half" && isAtTop))) {
+      if (sheetState !== "expanded") {
+        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
+        transitionToState(sheetState === "collapsed" ? "half" : "expanded");
       }
     }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (touchStartY.current === null || touchStartX.current === null) return;
-    const deltaY = e.touches[0].clientY - touchStartY.current; // > 0: 아래로 당김, < 0: 위로 당김
-    const deltaX = e.touches[0].clientX - touchStartX.current;
-    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.5) return;
-
-    const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
-
-    // 맨 위에서 아래로 스와이프하면 언더바가 자연스럽게 내려감
-    if (deltaY > 36 && isAtTop) {
-      if (sheetState === "expanded") {
-        transitionToState("half");
-        touchStartY.current = null;
-      } else if (sheetState === "half") {
-        transitionToState("collapsed");
-        touchStartY.current = null;
+    // 아래로 스크롤 (deltaY > 15): 최상단이거나 핸들 위일 때 시트 내리기 (축소)
+    else if (e.deltaY > 15 && (isOverHandle || (isAtTop && sheetState !== "collapsed"))) {
+      if (sheetState !== "collapsed") {
+        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
+        transitionToState(sheetState === "expanded" ? "half" : "collapsed");
       }
     }
-    // 위로 스와이프하면 언더바 펼침
-    else if (deltaY < -36) {
-      if (sheetState === "collapsed") {
-        transitionToState("half");
-        touchStartY.current = null;
-      } else if (sheetState === "half" && isAtTop) {
-        transitionToState("expanded");
-        touchStartY.current = null;
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchStartY.current = null;
-    touchStartX.current = null;
   };
 
   const [selectedRestaurants, setSelectedRestaurants] = useState<Restaurant[]>([]);
@@ -679,9 +613,6 @@ export function MapScreen({
         className={`${styles.localSheet} ${styles[`sheet_${sheetState}`]} ${isTransitMode ? styles.transitSheet : ""} ${selectedCategory === "food" && selectedRestaurants.length > 0 ? styles.restaurantSheet : ""}`}
         ref={sheetRef}
         onWheel={handleWheel}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         onPointerDown={handleSheetPointerDown}
       >
         <button
@@ -691,7 +622,7 @@ export function MapScreen({
             sheetState === "expanded"
               ? "지도 목록 반으로 접기"
               : sheetState === "half"
-                ? "지도 목록 접기"
+                ? "지도 목록 전체 펼치기"
                 : "지도 목록 펼치기"
           }
           aria-expanded={sheetState !== "collapsed"}

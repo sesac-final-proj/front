@@ -33,7 +33,7 @@ export function MyMenuScreen({
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="나의 가지"
+        title="나의 당근"
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
