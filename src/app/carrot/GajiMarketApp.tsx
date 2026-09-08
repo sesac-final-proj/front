@@ -231,27 +231,35 @@ export default function GajiMarketApp() {
   // 못 만든다 — 그 두 값이 실서버 데이터에 대해 항상 false라 새로고침(새 세션)마다
   // 빈 목록이 됐었다(버그). 서버가 이미 created_by/찜 여부로 걸러주는 전용
   // 엔드포인트를 그대로 쓴다.
+  // 판매내역/찜목록 각각 다시 받아온다 — 최초 로딩 effect와 각 화면의 당겨서
+  // 새로고침(pull-to-refresh) 둘 다 이 두 함수를 그대로 재사용한다.
+  const refreshMyProducts = useCallback(async (signal?: AbortSignal) => {
+    const page = await getMyProducts(signal);
+    setMyProducts(page.items.map((item) => ({ ...toProductListItem(item), mine: true })));
+  }, []);
+  const refreshFavorites = useCallback(async (signal?: AbortSignal) => {
+    const page = await getMyFavorites(signal);
+    setFavoriteProducts(page.items.map((item) => ({ ...toProductListItem(item), isFavorite: true })));
+  }, []);
+
   useEffect(() => {
     // me는 로그아웃 전환 없이 null -> 값으로만 바뀌므로(로그아웃은 페이지 리로드),
     // 로그인 전 상태는 그냥 초기값([])을 쓰면 된다 — 여기서 다시 비울 필요 없음.
     if (!me) return;
     const controller = new AbortController();
-    getMyProducts(controller.signal)
-      .then((page) => setMyProducts(page.items.map((item) => ({ ...toProductListItem(item), mine: true }))))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("판매내역을 불러오지 못했습니다.", error);
-      });
-    getMyFavorites(controller.signal)
-      .then((page) =>
-        setFavoriteProducts(page.items.map((item) => ({ ...toProductListItem(item), isFavorite: true }))),
-      )
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("찜 목록을 불러오지 못했습니다.", error);
-      });
+    // refreshMyProducts/refreshFavorites 내부에서 setState를 동기 호출한다 —
+    // effect가 로그인 시점에 최초 1회 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshMyProducts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("판매내역을 불러오지 못했습니다.", error);
+    });
+    refreshFavorites(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("찜 목록을 불러오지 못했습니다.", error);
+    });
     return () => controller.abort();
-  }, [me]);
+  }, [me, refreshMyProducts, refreshFavorites]);
 
   const [recentNeighborhoods, setRecentNeighborhoods] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -326,17 +334,23 @@ export default function GajiMarketApp() {
   }, [verifiedApartment]);
 
   // 채팅방 목록. 로그인 전엔 서버가 401을 주므로 me가 로드된 뒤에만 시도한다.
+  // 최초 로딩 effect와 채팅목록 화면의 당겨서 새로고침 둘 다 이 함수를 재사용한다.
+  const refreshChats = useCallback(async (signal?: AbortSignal) => {
+    const page = await listChatRooms(signal);
+    setChats(page.items.map(toChatRoomUi));
+  }, []);
+
   useEffect(() => {
     if (!me) return;
     const controller = new AbortController();
-    listChatRooms(controller.signal)
-      .then((page) => setChats(page.items.map(toChatRoomUi)))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("채팅 목록을 불러오지 못했습니다.", error);
-      });
+    // effect가 로그인 시점에 최초 1회 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshChats(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("채팅 목록을 불러오지 못했습니다.", error);
+    });
     return () => controller.abort();
-  }, [me]);
+  }, [me, refreshChats]);
 
   // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
   // 컨테이너라 이전 화면의 스크롤 위치가 그대로 남아있어서, 이게 없으면 헤더(뒤로가기)가
@@ -1433,12 +1447,14 @@ export default function GajiMarketApp() {
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onStatusChange={updateProductStatus}
+              onRefresh={refreshMyProducts}
             />
           ) : subPage?.type === "favorites" ? (
             <FavoriteScreen
               products={favoriteProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
+              onRefresh={refreshFavorites}
             />
           ) : subPage?.type === "recently-viewed" ? (
             <FavoriteScreen
@@ -1555,6 +1571,7 @@ export default function GajiMarketApp() {
               onOpenNotifications={() => setSheet("notifications")}
               onOpenSettings={() => setSubPage({ type: "settings" })}
               onOpenChat={openChat}
+              onRefresh={refreshChats}
             />
           ) : (
             <MyScreen

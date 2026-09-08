@@ -7,6 +7,7 @@ export * from "./Avatar";
 export * from "./BottomNav";
 export * from "./FloatingWriteButton";
 export * from "./BottomSheet";
+export * from "./PullToRefreshIndicator";
 export * from "./AllServicesScreen";
 export * from "./RegionSearchScreen";
 export * from "./SearchScreen";

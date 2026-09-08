@@ -2,7 +2,8 @@ import React from "react";
 import { ChevronLeft } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem } from "@/types";
-import { ScreenHeader, IconButton, StateBlock } from "../common";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
+import { ScreenHeader, IconButton, StateBlock, PullToRefreshIndicator } from "../common";
 import { ProductRow } from "../trade";
 
 export interface FavoriteScreenProps {
@@ -12,6 +13,9 @@ export interface FavoriteScreenProps {
   title?: string;
   emptyTitle?: string;
   emptyBody?: string;
+  // 최근 본 상품처럼 로컬 데이터만 쓰는 화면엔 넘기지 않는다 — 그럼 당겨서
+  // 새로고침 제스처 자체가 비활성화된다.
+  onRefresh?: () => Promise<void>;
 }
 
 export function FavoriteScreen({
@@ -21,9 +25,13 @@ export function FavoriteScreen({
   title = "관심목록",
   emptyTitle = "관심 상품이 없어요",
   emptyBody = "마음에 드는 물건의 하트를 눌러 모아보세요.",
+  onRefresh,
 }: FavoriteScreenProps) {
+  const { pullOffset, isRefreshing, contentStyle, handlers } = usePullToRefresh(onRefresh);
   return (
-    <section className={styles.screen}>
+    <section className={styles.screen} {...handlers}>
+      <PullToRefreshIndicator pullOffset={pullOffset} isRefreshing={isRefreshing} />
+      <div style={contentStyle}>
       <ScreenHeader
         title={title}
         leading={
@@ -50,6 +58,7 @@ export function FavoriteScreen({
           ))}
         </div>
       )}
+      </div>
     </section>
   );
 }
