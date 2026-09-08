@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Heart, MapPin } from "lucide-react";
-import { AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
 import styles from "./OnboardingScreen.module.css";
 
 // carrot/GajiMarketApp.tsx와 동일한 패턴 (NEXT_PUBLIC_API_BASE_URL 비어있으면 상대경로).
@@ -191,28 +189,6 @@ function FeatureCarousel() {
 }
 
 export default function OnboardingScreen() {
-  const router = useRouter();
-
-  const handleDevLogin = async () => {
-    try {
-      const res = await fetch(apiUrl("/api/v1/auth/login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "test@test.com", password: "test1234" }),
-      });
-      if (!res.ok) {
-        alert("테스트 계정 로그인 실패: 백엔드 응답 오류");
-        return;
-      }
-      const data = await res.json();
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
-      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refresh_token);
-      router.push("/carrot");
-    } catch {
-      alert("백엔드 서버(8000포트) 연결에 실패했습니다.");
-    }
-  };
-
   return (
     <div className={styles.stage}>
       <div className={styles.phoneShell}>
@@ -237,14 +213,6 @@ export default function OnboardingScreen() {
             >
               <span className={styles.naverMark}>N</span>
               <span>3초만에 네이버로 시작하기</span>
-            </button>
-            <button
-              type="button"
-              className={styles.socialButton}
-              style={{ background: "#4B5563", color: "#ffffff", marginTop: "4px" }}
-              onClick={handleDevLogin}
-            >
-              ⚡ 개발용 테스트 계정 1초 로그인
             </button>
           </div>
 
