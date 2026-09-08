@@ -32,6 +32,7 @@ export interface SettingsScreenProps {
   onGuestToggle: () => void;
   onNetworkErrorToggle: () => void;
   onLogout: () => void;
+  onWithdraw: () => void;
 }
 
 export function SettingsScreen({
@@ -45,6 +46,7 @@ export function SettingsScreen({
   onGuestToggle,
   onNetworkErrorToggle,
   onLogout,
+  onWithdraw,
 }: SettingsScreenProps) {
   return (
     <section className={styles.screen}>
@@ -99,7 +101,7 @@ export function SettingsScreen({
           { label: "고객센터", icon: Headphones },
           { label: "의견 남기기", icon: Mail },
           { label: "로그아웃", icon: LogOut, onClick: onLogout },
-          { label: "탈퇴하기", icon: X },
+          { label: "탈퇴하기", icon: X, onClick: onWithdraw },
           { label: "가지마켓 알아보기", icon: Sparkles },
           { label: "약관 및 정책", icon: BookOpen },
         ]}

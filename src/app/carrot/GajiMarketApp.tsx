@@ -61,6 +61,7 @@ import {
   createProduct,
   setFavorite,
   logout as logoutRequest,
+  withdrawAccount,
   AuthRequiredError,
   getTogetherPosts,
   createTogetherPost,
@@ -167,6 +168,13 @@ export default function GajiMarketApp() {
 
   function handleLogout() {
     logoutRequest().finally(() => router.replace("/onboarding"));
+  }
+
+  function handleWithdraw() {
+    if (!window.confirm("정말 탈퇴하시겠어요?\n작성한 글과 채팅 내역은 남지만, 계정 정보는 삭제되고 되돌릴 수 없어요.")) return;
+    withdrawAccount()
+      .then(() => router.replace("/onboarding"))
+      .catch(() => window.alert("탈퇴 처리에 실패했어요. 잠시 후 다시 시도해주세요."));
   }
 
   function changeTheme(value: ThemeMode) {
@@ -1416,6 +1424,7 @@ export default function GajiMarketApp() {
               onNetworkErrorToggle={() => setHasNetworkError((value) => !value)}
               hasNetworkError={hasNetworkError}
               onLogout={handleLogout}
+              onWithdraw={handleWithdraw}
             />
           ) : subPage?.type === "sales" ? (
             <ManagementScreen
