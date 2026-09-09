@@ -27,6 +27,12 @@ export function DreamFacilityCallout({
       </div>
       <strong>{facility.name}</strong>
       <p>{facility.facilityType} · {facility.neighborhoodName}</p>
+      {facility.isRepresentative && (
+        <div className={styles.dreamTrustCallout}>
+          <span>신뢰처리 상위 {facility.districtRank}순위</span>
+          {facility.totalScore !== null && <strong>{facility.totalScore}점</strong>}
+        </div>
+      )}
       <dl className={styles.dreamFacilityCalloutDetails}>
         <div><dt>주소</dt><dd>{facility.address}</dd></div>
         {facility.phone && <div><dt>전화</dt><dd>{facility.phone}</dd></div>}

@@ -1435,22 +1435,30 @@ export default function GajiMarketApp() {
               }}
             />
           ) : subPage?.type === "chat-room" && selectedChat ? (
-            <ChatRoomScreen
-              room={selectedChat}
-              messages={roomMessages[selectedChat.id] ?? []}
-              draft={messageDraft}
-              onDraftChange={setMessageDraft}
-              onSubmit={(event) => submitMessage(event, selectedChat.id)}
-              onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
-              onBack={goBack}
-              otherUserId={roomOtherUserId[selectedChat.id]}
-              onLeave={() => leaveChat(selectedChat.id)}
-              onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
-              onBlock={blockChatPartner}
-              onReport={reportChatPartner}
-              onOpenPayment={() => openPayment(selectedChat.id)}
-              onViewPayment={(transactionId) => viewPayment(selectedChat.id, transactionId)}
-            />
+            <motion.div
+              key={`chat-room-${selectedChat.id}`}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+            >
+              <ChatRoomScreen
+                room={selectedChat}
+                messages={roomMessages[selectedChat.id] ?? []}
+                draft={messageDraft}
+                onDraftChange={setMessageDraft}
+                onSubmit={(event) => submitMessage(event, selectedChat.id)}
+                onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
+                onBack={goBack}
+                otherUserId={roomOtherUserId[selectedChat.id]}
+                onLeave={() => leaveChat(selectedChat.id)}
+                onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
+                onBlock={blockChatPartner}
+                onReport={reportChatPartner}
+                onOpenPayment={() => openPayment(selectedChat.id)}
+                onViewPayment={(transactionId) => viewPayment(selectedChat.id, transactionId)}
+              />
+            </motion.div>
           ) : subPage?.type === "payment-amount" && paymentRoom ? (
             <PaymentAmountScreen
               room={paymentRoom}
@@ -1496,6 +1504,7 @@ export default function GajiMarketApp() {
             <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
+              activeNeighborhood={activeNeighborhood}
               onBack={goBack}
               onVerify={(aptName) => {
                 setVerifiedApartment(aptName);
@@ -1633,6 +1642,10 @@ export default function GajiMarketApp() {
                     setSubPage({ type: "my-menu" });
                   }}
                   onFilterChange={(value) => {
+                    if (value === "알바") {
+                      setSubPage({ type: "alba" });
+                      return;
+                    }
                     if (value === "부동산") {
                       openRealEstate();
                       return;
@@ -1664,6 +1677,9 @@ export default function GajiMarketApp() {
                     setSubPage({ type: "settings" });
                   }}
                   onPostClick={(id) => setSubPage({ type: "community-detail", id })}
+                  verifiedApartment={verifiedApartment}
+                  onOpenApartment={openApartmentFlow}
+                  activeNeighborhood={activeNeighborhood}
                 />
               ) : activeTab === "map" ? (
                 <MapScreen

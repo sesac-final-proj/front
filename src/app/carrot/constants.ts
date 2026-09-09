@@ -21,8 +21,8 @@ export const PRICE_FILTER_MAX = 1000000;
 export const PRICE_FILTER_STEP = 10000;
 export const DEFAULT_PRODUCT_FILTERS: ProductFilters = { sort: "latest" };
 
-export const PRODUCT_FILTERS = ["전체", "중고차", "알바", "중고거래", "부동산", "기타 서비스"];
-export const COMMUNITY_TABS = ["전체", "자유 주제", "같이해요", "질문", "동네 정보"];
+export const PRODUCT_FILTERS = ["전체", "알바", "중고거래", "부동산", "기타 서비스"];
+export const COMMUNITY_TABS = ["전체", "아파트", "같이해요", "자유 주제", "질문", "동네 정보"];
 export const COMMUNITY_FILTERS = ["추천", "인기", "취미/여가", "운동/스포츠", "맛집/음식", "동네친구", "일반"];
 export const CHAT_FILTERS = ["전체", "판매", "구매", "안읽음", "모임", "알바"];
 

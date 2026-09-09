@@ -3235,8 +3235,30 @@
   gap: 14px;
   align-items: center;
   text-align: left;
-  padding: 13px 0;
+  padding: 13px 8px;
+  margin: 0 -8px;
   position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chatRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chatRow:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stage[data-theme="light"] .chatRow:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.stage[data-theme="light"] .chatRow:active {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .avatarCircle {
@@ -4048,48 +4070,137 @@
 /* Seed Design style clean map marker & pill tooltip */
 .dreamFacilityPin {
   position: relative;
-  --dream-marker-scale: 1;
   width: max-content;
-  min-height: 48px;
+  min-height: 32px;
   border: 0;
   background: transparent;
   color: #ffffff;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-end;
   padding: 0;
   font-family: inherit;
   white-space: nowrap;
   cursor: pointer;
-  transform: translate(-50%, calc(-100% - 2px)) scale(var(--dream-marker-scale));
-  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  filter: none; /* Remove harsh blurry brand drop-shadow */
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: none;
+  z-index: 10;
 }
 
+@keyframes elephantFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes elephantPop {
+  0% {
+    transform: scale(0.85);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes labelPopup {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.8);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* 평상시: 크기를 콤팩트하게 줄여 귀엽고 깔끔한 기본 크기 (34px x 29px) */
 .dreamFacilityPinMascot {
   position: relative;
-  width: 50px;
-  height: 42px;
+  width: 35px;
+  height: 30px;
   display: grid;
   place-items: center;
   border: 0;
   background: transparent;
   overflow: visible;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
+  transform-origin: 50% 100%;
+  transition: width 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 280ms ease,
+              transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: elephantFloat 3s ease-in-out infinite;
 }
 
 .dreamFacilityPinMascot img {
-  width: 50px;
+  width: 35px;
   height: auto;
   display: block;
   pointer-events: none;
+  transition: width 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Seed Design Iconography / Tooltip Pill */
+.dreamFacilityPin:hover .dreamFacilityPinMascot {
+  transform: scale(1.12);
+  filter: drop-shadow(0 3px 8px rgba(255, 111, 15, 0.35));
+}
+
+/* 클릭/선택 시: 원래의 현재 크기(50px x 42px)로 통통 튀며 확대! */
+.dreamFacilityPinSelected {
+  z-index: 99 !important;
+}
+
+.dreamFacilityPinSelected .dreamFacilityPinMascot {
+  width: 50px;
+  height: 42px;
+  filter: drop-shadow(0 4px 12px rgba(255, 111, 15, 0.45));
+  animation: elephantPop 350ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.dreamFacilityPinSelected .dreamFacilityPinMascot img {
+  width: 50px;
+  height: auto;
+}
+
+.dreamFacilityTrustDot {
+  position: absolute;
+  right: -3px;
+  top: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  border: 1.5px solid #ffffff;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.3);
+  z-index: 2;
+}
+
+/* 말풍선 라벨: 코끼리 머리 위에 절대위치로 띄워 코끼리 기준점(좌표)이 절대 흔들리지 않게 고정 */
 .dreamFacilityPinLabel {
-  position: relative;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -4099,11 +4210,13 @@
   background: #ff6f0f;
   color: #ffffff;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.2px;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(255, 111, 15, 0.24);
-  margin-bottom: 1px;
+  border: 1.5px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(255, 111, 15, 0.3);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: labelPopup 240ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .dreamFacilityPinLabel::after {
@@ -4114,31 +4227,66 @@
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 3.5px solid transparent;
-  border-right: 3.5px solid transparent;
-  border-top: 4px solid #ff6f0f;
-}
-
-.dreamFacilityPin:hover {
-  --dream-marker-scale: 1.05;
-}
-
-.dreamFacilityPinSelected {
-  --dream-marker-scale: 1.08;
-}
-
-.dreamFacilityPinSelected .dreamFacilityPinMascot {
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.22));
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid #ff6f0f;
 }
 
 .dreamFacilityPinSelected .dreamFacilityPinLabel {
-  background: #e85d04;
+  background: #ff6f0f;
   border-color: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(255, 146, 43, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(255, 146, 43, 0.4);
 }
 
 .dreamFacilityPinSelected .dreamFacilityPinLabel::after {
-  border-top-color: #e85d04;
+  border-top-color: #ff6f0f;
+}
+
+.dreamTrustBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #e6fffb;
+  color: #0f766e;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.dreamTrustChecklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.dreamTrustChecklist span,
+.dreamTrustCallout span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f1fbf8;
+  color: #16685f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dreamTrustCallout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.dreamTrustCallout strong {
+  color: #0f766e;
+  font-size: 0.875rem;
 }
 
 .dreamMapRecenter {
@@ -4580,7 +4728,7 @@
 
 .quickStats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   min-height: 94px;
   margin-bottom: 14px;
 }
@@ -4608,8 +4756,8 @@
 
 .quickStats strong {
   position: absolute;
-  top: 18px;
-  right: 27px;
+  top: 16px;
+  left: calc(50% + 8px);
   min-width: 18px;
   height: 18px;
   display: grid;
@@ -6321,7 +6469,7 @@
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
   overscroll-behavior-y: contain;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -6338,55 +6486,69 @@
 }
 
 .albaHeader {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
+  padding: 8px 17px 0;
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(11, 11, 13, 0.94);
+  background: rgba(11, 11, 13, 0.96);
   border-bottom: 1px solid var(--color-line);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .stage[data-theme="light"] .albaHeader {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
 }
 
-.albaHeader h1 {
-  font-size: 1.125rem;
-  line-height: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  text-align: center;
-  flex: 1;
-  letter-spacing: 0;
+.albaHeader .screenHeader {
+  min-height: 52px;
+  margin-bottom: 0;
 }
 
-.albaHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.albaHeader .headerTitleRow {
+  gap: 2px;
+}
+
+.albaHeader .headerTitleRow h1 {
+  font-size: 1.1875rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 .albaTopSection {
-  padding: 14px 16px 16px;
-  border-bottom: 8px solid var(--color-surface-2);
+  padding: 22px 17px 24px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.albaSectionIntro {
+  margin-bottom: 16px;
+}
+
+.albaSectionIntro h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.albaSectionIntro p {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
 .albaPopularCard {
   width: 100%;
-  min-height: 96px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  padding: 14px 14px 14px 16px;
+  min-height: 132px;
+  background: var(--color-primary-container);
+  border: 0;
+  border-radius: 16px;
+  padding: 18px;
   color: var(--color-text);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
+  grid-template-columns: minmax(0, 1fr) 82px;
   align-items: center;
   gap: 14px;
   cursor: pointer;
@@ -6397,17 +6559,12 @@
 }
 
 .albaPopularCard::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: var(--alba-brand);
+  content: none;
 }
 
 .albaPopularCard:hover {
   transform: translateY(-1px);
-  border-color: var(--alba-brand-border);
-  background: var(--color-surface-2);
+  background: var(--color-primary-container);
 }
 
 .albaPopularCard:active {
@@ -6433,8 +6590,8 @@
   display: block;
   font-size: 0.8125rem;
   line-height: 1.125rem;
-  color: var(--color-muted);
-  font-weight: 500;
+  color: var(--alba-brand);
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -6442,9 +6599,9 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 1.125rem;
-  line-height: 1.5rem;
-  font-weight: 700;
+  font-size: 1.1875rem;
+  line-height: 1.55rem;
+  font-weight: 800;
   color: var(--color-text);
   margin-top: 1px;
   letter-spacing: 0;
@@ -6454,7 +6611,7 @@
   display: block;
   margin: 4px 0 0;
   max-width: 22rem;
-  color: var(--color-muted);
+  color: var(--color-dim);
   font-size: 0.8125rem;
   line-height: 1.125rem;
   font-weight: 400;
@@ -6474,7 +6631,7 @@
   min-height: 22px;
   padding: 3px 7px;
   border-radius: 6px;
-  background: var(--alba-brand-soft);
+  background: var(--color-bg);
   color: var(--alba-brand);
   font-size: 0.75rem;
   line-height: 1rem;
@@ -6482,10 +6639,10 @@
 }
 
 .albaPopularMapVisual {
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
-  background: var(--alba-brand-soft);
+  width: 78px;
+  height: 78px;
+  border-radius: 18px;
+  background: var(--color-bg);
   color: var(--alba-brand);
   display: grid;
   place-items: center;
@@ -6516,24 +6673,30 @@
 }
 
 .albaCategoryGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin: 16px -17px 0;
+  padding: 0 17px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.albaCategoryGrid::-webkit-scrollbar {
+  display: none;
 }
 
 .albaCategoryBtn {
-  min-width: 0;
-  min-height: 72px;
+  min-width: max-content;
+  min-height: 42px;
   border: 1px solid var(--color-line);
   background: var(--color-surface);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 8px 4px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
   color: var(--color-text);
   font-size: 0.75rem;
   line-height: 1rem;
@@ -6558,9 +6721,11 @@
 }
 
 .albaCategoryIconCircle {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   display: grid;
   place-items: center;
   background: var(--color-surface-2);
@@ -6577,7 +6742,7 @@
 }
 
 .albaFeedSection {
-  padding: 18px 16px 28px;
+  padding: 22px 17px 28px;
 }
 
 .albaSearchField {
@@ -6589,12 +6754,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .albaFeedHeading h2 {
   min-width: 0;
-  font-size: 1.25rem;
+  font-size: 1.1875rem;
   line-height: 1.6875rem;
   font-weight: 700;
   margin: 0;
@@ -6613,32 +6778,83 @@
   font-weight: 500;
 }
 
+.chatRow {
+  min-height: 96px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+  padding: 13px 8px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chatRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chatRow:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stage[data-theme="light"] .chatRow:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.stage[data-theme="light"] .chatRow:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 .albaGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px 12px;
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .albaCard {
-  border: 0;
-  background: transparent;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
   position: relative;
   min-width: 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.albaCardMain {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 40px 16px 0;
+  cursor: pointer;
+  min-width: 0;
+  font: inherit;
+}
+
+.albaCardMain:focus-visible {
+  outline: 2px solid var(--alba-brand);
+  outline-offset: 3px;
+  border-radius: 12px;
 }
 
 .albaCardThumbFrame {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  height: 108px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--color-surface-2);
-  margin-bottom: 9px;
-  border: 1px solid var(--color-line);
+  margin: 0;
+  border: 0;
 }
 
 .albaCardThumbVisual {
@@ -6667,7 +6883,7 @@
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.2);
   font-size: 1.65rem;
   line-height: 1;
@@ -6677,34 +6893,46 @@
 
 .albaCardHeartBtn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 14px;
+  right: 0;
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(11, 11, 13, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 2;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   transition: transform 140ms ease, background 140ms ease, color 140ms ease;
 }
 
 .stage[data-theme="light"] .albaCardHeartBtn {
-  background: rgba(255, 255, 255, 0.84);
-  border-color: rgba(17, 17, 20, 0.08);
-  color: #22252a;
+  background: transparent;
+  color: var(--color-muted);
 }
 
 .albaCardHeartBtn:hover,
 .albaCardHeartBtnActive {
-  background: var(--alba-brand);
-  border-color: transparent;
-  color: #ffffff;
+  background: var(--alba-brand-soft);
+  color: var(--alba-brand);
+}
+
+.albaCardBody {
+  min-width: 0;
+  align-self: center;
+}
+
+.albaCardCompany {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .albaCardHeartBtn:active {
@@ -6713,14 +6941,14 @@
 
 .albaCardTitle {
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.375rem;
   color: var(--color-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 5px;
+  margin: 0 0 3px;
   text-wrap: pretty;
   letter-spacing: 0;
 }
@@ -6730,7 +6958,7 @@
   line-height: 1.375rem;
   font-weight: 700;
   color: var(--alba-brand);
-  margin-bottom: 2px;
+  margin: 5px 0 6px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -6745,7 +6973,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 7px;
+  margin-bottom: 0;
 }
 
 .albaBadgeRow {
@@ -6837,11 +7065,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(64px + env(safe-area-inset-bottom));
-  padding: 6px 12px env(safe-area-inset-bottom);
+  height: calc(72px + env(safe-area-inset-bottom));
+  padding: 7px 8px env(safe-area-inset-bottom);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: rgba(17, 17, 20, 0.94);
+  background: rgba(17, 17, 20, 0.96);
   border-top: 1px solid var(--color-line);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -6860,7 +7088,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   font-size: 0.6875rem;
   font-weight: 500;
   cursor: pointer;
@@ -6873,12 +7101,9 @@
 }
 
 .albaNavBtnActive {
-  color: var(--color-text);
+  color: var(--alba-brand);
   font-weight: 700;
-  margin: 0 2px;
-  border-radius: 999px;
-  background: var(--alba-brand-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: transparent;
 }
 
 .albaNavBtnActive svg {

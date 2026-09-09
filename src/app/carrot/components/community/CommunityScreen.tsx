@@ -3,11 +3,16 @@
 import React from "react";
 import {
   Bell,
+  Building2,
+  CheckCircle2,
   ChevronRight,
+  MapPin,
   Menu,
   MessageCircle,
   MoreVertical,
   Search,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { CommunityPost } from "../../types";
@@ -77,6 +82,9 @@ export function CommunityScreen({
   onOpenNotifications,
   onOpenMenu,
   onPostClick,
+  verifiedApartment,
+  onOpenApartment,
+  activeNeighborhood = "개봉동",
 }: {
   activeTab: string;
   activeFilter: string;
@@ -93,6 +101,9 @@ export function CommunityScreen({
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
   onPostClick: (id: string) => void;
+  verifiedApartment?: string | null;
+  onOpenApartment?: () => void;
+  activeNeighborhood?: string;
 }) {
   return (
     <section className={styles.screen}>
@@ -122,29 +133,96 @@ export function CommunityScreen({
             onClick={() => onTabChange(tab)}
           >
             {tab}
+            {tab === "아파트" && <em className={styles.communityNBadge} style={{ background: "#4dabf7" }}>APT</em>}
             {tab === "같이해요" && <em className={styles.communityNBadge}>N</em>}
           </button>
         ))}
       </nav>
 
-      {/* Together Banner Slider - Visible on All / Together Tab */}
-      <div
-        onClick={onOpenTogetherIntro}
-        className={styles.daangnTogetherBanner}
-      >
-        <div className={styles.daangnTogetherBannerLeft}>
-          <span className={styles.daangnTogetherBannerIcon}>🤝</span>
-          <div className={styles.daangnTogetherBannerText}>
-            <span className={styles.daangnTogetherBannerSub}>입주민끼리 무엇이든 같이해보세요</span>
-            <strong className={styles.daangnTogetherBannerTitle}>이웃과 같이해요</strong>
+      {/* 🏢 별도의 아파트 커뮤니티 전용 독립 섹션 (전체 탭 상단 배너 카드) */}
+      {activeTab === "전체" && (
+        <div
+          onClick={onOpenApartment}
+          style={{
+            margin: "12px 16px 8px",
+            padding: "14px 16px",
+            borderRadius: "16px",
+            background: "linear-gradient(135deg, #f0f7ff 0%, #e7f2ff 100%)",
+            border: "1px solid #d0ebff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(34, 139, 230, 0.08)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                backgroundColor: "#228be6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                flexShrink: 0,
+              }}
+            >
+              <Building2 size={22} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#1c7ed6",
+                    backgroundColor: "#e7f5ff",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  {verifiedApartment ? "인증 입주민" : "입주민 전용"}
+                </span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#1971c2" }}>
+                  {verifiedApartment ? `${verifiedApartment} 커뮤니티` : "우리 아파트 커뮤니티"}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: "12px", color: "#495057" }}>
+                {verifiedApartment
+                  ? "우리 단지 이웃과 소통하는 공간으로 가기"
+                  : "GPS로 내 아파트 인증하고 단지 전용 소통 공간 열기"}
+              </p>
+            </div>
           </div>
+          <ChevronRight size={20} color="#228be6" />
         </div>
-        <ChevronRight size={18} className={styles.togetherBannerArrow} />
-      </div>
-      <div className={styles.daangnBannerDots}>
-        <span className={`${styles.daangnBannerDot} ${styles.daangnBannerDotActive}`} />
-        <span className={styles.daangnBannerDot} />
-      </div>
+      )}
+
+      {/* Together Banner Slider - Visible on All / Together Tab */}
+      {activeTab !== "아파트" && (
+        <>
+          <div
+            onClick={onOpenTogetherIntro}
+            className={styles.daangnTogetherBanner}
+          >
+            <div className={styles.daangnTogetherBannerLeft}>
+              <span className={styles.daangnTogetherBannerIcon}>🤝</span>
+              <div className={styles.daangnTogetherBannerText}>
+                <span className={styles.daangnTogetherBannerSub}>입주민끼리 무엇이든 같이해보세요</span>
+                <strong className={styles.daangnTogetherBannerTitle}>이웃과 같이해요</strong>
+              </div>
+            </div>
+            <ChevronRight size={18} className={styles.togetherBannerArrow} />
+          </div>
+          <div className={styles.daangnBannerDots}>
+            <span className={`${styles.daangnBannerDot} ${styles.daangnBannerDotActive}`} />
+            <span className={styles.daangnBannerDot} />
+          </div>
+        </>
+      )}
 
       {/* Notice Megaphone Line */}
       <div className={styles.communityNoticeLine} onClick={onOpenTogetherIntro}>
@@ -152,7 +230,187 @@ export function CommunityScreen({
         <span>안녕하세요 😊 동네 커뮤니티는 가까운 이웃과 함께하는 공간입니다.</span>
       </div>
 
-      {activeTab === "같이해요" ? (
+      {activeTab === "아파트" ? (
+        <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+          {verifiedApartment ? (
+            /* 1. 인증된 입주민 전용 공간 */
+            <div
+              style={{
+                borderRadius: "20px",
+                background: "linear-gradient(145deg, #ffffff 0%, #f8faff 100%)",
+                border: "1.5px solid #d0ebff",
+                padding: "24px 20px",
+                boxShadow: "0 4px 16px rgba(34, 139, 230, 0.08)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    backgroundColor: "#e7f5ff",
+                    color: "#1971c2",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <CheckCircle2 size={13} /> 인증 완료
+                </span>
+                <span style={{ fontSize: "12px", color: "#868e96" }}>실거주 입주민 전용</span>
+              </div>
+              <h2 style={{ fontSize: "21px", fontWeight: 800, margin: "0 0 6px", color: "#1864ab" }}>
+                {verifiedApartment}
+              </h2>
+              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "#495057", lineHeight: 1.5 }}>
+                우리 아파트 주민들만 모여 소통하는 공간입니다.<br />
+                층간소음, 주차, 단지 소식을 이웃과 함께 나눠보세요.
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                  <div style={{ fontSize: "16px", marginBottom: "4px" }}>📢</div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>단지 소식·공지</strong>
+                  <span style={{ fontSize: "11px", color: "#868e96" }}>관리사무소 안내</span>
+                </div>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                  <div style={{ fontSize: "16px", marginBottom: "4px" }}>🚗</div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>주차·충전기</strong>
+                  <span style={{ fontSize: "11px", color: "#868e96" }}>지하주차장 소통</span>
+                </div>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                  <div style={{ fontSize: "16px", marginBottom: "4px" }}>🤫</div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>층간소음 배려</strong>
+                  <span style={{ fontSize: "11px", color: "#868e96" }}>이웃 간 배려 문화</span>
+                </div>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                  <div style={{ fontSize: "16px", marginBottom: "4px" }}>🎁</div>
+                  <strong style={{ fontSize: "13px", display: "block" }}>단지 나눔·공구</strong>
+                  <span style={{ fontSize: "11px", color: "#868e96" }}>배송비 아끼는 공구</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={onOpenApartment}
+                  style={{
+                    width: "100%",
+                    padding: "14px",
+                    borderRadius: "12px",
+                    backgroundColor: "#228be6",
+                    color: "#ffffff",
+                    border: "none",
+                    fontSize: "15px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(34, 139, 230, 0.3)",
+                  }}
+                >
+                  {verifiedApartment} 라운지 입장하기
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenApartment}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    backgroundColor: "transparent",
+                    color: "#868e96",
+                    border: "none",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                  }}
+                >
+                  다른 아파트로 재인증하기
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* 2. 미인증 상태: 아파트 인증 유도 섹션 */
+            <div
+              style={{
+                borderRadius: "20px",
+                background: "linear-gradient(145deg, #ffffff 0%, #f8faff 100%)",
+                border: "1.5px solid #d0ebff",
+                padding: "26px 20px",
+                textAlign: "center",
+                boxShadow: "0 4px 16px rgba(34, 139, 230, 0.08)",
+              }}
+            >
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "18px",
+                  backgroundColor: "#228be6",
+                  color: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  boxShadow: "0 4px 12px rgba(34, 139, 230, 0.25)",
+                }}
+              >
+                <Building2 size={30} />
+              </div>
+              <h2 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 8px", color: "#1864ab" }}>
+                입주민 전용 커뮤니티
+              </h2>
+              <p style={{ fontSize: "14px", color: "#495057", lineHeight: 1.6, margin: "0 0 20px" }}>
+                실제 거주 중인 아파트를 GPS로 인증하면<br />
+                외부인은 볼 수 없는 <strong>우리 단지 비밀 라운지</strong>가 열려요!
+              </p>
+
+              <button
+                type="button"
+                onClick={onOpenApartment}
+                style={{
+                  width: "100%",
+                  padding: "15px",
+                  borderRadius: "14px",
+                  backgroundColor: "#228be6",
+                  color: "#ffffff",
+                  border: "none",
+                  fontSize: "15px",
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(34, 139, 230, 0.3)",
+                  marginBottom: "20px",
+                }}
+              >
+                <MapPin size={18} /> GPS로 내 아파트 인증하기
+              </button>
+
+              <div
+                style={{
+                  textAlign: "left",
+                  padding: "14px 16px",
+                  borderRadius: "12px",
+                  backgroundColor: "#f8f9fa",
+                  border: "1px solid #e9ecef",
+                }}
+              >
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "#1971c2", display: "block", marginBottom: "6px" }}>
+                  ✨ 아파트 인증 시 제공되는 혜택
+                </span>
+                <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "#495057", lineHeight: 1.7 }}>
+                  <li>철저한 GPS 위치 기반으로 <strong>인증된 입주민만 이용</strong></li>
+                  <li>층간소음, 주차 문제, 단지 하자 등 솔직한 이웃 소통</li>
+                  <li>가까운 동·호수 이웃과의 단지 내 직거래 및 공동구매</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : activeTab === "같이해요" ? (
         <>
           {/* Seed ChipScroller */}
           <ChipScroller
