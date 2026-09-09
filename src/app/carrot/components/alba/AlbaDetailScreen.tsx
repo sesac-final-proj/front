@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ChevronLeft,
   Share2,
@@ -6,6 +6,8 @@ import {
   Clock3,
   Calendar,
   Heart,
+  Store,
+  MapPin,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { AlbaItem } from "@/types";
@@ -23,25 +25,43 @@ export function AlbaDetailScreen({
   onToggleFavorite,
   onApply,
 }: AlbaDetailScreenProps) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <section className={styles.albaDetailScreen}>
-      <div className={styles.albaDetailHero} style={{ background: alba.bgGradient }}>
+      <div className={styles.albaDetailHeroFrame}>
+        {alba.thumbnailUrl && !imgError ? (
+          <img
+            src={alba.thumbnailUrl}
+            alt={alba.companyName}
+            className={styles.albaDetailHeroImg}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div
+            className={styles.albaDetailHeroPlaceholder}
+            style={{ background: alba.bgGradient || "var(--color-surface-2)" }}
+          >
+            <Store size={48} className={styles.albaDetailHeroIcon} />
+          </div>
+        )}
+        <div className={styles.albaDetailHeroOverlay} />
         <div className={styles.albaDetailNavFloat}>
-          <button type="button" onClick={onBack} aria-label="뒤로">
-            <ChevronLeft size={24} />
+          <button type="button" className={styles.albaDetailGlassBtn} onClick={onBack} aria-label="뒤로">
+            <ChevronLeft size={22} />
           </button>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button type="button" aria-label="공유">
-              <Share2 size={20} />
+            <button type="button" className={styles.albaDetailGlassBtn} aria-label="공유">
+              <Share2 size={19} />
             </button>
-            <button type="button" aria-label="더보기">
-              <EllipsisVertical size={20} />
+            <button type="button" className={styles.albaDetailGlassBtn} aria-label="더보기">
+              <EllipsisVertical size={19} />
             </button>
           </div>
         </div>
-        <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: "3.5rem", display: "block", marginBottom: "8px" }}>{alba.thumbnailEmoji ?? "🏢"}</span>
-          <strong>{alba.companyName}</strong>
+        <div className={styles.albaDetailHeroBottom}>
+          <span className={styles.albaDetailHeroBadge}>{alba.category}</span>
+          <h2 className={styles.albaDetailHeroCompany}>{alba.companyName}</h2>
         </div>
       </div>
 
@@ -57,21 +77,21 @@ export function AlbaDetailScreen({
           <div className={styles.albaDetailConditionItem}>
             <Clock3 size={22} />
             <div>
-              <span>급여</span><br />
+              <span>급여</span>
               <strong>{alba.payLabel}</strong>
             </div>
           </div>
           <div className={styles.albaDetailConditionItem}>
             <Calendar size={22} />
             <div>
-              <span>근무 요일</span><br />
+              <span>근무 요일</span>
               <strong>{alba.workingDays}</strong>
             </div>
           </div>
           <div className={styles.albaDetailConditionItem}>
             <Clock3 size={22} />
             <div>
-              <span>근무 시간</span><br />
+              <span>근무 시간</span>
               <strong>{alba.workingHours}</strong>
             </div>
           </div>
@@ -91,7 +111,9 @@ export function AlbaDetailScreen({
         {/* Location Info */}
         <h2 className={styles.albaDetailSectionHeading}>근무지 위치</h2>
         <div className={styles.albaDetailDuties}>
-          <strong>📍 {alba.detailLocation}</strong>
+          <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <MapPin size={16} color="var(--alba-brand)" /> {alba.detailLocation}
+          </strong>
           <p style={{ margin: "4px 0 0", color: "var(--color-muted)", fontSize: "0.8125rem" }}>
             {alba.neighborhoodName}
           </p>

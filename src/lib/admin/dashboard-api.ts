@@ -11,6 +11,7 @@ export interface DashboardOverview {
   collection_trend: AdminDataStatus["daily_counts"];
   trade_status: AdminDataStatus["status_counts"];
   region_ranking: AdminDataStatus["region_counts"];
+  price_distribution: AdminDataStatus["price_band_counts"];
   source: { name: string; status: "available" | "empty"; last_collected_at: string | null };
   recent_transactions: AdminDataStatus["recent_transactions"];
 }

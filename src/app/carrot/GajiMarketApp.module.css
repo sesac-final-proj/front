@@ -6610,7 +6610,7 @@ img.thumbnail {
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  padding-bottom: calc(140px + env(safe-area-inset-bottom));
   overscroll-behavior-y: contain;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -6813,6 +6813,27 @@ img.thumbnail {
   color: #ffffff;
 }
 
+.stage[data-theme="light"] .albaPopularCard {
+  background: #fff8f3;
+  border: 1px solid #ffe3d1;
+}
+
+.stage[data-theme="light"] .albaPopularCard:hover {
+  background: #fff3ea;
+}
+
+.stage[data-theme="light"] .albaPopularStats span {
+  background: #ffffff;
+  color: #ff6f0f;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stage[data-theme="light"] .albaPopularMapVisual {
+  background: #ffffff;
+  color: #ff6f0f;
+  box-shadow: 0 2px 8px rgba(255, 111, 15, 0.12);
+}
+
 .albaCategoryGrid {
   display: flex;
   gap: 8px;
@@ -6964,6 +6985,15 @@ img.thumbnail {
   position: relative;
   min-width: 0;
   border-bottom: 1px solid var(--color-line);
+  transition: background-color 150ms ease;
+}
+
+.albaCard:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stage[data-theme="light"] .albaCard:hover {
+  background: rgba(0, 0, 0, 0.015);
 }
 
 .albaCardMain {
@@ -6973,12 +7003,13 @@ img.thumbnail {
   color: inherit;
   text-align: left;
   display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 14px;
-  padding: 16px 40px 16px 0;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 15px;
+  padding: 16px 42px 16px 0;
   cursor: pointer;
   min-width: 0;
   font: inherit;
+  align-items: start;
 }
 
 .albaCardMain:focus-visible {
@@ -6989,13 +7020,39 @@ img.thumbnail {
 
 .albaCardThumbFrame {
   position: relative;
-  width: 100%;
-  height: 108px;
+  width: 104px;
+  height: 104px;
   border-radius: 12px;
   overflow: hidden;
   background: var(--color-surface-2);
   margin: 0;
-  border: 0;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.albaCardThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 200ms ease;
+}
+
+.albaCard:hover .albaCardThumbImg {
+  transform: scale(1.04);
+}
+
+.albaCardThumbFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+}
+
+.albaCardThumbIcon {
+  opacity: 0.6;
 }
 
 .albaCardThumbVisual {
@@ -7010,13 +7067,6 @@ img.thumbnail {
   text-align: center;
   background-size: cover;
   background-position: center;
-  transition: transform 180ms ease, filter 180ms ease;
-  filter: saturate(0.92);
-}
-
-.albaCard:hover .albaCardThumbVisual {
-  transform: scale(1.025);
-  filter: saturate(1);
 }
 
 .albaCardThumbEmoji {
@@ -7028,16 +7078,14 @@ img.thumbnail {
   background: rgba(255, 255, 255, 0.2);
   font-size: 1.65rem;
   line-height: 1;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .albaCardHeartBtn {
   position: absolute;
   top: 14px;
   right: 0;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: transparent;
   border: 0;
@@ -7051,7 +7099,7 @@ img.thumbnail {
 
 .stage[data-theme="light"] .albaCardHeartBtn {
   background: transparent;
-  color: var(--color-muted);
+  color: #9ca3af;
 }
 
 .albaCardHeartBtn:hover,
@@ -7060,61 +7108,70 @@ img.thumbnail {
   color: var(--alba-brand);
 }
 
+.albaCardHeartBtn:active {
+  transform: scale(0.9);
+}
+
 .albaCardBody {
   min-width: 0;
-  align-self: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 1px;
 }
 
 .albaCardCompany {
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   color: var(--color-muted);
-  font-size: 0.75rem;
-  line-height: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.1rem;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.albaCardHeartBtn:active {
-  transform: scale(0.9);
-}
-
 .albaCardTitle {
-  font-size: 0.9375rem;
+  font-size: 0.96875rem;
   font-weight: 650;
-  line-height: 1.375rem;
+  line-height: 1.4;
   color: var(--color-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin: 0 0 3px;
+  margin: 0 0 4px;
   text-wrap: pretty;
-  letter-spacing: 0;
-}
-
-.albaCardPay {
-  font-size: 1rem;
-  line-height: 1.375rem;
-  font-weight: 700;
-  color: var(--alba-brand);
-  margin: 5px 0 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.stage[data-theme="dark"] .albaCardPay {
-  color: var(--alba-brand);
+  letter-spacing: -0.015em;
 }
 
 .albaCardMeta {
-  font-size: 0.75rem;
-  line-height: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.1rem;
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0;
+  margin-bottom: 5px;
+}
+
+.albaCardPay {
+  font-size: 1.03125rem;
+  line-height: 1.4rem;
+  font-weight: 750;
+  color: var(--alba-brand);
+  margin: 2px 0 6px;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage[data-theme="dark"] .albaCardPay {
+  color: #ff8a3d;
+}
+
+.stage[data-theme="light"] .albaCardPay {
+  color: #ff6f0f;
 }
 
 .albaBadgeRow {
@@ -7126,21 +7183,24 @@ img.thumbnail {
 .albaBadge {
   font-size: 0.6875rem;
   font-weight: 600;
-  line-height: 0.9375rem;
-  padding: 3px 6px;
-  border-radius: 6px;
+  line-height: 1rem;
+  padding: 2px 7px;
+  border-radius: 4px;
   background: var(--color-surface-2);
   color: var(--color-muted);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .albaBadgeGreen {
   background: var(--alba-positive-soft);
-  color: #20b77a;
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .stage[data-theme="light"] .albaBadgeGreen {
-  background: #e6f7f0;
-  color: #078452;
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #d1fae5;
 }
 
 .albaManageWriteBtn {
@@ -7253,24 +7313,52 @@ img.thumbnail {
 
 /* Alba Detail Screen (Matching user image 4) */
 .albaDetailScreen {
-  min-height: var(--app-height);
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  height: var(--app-height);
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
   background: var(--color-bg);
   color: var(--color-text);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
 
-.albaDetailHero {
+.albaDetailScreen::-webkit-scrollbar {
+  display: none;
+}
+
+.albaDetailHeroFrame {
   width: 100%;
   height: 240px;
   position: relative;
   background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.albaDetailHeroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.albaDetailHeroPlaceholder {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
-  font-size: 1.5rem;
-  font-weight: 800;
   color: #ffffff;
-  background-size: cover;
-  background-position: center;
+}
+
+.albaDetailHeroIcon {
+  opacity: 0.8;
+}
+
+.albaDetailHeroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0.7) 100%);
+  pointer-events: none;
 }
 
 .albaDetailNavFloat {
@@ -7284,17 +7372,56 @@ img.thumbnail {
   z-index: 5;
 }
 
-.albaDetailNavFloat button {
-  width: 36px;
-  height: 36px;
+.albaDetailGlassBtn {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
-  border: 0;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
   display: grid;
   place-items: center;
   cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.albaDetailGlassBtn:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.albaDetailGlassBtn:active {
+  transform: scale(0.95);
+}
+
+.albaDetailHeroBottom {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  z-index: 5;
+}
+
+.albaDetailHeroBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--alba-brand);
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.albaDetailHeroCompany {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  letter-spacing: -0.02em;
 }
 
 .albaDetailContent {
@@ -7373,7 +7500,7 @@ img.thumbnail {
 
 /* Detail Fixed Bottom Action Bar */
 .albaDetailActionBar {
-  position: absolute;
+  position: sticky;
   left: 0;
   right: 0;
   bottom: 0;
@@ -7387,6 +7514,7 @@ img.thumbnail {
   align-items: center;
   gap: 10px;
   z-index: 60;
+  margin-top: auto;
 }
 
 .stage[data-theme="light"] .albaDetailActionBar {

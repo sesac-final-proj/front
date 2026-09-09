@@ -3,7 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { getDashboardOverview } from "@/lib/admin/dashboard-api";
 import { useAdminResource } from "@/components/admin/useAdminResource";
 import { AdminPageHeader, MetricCard, Skeleton, ErrorState } from "@/components/admin/AdminUI";
-import { CollectionTrendChart, TradeStatusCard, HorizontalBars } from "@/components/admin/DashboardCharts";
+import { CollectionTrendChart, PriceDistributionChart, TradeStatusCard, HorizontalBars } from "@/components/admin/DashboardCharts";
 import { DataSourceStatus } from "@/components/admin/DataSourceStatus";
 import { RecentTransactions } from "@/components/admin/RecentTransactions";
 import styles from "@/components/admin/portal.module.css";
@@ -18,7 +18,8 @@ export default function DashboardPage() {
  <MetricCard label="평균 등록가" value={data.summary.average_listing_price === null ? "—" : `${data.summary.average_listing_price.toLocaleString("ko-KR")}원`} detail="가격 보유 거래 기준 · 체결가 아님" />
  </div>
  <div className={styles.chartGrid}><article className={styles.card}><div className={styles.cardHead}><div><h2>최근 14일 수집 추이</h2><p>UTC 기준 · {data.collection_trend[0]?.date} – {data.collection_trend.at(-1)?.date}</p></div></div><CollectionTrendChart data={data.collection_trend} /></article><TradeStatusCard data={data.trade_status} /></div>
- <div className={styles.chartGrid}><article className={styles.card}><div className={styles.cardHead}><div><h2>지역별 거래 TOP 5</h2><p>누적 거래 수 기준 · 지역 미확인 제외</p></div></div><HorizontalBars data={data.region_ranking.map(row => ({ name: row.region_name, count: row.transaction_count }))} /></article><DataSourceStatus source={data.source} /></div>
+ <div className={styles.chartGrid}><PriceDistributionChart data={data.price_distribution} /><article className={styles.card}><div className={styles.cardHead}><div><h2>지역별 거래 TOP 5</h2><p>누적 거래 수 기준 · 지역 미확인 제외</p></div></div><HorizontalBars data={data.region_ranking.map(row => ({ name: row.region_name, count: row.transaction_count }))} /></article></div>
+ <div className={styles.chartGrid}><DataSourceStatus source={data.source} /></div>
  <RecentTransactions rows={data.recent_transactions} />
  </>}
  </>;

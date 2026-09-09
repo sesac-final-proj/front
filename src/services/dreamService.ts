@@ -1,7 +1,5 @@
 import { authorizedFetch } from "@/services/tradeService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
 export interface DreamFacility {
   id: string;
   name: string;
@@ -45,9 +43,7 @@ interface ApiFacility {
 
 export async function getDreamFacilities(district: string, signal?: AbortSignal): Promise<DreamFacility[]> {
   const params = new URLSearchParams({ district, limit: "50" });
-  const url = API_BASE_URL
-    ? new URL(`/api/v1/dream/facilities?${params}`, API_BASE_URL).toString()
-    : `/api/v1/dream/facilities?${params}`;
+  const url = `/api/v1/dream/facilities?${params}`;
   const response = await fetch(url, { signal, headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error("어린이 센터를 불러오지 못했습니다.");
 

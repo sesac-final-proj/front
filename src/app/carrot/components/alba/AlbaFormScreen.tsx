@@ -48,6 +48,11 @@ export function AlbaFormScreen({
       badges: ["모범구인"],
       thumbnailTone: "custom",
       thumbnailEmoji: "💼",
+      thumbnailUrl: category === "식당/카페"
+        ? "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&auto=format&fit=crop&q=80"
+        : category === "물류/현장"
+        ? "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=80"
+        : "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&auto=format&fit=crop&q=80",
       bgGradient: "linear-gradient(135deg, #ff6f0f 0%, #ffb057 100%)",
       descriptionBullets: ["1. 상세 업무 협의 가능", "2. 친절하고 성실한 분 환영"],
       details: details || "함께 즐겁게 일할 이웃을 모집합니다.",

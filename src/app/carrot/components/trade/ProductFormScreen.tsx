@@ -109,23 +109,6 @@ export function ProductFormScreen({
             <ChevronRight size={20} />
           </span>
         </button>
-        {!isEdit && (
-          <button
-            type="button"
-            className={styles.marketAnalysisButton}
-            onClick={(event) => {
-              const form = event.currentTarget.form;
-              if (!form) return;
-              const values = new FormData(form);
-              const title = String(values.get("title") ?? "").trim();
-              const price = String(values.get("price") ?? "").trim();
-              const params = new URLSearchParams({ title, price });
-              window.open(`/analysis?${params.toString()}`, "_blank", "noopener,noreferrer");
-            }}
-          >
-            외부 시세와 먼저 비교
-          </button>
-        )}
         <button type="submit" className={styles.primaryButton}>
           {isEdit ? "수정하기" : "등록하기"}
         </button>

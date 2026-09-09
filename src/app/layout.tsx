@@ -5,6 +5,15 @@ import RegisterSW from "./register-sw";
 export const metadata: Metadata = {
   title: "당근",
   description: "중고거래와 동네 생활을 연결하는 당근 모바일 프로토타입",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
