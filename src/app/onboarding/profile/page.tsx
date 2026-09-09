@@ -106,7 +106,12 @@ export default function ProfileSetupPage() {
     updateProfile({ phoneNumber })
       .catch((err: unknown) => {
         // 전화번호는 선택 정보라 중복이어도 닉네임 설정은 계속한다.
-        if (err instanceof Error && err.message === "이미 등록된 전화번호입니다.") return;
+        if (
+          err instanceof Error &&
+          (err.message.includes("이미 등록된 전화번호") || err.message.includes("CONFLICT"))
+        ) {
+          return;
+        }
         throw err;
       })
       .then(() => selectNickname(nickname))

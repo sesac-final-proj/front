@@ -191,8 +191,19 @@ function FeatureCarousel() {
 export default function OnboardingScreen() {
   return (
     <div className={styles.stage}>
+      <div className={styles.glassAmbientBlob1} />
+      <div className={styles.glassAmbientBlob2} />
+      <div className={styles.glassAmbientBlob3} />
+
       <div className={styles.phoneShell}>
         <div className={styles.content}>
+          <div className={styles.brandHeader}>
+            <div className={styles.smallLogoBadge}>
+              <img src="/brand/daangn-mark.svg?v=3" alt="당근 로고" className={styles.smallLogoImg} />
+            </div>
+            <span className={styles.brandTitle}>당근</span>
+          </div>
+
           <section className={styles.onboarding}>
             <FeatureCarousel />
           </section>

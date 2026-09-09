@@ -12,7 +12,9 @@ function apiUrl(path: string) {
 async function extractErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const payload = await response.json();
-    return typeof payload?.detail === "string" ? payload.detail : fallback;
+    if (typeof payload?.message === "string" && payload.message) return payload.message;
+    if (typeof payload?.detail === "string" && payload.detail) return payload.detail;
+    return fallback;
   } catch {
     return fallback;
   }
@@ -23,6 +25,7 @@ export interface Me {
   email: string;
   nickname: string;
   nicknameSet: boolean;
+  role?: "user" | "admin";
   phoneNumber: string | null;
   profileImageUrl: string | null;
   region: { id: number; dongName: string; guName: string } | null;
@@ -33,6 +36,7 @@ interface ApiMeResponse {
   email: string;
   nickname: string;
   nickname_set: boolean;
+  role?: "user" | "admin";
   phone_number: string | null;
   profile_image_url: string | null;
   region: { id: number; dong_name: string; gu_name: string } | null;
@@ -44,10 +48,15 @@ function toMe(payload: ApiMeResponse): Me {
     email: payload.email,
     nickname: payload.nickname,
     nicknameSet: payload.nickname_set,
+    role: payload.role,
     phoneNumber: payload.phone_number,
     profileImageUrl: payload.profile_image_url,
     region: payload.region
-      ? { id: payload.region.id, dongName: payload.region.dong_name, guName: payload.region.gu_name }
+      ? {
+          id: payload.region.id,
+          dongName: payload.region.dong_name,
+          guName: payload.region.gu_name,
+        }
       : null,
   };
 }
