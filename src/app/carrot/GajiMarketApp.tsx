@@ -93,6 +93,7 @@ import {
 } from "@/services/chatService";
 import { blockUser, reportUser } from "@/services/safetyService";
 import { getWalletBalance, sendPayment as sendWalletPayment, chargeWallet, payByQr } from "@/services/walletService";
+import { getDreamPointsBalance } from "@/services/dreamService";
 
 // Types
 import type {
@@ -310,6 +311,13 @@ export default function GajiMarketApp() {
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
   // RegionSearchScreen이 이미 등록된 동네를 목록에서 빼주지만, 최근 동네 칩 등으로
   // 우회해서 들어올 수도 있어 여기서도 한 번 더 막는다(중복 등록 방지의 최종 관문).
+  // 대표/2번째 동네를 서로 맞바꾼다 — 헤더의 동네 이름 더블클릭, 설정 화면 라디오 선택 둘 다 이걸 씀.
+  function swapNeighborhood(dongName: string) {
+    if (dongName === activeNeighborhood) return;
+    setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
+    setActiveNeighborhood(dongName);
+  }
+
   function addNeighborhood(dongName: string) {
     if (dongName === activeNeighborhood) return;
     const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
@@ -359,6 +367,9 @@ export default function GajiMarketApp() {
   // 당근페이 잔액 — 송금 화면 진입할 때마다 새로 받아온다(다른 채팅방에서 이미
   // 써버렸을 수 있어서 캐시하지 않음). null이면 아직 로딩 중.
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // 꿈방울(기부 가능 포인트) — 결제(일반결제 1%, 중고거래 0.1%·5,000원 이상)할 때마다
+  // 서버에서 자동 적립되니 여긴 조회만. My탭 "포인트" 배지에 씀.
+  const [dreamPoints, setDreamPoints] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
 
@@ -401,6 +412,20 @@ export default function GajiMarketApp() {
         console.error("잔액을 불러오지 못했습니다.", error);
       });
     return () => controller.abort();
+  }, [me]);
+
+  // 꿈방울 잔액 — 로그인 시점에 한 번 받아두고, 결제 성공(송금/QR결제) 직후 refreshDreamPoints로
+  // 다시 받아온다(적립은 서버가 결제와 같은 트랜잭션에서 처리하니 여긴 조회만).
+  const refreshDreamPoints = useCallback(() => {
+    getDreamPointsBalance()
+      .then(setDreamPoints)
+      .catch((error: unknown) => console.error("포인트를 불러오지 못했습니다.", error));
+  }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    refreshDreamPoints();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- me 바뀔 때만, refreshDreamPoints는 안정적
   }, [me]);
 
   // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
@@ -492,6 +517,20 @@ export default function GajiMarketApp() {
     syncTabFromHash();
     window.addEventListener("hashchange", syncTabFromHash);
     return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
+
+  // 결제 QR(=/carrot?pay=<storeId>)을 일반 카메라 앱으로 스캔해 브라우저로 바로 열었을 때도
+  // 같은 화면으로 들어오게 — 인앱 스캐너가 읽는 URL과 동일한 파라미터를 여기서도 본다.
+  useEffect(() => {
+    function openWalletPayFromQuery() {
+      const storeId = Number(new URLSearchParams(window.location.search).get("pay"));
+      if (Number.isInteger(storeId) && storeId > 0) {
+        setActiveTab("my");
+        setSubPage({ type: "wallet-pay", storeId });
+      }
+    }
+
+    openWalletPayFromQuery();
   }, []);
 
   useEffect(() => {
@@ -1088,6 +1127,8 @@ export default function GajiMarketApp() {
         getWalletBalance()
           .then(setWalletBalance)
           .catch((error: unknown) => console.error("잔액을 갱신하지 못했습니다.", error));
+        // 중고거래 송금 0.1% 꿈방울 적립(5,000원 이상만) — 서버가 이미 적립해뒀으니 갱신만.
+        refreshDreamPoints();
         if (message.payment) {
           setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId: String(message.payment.transactionId) });
         } else {
@@ -1120,11 +1161,15 @@ export default function GajiMarketApp() {
       });
   }
 
-  function submitWalletPay(merchantName: string, amount: number) {
-    payByQr(merchantName, amount)
+  // 성공하면 true — WalletPayScreen이 이걸 보고 완료 화면으로 넘어간다(화면 전환은
+  // 거기서 자체적으로 처리하므로 여기선 subPage를 건드리지 않는다).
+  function submitWalletPay(storeId: number, amount: number): Promise<boolean> {
+    return payByQr(storeId, amount)
       .then((balance) => {
         setWalletBalance(balance);
-        setSubPage(null);
+        // 일반결제(QR) 1% 꿈방울 적립 — 서버가 이미 적립해뒀으니 갱신만.
+        refreshDreamPoints();
+        return true;
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
@@ -1133,6 +1178,7 @@ export default function GajiMarketApp() {
           console.error("결제하지 못했습니다.", error);
           alert(error instanceof Error ? error.message : "결제하지 못했습니다.");
         }
+        return false;
       });
   }
 
@@ -1515,7 +1561,12 @@ export default function GajiMarketApp() {
           ) : subPage?.type === "wallet-charge" ? (
             <WalletChargeScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletCharge} />
           ) : subPage?.type === "wallet-pay" ? (
-            <WalletPayScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletPay} />
+            <WalletPayScreen
+              initialStoreId={subPage.storeId}
+              balance={walletBalance}
+              onBack={goBack}
+              onSubmit={submitWalletPay}
+            />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
               rooms={productChatRooms}
@@ -1678,6 +1729,7 @@ export default function GajiMarketApp() {
                   hasMore={products.length < productsTotal}
                   isLoadingMore={isLoadingMoreProducts}
                   onOpenRegion={() => setSheet("region")}
+                  onSwapNeighborhood={swapNeighborhood}
                   onOpenSearch={() => setSubPage({ type: "search" })}
                   onOpenNotifications={() => setSheet("notifications")}
                   onOpenMenu={() => {
@@ -1768,6 +1820,7 @@ export default function GajiMarketApp() {
                   favoriteCount={favoriteProducts.length}
                   myProducts={myProducts}
                   walletBalance={walletBalance}
+                  dreamPoints={dreamPoints}
                   onOpenSettings={() => setSubPage({ type: "settings" })}
                   onOpenMenu={() => setSubPage({ type: "my-menu" })}
                   onOpenAllServices={() => setSubPage({ type: "all-services" })}
@@ -1813,8 +1866,7 @@ export default function GajiMarketApp() {
           secondaryNeighborhood={secondaryNeighborhood}
           onClose={() => setSheet(null)}
           onSelectPrimary={(dongName) => {
-            setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
-            setActiveNeighborhood(dongName);
+            swapNeighborhood(dongName);
             setSheet(null);
           }}
           onRemoveNeighborhood={(target) => {

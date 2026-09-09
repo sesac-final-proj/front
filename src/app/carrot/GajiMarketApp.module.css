@@ -392,20 +392,29 @@
 }
 
 .neighborhoodSwitch {
-  border: 0;
-  background: transparent;
   color: var(--color-text);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
   font-size: inherit;
   font-weight: inherit;
   font-family: inherit;
   letter-spacing: inherit;
 }
 
-.neighborhoodSwitch span:nth-child(2) {
+.neighborhoodSwitch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.neighborhoodSwitchDim {
   color: var(--color-dim);
 }
 
@@ -3686,21 +3695,19 @@ img.thumbnail {
 .numberPad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--color-surface-3);
-  border-radius: 14px;
-  overflow: hidden;
 }
 
 .numberPadKey {
+  appearance: none;
   border: 0;
   height: 56px;
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text);
   font-size: 22px;
   font-weight: 700;
   display: grid;
   place-items: center;
+  border-radius: 14px;
 }
 
 .numberPadKey:active {
@@ -3722,24 +3729,6 @@ img.thumbnail {
 }
 
 /* 당근페이 QR 결제 화면 */
-.payScanInfo {
-  margin: 0 8px 4px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--color-surface-2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.payScanInfo strong {
-  font-size: 17px;
-  white-space: nowrap;
-}
-
 .payScanBody {
   padding: 24px 8px 220px;
   display: grid;
@@ -3788,6 +3777,51 @@ img.thumbnail {
 .payScanFrame::after {
   width: 2px;
   height: 28px;
+}
+
+/* 결제완료 카드 — 라이트/다크 상관없이 항상 흰 카드로 뜨는 시스템 토스트 느낌이라
+   테마 토큰 대신 고정 색을 씀(ponytail: 의도적 예외). */
+.payDoneBackdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 100;
+}
+
+.payDoneCard {
+  width: 260px;
+  padding: 32px 24px;
+  border-radius: 20px;
+  background: #fff;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.payDoneStore {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.payDoneAmount {
+  color: #17171a;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.payDoneCheck {
+  margin-top: 8px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
 }
 
 /* 당근페이 상세 내역 화면 */

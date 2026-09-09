@@ -48,6 +48,9 @@ export function WalletChargeScreen({
         <p className={styles.paymentBalance}>
           {balance == null ? "보유 잔액 확인 중..." : `보유 잔액 ${balance.toLocaleString("ko-KR")}원`}
         </p>
+        {balance != null && amount > 0 && (
+          <p className={styles.paymentBalance}>충전 후 잔액 {(balance + amount).toLocaleString("ko-KR")}원</p>
+        )}
       </div>
       <div className={styles.paymentAmountFooter}>
         <NumberPad onKeyPress={handleKeyPress} />
