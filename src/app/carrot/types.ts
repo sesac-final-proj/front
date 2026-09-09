@@ -31,6 +31,7 @@ export interface AlbaItem {
   reviewCount?: number;
   thumbnailTone: string;
   thumbnailEmoji?: string;
+  thumbnailUrl?: string;
   bgGradient: string;
   descriptionBullets: string[];
   details: string;
