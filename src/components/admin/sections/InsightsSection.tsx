@@ -5,20 +5,15 @@ import {
   Search,
   SlidersHorizontal,
   FileText,
-  CheckSquare,
-  Square,
   X,
   ArrowUpDown,
-  ExternalLink,
   ShieldCheck,
-  ShieldAlert,
   BarChart3,
-  Tags,
   Sparkles,
-  Info,
-  RefreshCw,
   Layers,
-  ChevronDown,
+  ChevronRight,
+  TrendingUp,
+  Percent,
 } from "lucide-react";
 import type { AdminAudienceInsights, AdminProductCluster } from "@/services/adminService";
 import styles from "@/app/admin/admin.module.css";
@@ -95,7 +90,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   const dataQuality = insights.dataQuality;
   const modelQuality = insights.modelQuality;
 
-  // Extract unique families for filter dropdown
+  // Extract unique families for interactive Tab Bar
   const uniqueFamilies = useMemo(() => {
     const families = new Set<string>();
     rawClusters.forEach((c) => {
@@ -150,7 +145,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
           return false;
         }
 
-        // Quality Tier Filter (uses tuned status if tuned, or original status)
+        // Quality Tier Filter
         if (selectedQuality !== "all") {
           const status = showTuningPanel ? c.tunedStatus : c.qualityStatus;
           if (status !== selectedQuality) return false;
@@ -176,8 +171,8 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             valB = b.median || b.medianPrice || 0;
             break;
           case "iqr":
-            valA = a.iqr || (a.q3 - a.q1) || 0;
-            valB = b.iqr || (b.q3 - b.q1) || 0;
+            valA = a.iqr || a.q3 - a.q1 || 0;
+            valB = b.iqr || b.q3 - b.q1 || 0;
             break;
           case "dispersion":
             valA = a.effectiveDispersion || 0;
@@ -204,6 +199,21 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     const start = (currentPage - 1) * pageSize;
     return filteredClusters.slice(start, start + pageSize);
   }, [filteredClusters, currentPage, pageSize]);
+
+  // Statistics for selected family / overall slice
+  const currentSliceStats = useMemo(() => {
+    const totalCount = filteredClusters.reduce((acc, c) => acc + (c.count || 0), 0);
+    const prices = filteredClusters.map((c) => c.median || 0).filter((p) => p > 0);
+    const avgMedian = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    const reliableCount = filteredClusters.filter((c) => c.qualityStatus === "reliable").length;
+
+    return {
+      totalCount,
+      clusterCount: filteredClusters.length,
+      avgMedian,
+      reliableCount,
+    };
+  }, [filteredClusters]);
 
   // Tuning simulation summary metrics
   const tuningStats = useMemo(() => {
@@ -243,13 +253,29 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case "reliable":
-        return <span style={{ color: "#16a34a", background: "#f0fdf4", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #bbf7d0" }}>신뢰 (n≥10)</span>;
+        return (
+          <span style={{ color: "#16a34a", background: "#f0fdf4", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #bbf7d0" }}>
+            신뢰 (n≥10)
+          </span>
+        );
       case "limited":
-        return <span style={{ color: "#ca8a04", background: "#fefce8", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #fef08a" }}>제한 (5≤n&lt;10)</span>;
+        return (
+          <span style={{ color: "#ca8a04", background: "#fefce8", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #fef08a" }}>
+            제한 (5≤n&lt;10)
+          </span>
+        );
       case "noisy":
-        return <span style={{ color: "#ea580c", background: "#fff7ed", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #fed7aa" }}>분산주의</span>;
+        return (
+          <span style={{ color: "#ea580c", background: "#fff7ed", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #fed7aa" }}>
+            분산주의
+          </span>
+        );
       default:
-        return <span style={{ color: "#64748b", background: "#f1f5f9", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #e2e8f0" }}>희소 (n&lt;5)</span>;
+        return (
+          <span style={{ color: "#64748b", background: "#f1f5f9", padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px", border: "1px solid #e2e8f0" }}>
+            희소 (n&lt;5)
+          </span>
+        );
     }
   };
 
@@ -261,7 +287,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
           <span>EXT·01</span>
           <div>
             <p className={styles.eyebrow}>EXTERNAL MARKET INTELLIGENCE</p>
-            <h2 style={{ fontSize: "22px", margin: "4px 0" }}>외부 마켓 시세 & 데이터 클러스터 관리</h2>
+            <h2 style={{ fontSize: "22px", margin: "4px 0" }}>타 플랫폼 비교 시세 & 제품 클러스터 관리</h2>
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -308,38 +334,127 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         </div>
       </div>
 
-      {/* KPI Highlight Strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", margin: "16px 0" }}>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "14px 18px", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>총 분석 표본수</span>
-          <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "var(--ink)" }}>
+      {/* Interactive Product Family Tab Bar (품목 선택 바) */}
+      <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "10px", margin: "16px 0 12px", scrollbarWidth: "thin" }}>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedFamily("all");
+            setCurrentPage(1);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 16px",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: 700,
+            border: "1px solid",
+            borderColor: selectedFamily === "all" ? "var(--carrot)" : "var(--line)",
+            background: selectedFamily === "all" ? "var(--carrot)" : "var(--surface)",
+            color: selectedFamily === "all" ? "#fff" : "var(--ink)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            boxShadow: selectedFamily === "all" ? "0 2px 4px rgba(255, 111, 15, 0.2)" : "none",
+            transition: "all 0.15s",
+          }}
+        >
+          <span>전체 품목 보기</span>
+          <span
+            style={{
+              fontSize: "11px",
+              padding: "2px 7px",
+              borderRadius: "10px",
+              background: selectedFamily === "all" ? "rgba(255,255,255,0.3)" : "#f1f5f9",
+              color: selectedFamily === "all" ? "#fff" : "var(--muted)",
+              fontWeight: 800,
+            }}
+          >
             {number.format(rawClusters.reduce((acc, c) => acc + (c.count || 0), 0))}건
+          </span>
+        </button>
+
+        {uniqueFamilies.map((family) => {
+          const famCount = rawClusters.filter((c) => c.item === family).reduce((acc, c) => acc + (c.count || 0), 0);
+          const isSelected = selectedFamily === family;
+
+          return (
+            <button
+              key={family}
+              type="button"
+              onClick={() => {
+                setSelectedFamily(family);
+                setCurrentPage(1);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                borderRadius: "20px",
+                fontSize: "12px",
+                fontWeight: 700,
+                border: "1px solid",
+                borderColor: isSelected ? "var(--carrot)" : "var(--line)",
+                background: isSelected ? "var(--carrot)" : "var(--surface)",
+                color: isSelected ? "#fff" : "var(--ink)",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                boxShadow: isSelected ? "0 2px 4px rgba(255, 111, 15, 0.2)" : "none",
+                transition: "all 0.15s",
+              }}
+            >
+              <span>{family}</span>
+              <span
+                style={{
+                  fontSize: "11px",
+                  padding: "2px 7px",
+                  borderRadius: "10px",
+                  background: isSelected ? "rgba(255,255,255,0.3)" : "#f1f5f9",
+                  color: isSelected ? "#fff" : "var(--muted)",
+                  fontWeight: 800,
+                }}
+              >
+                {number.format(famCount)}건
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* KPI Highlight Strip for Selected Product Family */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "14px 18px", borderRadius: "6px" }}>
+          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>
+            {selectedFamily === "all" ? "전체 수집 표본수" : `${selectedFamily} 표본수`}
+          </span>
+          <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "var(--ink)" }}>
+            {number.format(currentSliceStats.totalCount)}건
           </strong>
           <small style={{ color: "var(--muted)", fontSize: "11px" }}>번개장터 + 중고나라 실거래</small>
         </div>
 
         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "14px 18px", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>제품 시그니처 클러스터</span>
+          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>시그니처 클러스터</span>
           <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "var(--ink)" }}>
-            {rawClusters.length}개 그룹
+            {currentSliceStats.clusterCount}개 모델 그룹
           </strong>
           <small style={{ color: "#16a34a", fontSize: "11px", fontWeight: 700 }}>
-            신뢰 클러스터 {rawClusters.filter((c) => c.qualityStatus === "reliable").length}개
+            신뢰 클러스터 {currentSliceStats.reliableCount}개
           </small>
         </div>
 
         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "14px 18px", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>선정 가격 예측 모델</span>
-          <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "#2563eb" }}>
-            {modelQuality?.selectedModel ?? "RandomForest"}
+          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>품목 대표 평균 중앙값</span>
+          <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "var(--carrot-dark)" }}>
+            {money(Math.round(currentSliceStats.avgMedian))}
           </strong>
-          <small style={{ color: "var(--muted)", fontSize: "11px" }}>
-            R² {modelQuality?.r2.toFixed(3) ?? "0.500"} · MAE {money(modelQuality?.mae ?? 56597)}
-          </small>
+          <small style={{ color: "var(--muted)", fontSize: "11px" }}>이상치 제거 후 실거래 기준</small>
         </div>
 
         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "14px 18px", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>이상가/소모품 필터링</span>
+          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>이상치/소모품 필터링</span>
           <strong style={{ display: "block", fontSize: "18px", marginTop: "4px", color: "#e11d48" }}>
             {dataQuality ? `${dataQuality.removedRate}%` : "23.5%"}
           </strong>
@@ -374,7 +489,9 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
                 <span>최소 신뢰 표본수 (Min Samples Cutoff):</span>
-                <strong style={{ color: "#38bdf8", fontSize: "13px" }}>n ≥ {minSampleThreshold * 2} (제한: n ≥ {minSampleThreshold})</strong>
+                <strong style={{ color: "#38bdf8", fontSize: "13px" }}>
+                  n ≥ {minSampleThreshold * 2} (제한: n ≥ {minSampleThreshold})
+                </strong>
               </div>
               <input
                 type="range"
@@ -386,7 +503,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 style={{ width: "100%", accentColor: "#38bdf8" }}
               />
               <p style={{ fontSize: "11px", color: "#94a3b8", margin: "4px 0 0" }}>
-                설정한 기준 미만의 클러스터는 시세 산정 시 상위 품목군 중앙값으로 자동 Fallback 처리됩니다.
+                설정한 기준 미만의 클러스터는 당근 시세 산정 시 상위 품목군 중앙값으로 자동 Fallback 처리됩니다.
               </p>
             </div>
 
@@ -394,7 +511,9 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
                 <span>이상치 판정 민감도 (IQR Outlier Guard):</span>
-                <strong style={{ color: "#fb923c", fontSize: "13px" }}>{iqrMultiplier.toFixed(1)}x IQR (분산 컷: {(0.5 * (iqrMultiplier / 1.5)).toFixed(2)})</strong>
+                <strong style={{ color: "#fb923c", fontSize: "13px" }}>
+                  {iqrMultiplier.toFixed(1)}x IQR (분산 컷: {(0.5 * (iqrMultiplier / 1.5)).toFixed(2)})
+                </strong>
               </div>
               <input
                 type="range"
@@ -406,7 +525,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 style={{ width: "100%", accentColor: "#fb923c" }}
               />
               <p style={{ fontSize: "11px", color: "#94a3b8", margin: "4px 0 0" }}>
-                분산도가 컷오프를 초과하는 클러스터는 '분산주의'로 분류되어 단독 시세 표기를 제한합니다.
+                분산도가 컷오프를 초과하는 클러스터는 '분산주의'로 분류되어 단독 시세 가이드를 제한합니다.
               </p>
             </div>
           </div>
@@ -434,7 +553,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
       )}
 
       {/* Main Interactive Table & Filter Card */}
-      <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "8px", padding: "20px", marginTop: "12px" }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "8px", padding: "20px" }}>
         {/* Table Controls Strip */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
           {/* Search Input */}
@@ -442,7 +561,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             <Search size={16} color="var(--muted)" style={{ marginRight: "8px" }} />
             <input
               type="text"
-              placeholder="품목, 정규화 모델, 규격, 상태 검색..."
+              placeholder="모델코드(CRP, SV), 규격, 상태 검색..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -451,11 +570,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
               style={{ border: "none", background: "transparent", outline: "none", fontSize: "12px", width: "100%" }}
             />
             {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                style={{ border: "none", background: "transparent", cursor: "pointer", padding: "0" }}
-              >
+              <button type="button" onClick={() => setSearchQuery("")} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "0" }}>
                 <X size={14} color="var(--muted)" />
               </button>
             )}
@@ -463,23 +578,6 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
 
           {/* Filters & Column Customizer */}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-            {/* Product Family Dropdown */}
-            <select
-              value={selectedFamily}
-              onChange={(e) => {
-                setSelectedFamily(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{ padding: "6px 10px", fontSize: "12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--surface)" }}
-            >
-              <option value="all">전체 품목군 ({uniqueFamilies.length})</option>
-              {uniqueFamilies.map((fam) => (
-                <option key={fam} value={fam}>
-                  {fam}
-                </option>
-              ))}
-            </select>
-
             {/* Quality Tier Dropdown */}
             <select
               value={selectedQuality}
@@ -830,7 +928,9 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid var(--line)", paddingBottom: "12px" }}>
               <div>
                 <span style={{ fontSize: "11px", color: "var(--carrot-dark)", fontWeight: 700 }}>CLUSTER DRILL-DOWN</span>
-                <h3 style={{ fontSize: "18px", margin: "4px 0" }}>{selectedCluster.item} · {selectedCluster.normalizedModel || selectedCluster.model}</h3>
+                <h3 style={{ fontSize: "18px", margin: "4px 0" }}>
+                  {selectedCluster.item} · {selectedCluster.normalizedModel || selectedCluster.model}
+                </h3>
                 <small style={{ color: "var(--muted)", fontSize: "11px" }}>{selectedCluster.productSignature || selectedCluster.cluster}</small>
               </div>
               <button type="button" onClick={() => setSelectedCluster(null)} style={{ border: "none", background: "transparent", cursor: "pointer" }}>
