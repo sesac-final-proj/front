@@ -41,3 +41,30 @@ export async function sendPayment(chatRoomId: number, amount: number): Promise<C
   const payload: ApiChatMessage = await response.json();
   return toChatMessage(payload);
 }
+
+// 당근머니 충전 — 실제 계좌 연동 없는 mock이라 금액만 보내면 그대로 잔액에 더해진다.
+export async function chargeWallet(amount: number): Promise<number> {
+  const response = await authorizedFetch("/api/v1/wallet/charge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ amount }),
+  });
+  if (!response.ok) throw new Error(await extractErrorMessage(response, "충전하지 못했습니다."));
+
+  const payload: ApiWalletBalance = await response.json();
+  return payload.balance;
+}
+
+// 매장 QR 결제 — 가맹점 연동 없는 mock이라 QR에서 읽은 이름/금액을 그대로 보내면
+// 잔액에서 차감된다.
+export async function payByQr(merchantName: string, amount: number): Promise<number> {
+  const response = await authorizedFetch("/api/v1/wallet/pay", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ merchant_name: merchantName, amount }),
+  });
+  if (!response.ok) throw new Error(await extractErrorMessage(response, "결제하지 못했습니다."));
+
+  const payload: ApiWalletBalance = await response.json();
+  return payload.balance;
+}

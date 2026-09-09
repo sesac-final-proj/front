@@ -41,6 +41,8 @@ import {
   FavoriteScreen,
   DreamDashboardScreen,
   DreamNoticeScreen,
+  WalletChargeScreen,
+  WalletPayScreen,
   // real-estate
   RealEstateScreen,
   // alba
@@ -90,7 +92,7 @@ import {
   type ChatTradeStatus,
 } from "@/services/chatService";
 import { blockUser, reportUser } from "@/services/safetyService";
-import { getWalletBalance, sendPayment as sendWalletPayment } from "@/services/walletService";
+import { getWalletBalance, sendPayment as sendWalletPayment, chargeWallet, payByQr } from "@/services/walletService";
 
 // Types
 import type {
@@ -1081,6 +1083,11 @@ export default function GajiMarketApp() {
           setProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
           setMyProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
         }
+        // 송금 직후 내 정보 화면의 당근페이 잔액도 갱신 — 안 그러면 화면을 새로
+        // 열기 전까진 송금 전 잔액이 그대로 보인다.
+        getWalletBalance()
+          .then(setWalletBalance)
+          .catch((error: unknown) => console.error("잔액을 갱신하지 못했습니다.", error));
         if (message.payment) {
           setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId: String(message.payment.transactionId) });
         } else {
@@ -1093,6 +1100,38 @@ export default function GajiMarketApp() {
         } else {
           console.error("송금하지 못했습니다.", error);
           alert(error instanceof Error ? error.message : "송금하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitWalletCharge(amount: number) {
+    chargeWallet(amount)
+      .then((balance) => {
+        setWalletBalance(balance);
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("충전하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "충전하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitWalletPay(merchantName: string, amount: number) {
+    payByQr(merchantName, amount)
+      .then((balance) => {
+        setWalletBalance(balance);
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("결제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "결제하지 못했습니다.");
         }
       });
   }
@@ -1465,6 +1504,10 @@ export default function GajiMarketApp() {
               mine={paymentMessage.mine}
               onBack={goBack}
             />
+          ) : subPage?.type === "wallet-charge" ? (
+            <WalletChargeScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletCharge} />
+          ) : subPage?.type === "wallet-pay" ? (
+            <WalletPayScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletPay} />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
               rooms={productChatRooms}
@@ -1718,6 +1761,8 @@ export default function GajiMarketApp() {
                   onOpenFavorites={() => setSubPage({ type: "favorites" })}
                   onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
                   onOpenApartment={openApartmentFlow}
+                  onOpenWalletCharge={() => setSubPage({ type: "wallet-charge" })}
+                  onOpenWalletPay={() => setSubPage({ type: "wallet-pay" })}
                 />
               )}
             </motion.div>

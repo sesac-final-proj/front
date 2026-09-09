@@ -40,6 +40,8 @@ export interface MyScreenProps {
   onOpenFavorites: () => void;
   onOpenRecentlyViewed: () => void;
   onOpenApartment?: () => void;
+  onOpenWalletCharge: () => void;
+  onOpenWalletPay: () => void;
 }
 
 export function MyScreen({
@@ -59,6 +61,8 @@ export function MyScreen({
   onOpenFavorites,
   onOpenRecentlyViewed,
   onOpenApartment,
+  onOpenWalletCharge,
+  onOpenWalletPay,
 }: MyScreenProps) {
   const services: IconItem[] = [
     { label: "중고거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
@@ -112,9 +116,9 @@ export function MyScreen({
       <section className={styles.payCard}>
         <div className={styles.payHeader}>
           <BrandWordmark />
-          <button type="button">충전</button>
+          <button type="button" onClick={onOpenWalletCharge}>충전</button>
           <button type="button">송금</button>
-          <button type="button" className={styles.payButton}>
+          <button type="button" className={styles.payButton} onClick={onOpenWalletPay}>
             <QrCode size={19} /> 결제
           </button>
         </div>

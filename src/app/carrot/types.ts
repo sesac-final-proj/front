@@ -53,6 +53,8 @@ export type SubPage =
   | { type: "chat-room-list"; productId: string; productTitle: string }
   | { type: "payment-amount"; chatRoomId: string }
   | { type: "payment-detail"; chatRoomId: string; transactionId: string }
+  | { type: "wallet-charge" }
+  | { type: "wallet-pay" }
   | { type: "my-menu" }
   | { type: "all-services" }
   | { type: "merge-game" }

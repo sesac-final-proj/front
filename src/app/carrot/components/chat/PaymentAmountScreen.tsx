@@ -4,7 +4,10 @@ import React, { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ChatRoom } from "@/types";
-import { ScreenHeader, IconButton, Avatar } from "../common";
+import { ScreenHeader, IconButton, Avatar, NumberPad } from "../common";
+
+// 자릿수 제한 — 이 이상은 잔액 체크로 막히니 입력 화면에서 굳이 더 받을 필요 없음.
+const MAX_DIGITS = 9;
 
 export function PaymentAmountScreen({
   room,
@@ -25,6 +28,14 @@ export function PaymentAmountScreen({
   const insufficientBalance = balance != null && amount > balance;
   const canSubmit = amount > 0 && balance != null && !insufficientBalance;
 
+  function handleKeyPress(key: string) {
+    setAmountInput((prev) => {
+      if (key === "back") return prev.slice(0, -1);
+      if (prev.length >= MAX_DIGITS) return prev;
+      return (prev + key).replace(/^0+(?=\d)/, "");
+    });
+  }
+
   return (
     <section className={styles.screen}>
       <ScreenHeader
@@ -42,17 +53,10 @@ export function PaymentAmountScreen({
         </div>
         {/* ponytail: 실제 계좌 자동충전 연동은 스코프 밖(docs/carrot-pay-trade-flow-plan.md
             6절) — 은행 계좌 대신 이 앱 안의 당근머니 잔액만 보여주고 그걸로 검증한다. */}
-        <label className={styles.paymentAmountField}>
-          <input
-            type="tel"
-            inputMode="numeric"
-            autoFocus
-            placeholder="0"
-            value={amountInput}
-            onChange={(event) => setAmountInput(event.target.value.replace(/[^0-9]/g, ""))}
-          />
+        <div className={styles.paymentAmountField}>
+          <strong>{amountInput ? amount.toLocaleString("ko-KR") : "0"}</strong>
           <span>원</span>
-        </label>
+        </div>
         <p className={insufficientBalance ? styles.paymentBalanceWarn : styles.paymentBalance}>
           {balance == null
             ? "보유 잔액 확인 중..."
@@ -61,14 +65,17 @@ export function PaymentAmountScreen({
               : `보유 잔액 ${balance.toLocaleString("ko-KR")}원`}
         </p>
       </div>
-      <button
-        type="button"
-        className={styles.paymentSubmitBtn}
-        disabled={!canSubmit}
-        onClick={() => onSubmit(amount)}
-      >
-        보내기
-      </button>
+      <div className={styles.paymentAmountFooter}>
+        <NumberPad onKeyPress={handleKeyPress} />
+        <button
+          type="button"
+          className={styles.paymentSubmitBtn}
+          disabled={!canSubmit}
+          onClick={() => onSubmit(amount)}
+        >
+          보내기
+        </button>
+      </div>
     </section>
   );
 }

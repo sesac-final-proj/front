@@ -12,3 +12,4 @@ export * from "./AllServicesScreen";
 export * from "./RegionSearchScreen";
 export * from "./SearchScreen";
 export * from "./DaangnSplash";
+export * from "./NumberPad";
