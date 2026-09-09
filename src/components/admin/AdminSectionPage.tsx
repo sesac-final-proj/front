@@ -15,9 +15,9 @@ import type { ModelValidation } from "./sections/types";
 import styles from "@/app/admin/admin.module.css";
 export const sectionTitles: Record<string, string> = { trades: "거래 데이터 탐색", quality: "수집 품질", insights: "비교 인사이트", sources: "수집원 관리", "price-model": "가격 모델", donations: "꿈가지 분석", notices: "공지·기부", system: "구현 현황" };
 async function getModel(): Promise<ModelValidation> {
- const response = await fetch("/model-validation.json");
- if (!response.ok) throw new Error("가격 모델 검증 산출물을 불러오지 못했습니다.");
- return response.json();
+  const response = await fetch("/model-validation.json", { cache: "no-store" });
+  if (!response.ok) throw new Error("가격 모델 검증 산출물을 불러오지 못했습니다.");
+  return response.json();
 }
 export default function AdminSectionPage({ section }: { section: string }) {
  const loader = useCallback(async () => {

@@ -30,6 +30,9 @@ import { useTransitStops } from "./useTransitStops";
 import { RealtimeDangerTicker } from "./RealtimeDangerTicker";
 import { CongestionAnalysisSection } from "./CongestionAnalysisSection";
 import { DangerSignalCallout } from "./DangerSignalCallout";
+import { WorkoutFacilitySection } from "./WorkoutFacilitySection";
+import { useWorkoutFacilities } from "./useWorkoutFacilities";
+import type { WorkoutFacility } from "@/services/workoutService";
 
 export function createDangerMarkerContent(
   business: LocalBusiness,
@@ -106,7 +109,14 @@ export function MapScreen({
   }, []);
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const isCongestionMode = selectedCategory === "congestion";
+  const isWorkoutMode = selectedCategory === "workout";
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const workout = useWorkoutFacilities({
+    enabled: isWorkoutMode,
+    activeNeighborhood,
+    currentLocation,
+    coordsMap: NEIGHBORHOOD_COORDS,
+  });
   const [centerRequest, setCenterRequest] = useState(0);
   const [selectedDanger, setSelectedDanger] = useState<LocalBusiness | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -186,6 +196,12 @@ export function MapScreen({
     transitionToState("half");
     window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "smooth" }));
   }, [transitionToState]);
+
+  const handleSelectWorkoutFacility = useCallback((facility: WorkoutFacility) => {
+    workout.handleSelectFacility(facility);
+    transitionToState("half");
+    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "smooth" }));
+  }, [workout, transitionToState]);
 
   const onGlobalPointerMove = useCallback((e: PointerEvent) => {
     const deltaY = e.clientY - dragStartYRef.current;

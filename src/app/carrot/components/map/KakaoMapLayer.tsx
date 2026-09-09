@@ -11,6 +11,7 @@ import {
 import styles from "../../GajiMarketApp.module.css";
 import transitStyles from "./TransitSection.module.css";
 import { getSubwayLineColor, getSubwayLineNames, type TransitBounds, type TransitStop } from "@/services/transitService";
+import type { WorkoutFacility } from "@/services/workoutService";
 
 export const KAKAO_MAP_KEY =
   process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
@@ -449,6 +450,65 @@ export function createSeedPastelHeatmapElement(
   return container;
 }
 
+export function createWorkoutMarkerElement(
+  facility: WorkoutFacility,
+  isSelected: boolean,
+  onSelect: () => void
+): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.setAttribute("role", "button");
+  button.setAttribute("aria-label", `${facility.name} (${facility.category})`);
+  button.title = `${facility.name} - ${facility.category}`;
+  button.style.display = "inline-flex";
+  button.style.alignItems = "center";
+  button.style.gap = "5px";
+  button.style.height = "32px";
+  button.style.padding = "0 10px";
+  button.style.borderRadius = "999px";
+  button.style.fontSize = "12px";
+  button.style.fontWeight = "750";
+  button.style.cursor = "pointer";
+  button.style.whiteSpace = "nowrap";
+  button.style.userSelect = "none";
+  button.style.boxShadow = isSelected
+    ? "0 3px 12px rgba(255, 111, 15, 0.45)"
+    : "0 2px 8px rgba(0, 0, 0, 0.18)";
+  button.style.border = isSelected ? "2px solid #ff6f0f" : "1.5px solid #212529";
+  button.style.background = isSelected ? "#ff6f0f" : "#212529";
+  button.style.color = "#ffffff";
+  button.style.transition = "transform 0.15s ease, background 0.15s ease";
+
+  const iconSpan = document.createElement("span");
+  iconSpan.style.fontSize = "13px";
+  iconSpan.textContent =
+    facility.subCategory === "swimming"
+      ? "🏊"
+      : facility.subCategory === "climbing"
+      ? "🧗"
+      : facility.subCategory === "pilates"
+      ? "🧘"
+      : facility.subCategory === "golf"
+      ? "⛳"
+      : "🏋️";
+
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = facility.name;
+  labelSpan.style.maxWidth = "110px";
+  labelSpan.style.overflow = "hidden";
+  labelSpan.style.textOverflow = "ellipsis";
+
+  button.appendChild(iconSpan);
+  button.appendChild(labelSpan);
+
+  button.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onSelect();
+  });
+
+  return button;
+}
+
 export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   activeNeighborhood: string;
   currentLocation: { lat: number; lng: number } | null;
@@ -462,6 +522,10 @@ export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   transitFocus?: TransitStop | null;
   onTransitBoundsChange?: (bounds: TransitBounds) => void;
   onSelectTransit?: (stop: TransitStop) => void;
+  workoutFacilities?: WorkoutFacility[];
+  selectedWorkoutId?: string | null;
+  onSelectWorkoutFacility?: (facility: WorkoutFacility) => void;
+  onWorkoutBoundsChange?: (bounds: { south: number; north: number; west: number; east: number }) => void;
   businesses: T[];
   renderBusinessMarker: (business: T) => HTMLElement;
   onCongestionBoundsChange: (bounds: { south: number; north: number; west: number; east: number }) => void;
@@ -486,6 +550,10 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   transitFocus,
   onTransitBoundsChange,
   onSelectTransit,
+  workoutFacilities = [],
+  selectedWorkoutId,
+  onSelectWorkoutFacility,
+  onWorkoutBoundsChange,
   businesses,
   renderBusinessMarker,
   onCongestionBoundsChange,
@@ -507,9 +575,11 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   const isRestaurantMode = selectedCategory === "food";
   const isCongestionMode = selectedCategory === "congestion";
   const isTransitMode = selectedCategory === "subway" || selectedCategory === "bike";
+  const isWorkoutMode = selectedCategory === "workout";
   const restaurantOverlaysRef = useRef<any[]>([]);
   const businessOverlaysRef = useRef<any[]>([]);
   const congestionOverlaysRef = useRef<any[]>([]);
+  const workoutOverlaysRef = useRef<any[]>([]);
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1007,6 +1077,70 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     return () => kakao.maps.event.removeListener(map, "idle", publishBounds);
   }, [canUseKakaoMap, isCongestionMode, onCongestionBoundsChange, activeNeighborhood, currentLocation, centerRequest]);
 
+  // Workout facility markers rendering
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isWorkoutMode) {
+      workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+      workoutOverlaysRef.current = [];
+      return;
+    }
+
+    workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+    workoutOverlaysRef.current = [];
+
+    const newOverlays = workoutFacilities.map((facility) => {
+      const isSelected = facility.id === selectedWorkoutId;
+      const markerEl = createWorkoutMarkerElement(facility, isSelected, () => {
+        const position = new kakao.maps.LatLng(facility.lat, facility.lng);
+        map.panTo(position);
+        onSelectWorkoutFacility?.(facility);
+      });
+
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(facility.lat, facility.lng),
+        content: markerEl,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        zIndex: isSelected ? 210 : 90,
+      });
+
+      overlay.setMap(map);
+      return overlay;
+    });
+
+    workoutOverlaysRef.current = newOverlays;
+
+    return () => {
+      workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+      workoutOverlaysRef.current = [];
+    };
+  }, [canUseKakaoMap, isWorkoutMode, workoutFacilities, selectedWorkoutId, onSelectWorkoutFacility]);
+
+  // Workout viewport synchronization
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isWorkoutMode) return;
+
+    const publishWorkoutBounds = () => {
+      const bounds = map.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      onWorkoutBoundsChange?.({
+        south: sw.getLat(),
+        north: ne.getLat(),
+        west: sw.getLng(),
+        east: ne.getLng(),
+      });
+    };
+
+    publishWorkoutBounds();
+    kakao.maps.event.addListener(map, "idle", publishWorkoutBounds);
+    return () => kakao.maps.event.removeListener(map, "idle", publishWorkoutBounds);
+  }, [canUseKakaoMap, isWorkoutMode, onWorkoutBoundsChange, activeNeighborhood, currentLocation, centerRequest]);
+
   return (
     <>
       <div className={styles.kakaoMapFrame}>
@@ -1047,6 +1181,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
           const ne = bounds.getNorthEast();
           const currentBounds = { south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() };
           if (isTransitMode) onTransitBoundsChange?.(currentBounds);
+          else if (isWorkoutMode) onWorkoutBoundsChange?.(currentBounds);
           else onSearchBounds(currentBounds);
         }}
       >

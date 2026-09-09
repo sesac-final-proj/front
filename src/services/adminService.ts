@@ -45,12 +45,60 @@ export interface AdminDataStatus {
   recent_errors: { source: string; message: string; occurred_at: string }[];
 }
 
+export interface AdminDataQuality {
+  rowsBeforeCleaning: number;
+  rowsAfterCleaning: number;
+  removedRows: number;
+  removedRate: number;
+  invalidPriceRows: number;
+  accessoryRows: number;
+  sparseClusterRate: number;
+  noisyClusterRate: number;
+  totalClusters: number;
+  reliableClusters: number;
+}
+
+export interface AdminModelQuality {
+  selectedModel: string;
+  r2: number;
+  mae: number;
+  baselineR2: number;
+  baselineMAE: number;
+  validationMethod: string;
+  trainCount: number;
+  testCount: number;
+}
+
+export interface AdminProductCluster {
+  cluster: string;
+  item: string;
+  model: string;
+  condition: string;
+  count: number;
+  median: number;
+  q1: number;
+  q3: number;
+  platformCount: number;
+  completedRate: number;
+  sampleCount?: number;
+  medianPrice?: number;
+  iqr?: number;
+  dispersion?: number;
+  productFamily?: string;
+  normalizedModel?: string;
+  productSignature?: string;
+  qualityStatus?: "reliable" | "limited" | "sparse" | "noisy";
+}
+
 export interface AdminAudienceInsights {
   asOf: string;
   population: { rows: number; platforms: number; items: number; completedRows: number };
+  modelQuality?: AdminModelQuality;
+  dataQuality?: AdminDataQuality;
   readerGuide: { question: string; answer: string }[];
   selectionReasons: string[];
   distributions: { item: string; count: number; q1: number; median: number; q3: number; outlierRate: number; interpretation: string }[];
+  productClusters: AdminProductCluster[];
   keywords: { keyword: string; count: number; medianPrice: number; medianIndex: number; completionRate: number }[];
   examples: { item: string; title: string; platform: string; price: number; status: string; model: string; reason: string; url: string }[];
   sourceValidation: {
