@@ -19,14 +19,20 @@ import {
   Sliders,
   CheckCircle2,
   ArrowUpRight,
-  LineChart
+  Filter,
+  RotateCcw,
+  Eye,
+  ListFilter,
+  Tag,
+  ShoppingBag,
+  Info
 } from "lucide-react";
 import type { AdminAudienceInsights, AdminProductCluster } from "@/services/adminService";
 import styles from "@/app/admin/admin.module.css";
 
 const number = new Intl.NumberFormat("ko-KR");
 const money = (value: number | null | undefined) =>
-  value == null ? "가격 미정" : `${new Intl.NumberFormat("ko-KR").format(value)}원`;
+  value == null ? "가격 미정" : `${new Intl.NumberFormat("ko-KR").format(Math.round(value))}원`;
 
 type ColumnKey =
   | "item"
@@ -55,23 +61,20 @@ const AVAILABLE_COLUMNS: { key: ColumnKey; label: string; defaultVisible: boolea
   { key: "qualityStatus", label: "품질상태", defaultVisible: true },
 ];
 
-// ==========================================
 // 구글 트렌드 (Google Trends 대한민국 관심도) & 외부 시장 매물 연동 지표
-// ==========================================
 interface GoogleTrendItem {
   item: string;
   category: string;
   googleQuery: string;
-  trendScore: number; // 0~100 Google Search Interest Index
+  trendScore: number;
   trendChange: string;
   marketSamples: number;
   medianPrice: number;
   marketShare: number;
-  trendSeries: {
-    week: string;
-    interest: number; // Google Trends Search Interest (0~100)
-    inflow: number;   // External Market Listings Inflow
-  }[];
+  minPrice: number;
+  maxPrice: number;
+  q1Price: number;
+  q3Price: number;
 }
 
 const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
@@ -84,14 +87,10 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 1600,
     medianPrice: 170000,
     marketShare: 33.5,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 78, inflow: 280 },
-      { week: "08.08~08.14", interest: 82, inflow: 310 },
-      { week: "08.15~08.21", interest: 86, inflow: 340 },
-      { week: "08.22~08.28", interest: 89, inflow: 390 },
-      { week: "08.29~09.04", interest: 92, inflow: 420 },
-      { week: "09.05~09.11", interest: 94, inflow: 460 },
-    ]
+    minPrice: 35000,
+    maxPrice: 420000,
+    q1Price: 120000,
+    q3Price: 225000
   },
   {
     item: "다이슨 청소기",
@@ -102,14 +101,10 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 1180,
     medianPrice: 240000,
     marketShare: 24.7,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 75, inflow: 220 },
-      { week: "08.08~08.14", interest: 77, inflow: 240 },
-      { week: "08.15~08.21", interest: 80, inflow: 260 },
-      { week: "08.22~08.28", interest: 82, inflow: 290 },
-      { week: "08.29~09.04", interest: 84, inflow: 310 },
-      { week: "09.05~09.11", interest: 85, inflow: 330 },
-    ]
+    minPrice: 60000,
+    maxPrice: 780000,
+    q1Price: 180000,
+    q3Price: 380000
   },
   {
     item: "메디큐브 부스터프로",
@@ -120,14 +115,10 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 1148,
     medianPrice: 195000,
     marketShare: 24.1,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 52, inflow: 140 },
-      { week: "08.08~08.14", interest: 64, inflow: 190 },
-      { week: "08.15~08.21", interest: 78, inflow: 280 },
-      { week: "08.22~08.28", interest: 85, inflow: 360 },
-      { week: "08.29~09.04", interest: 88, inflow: 410 },
-      { week: "09.05~09.11", interest: 91, inflow: 450 },
-    ]
+    minPrice: 85000,
+    maxPrice: 320000,
+    q1Price: 170000,
+    q3Price: 230000
   },
   {
     item: "풀리오 마사지기",
@@ -138,14 +129,10 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 454,
     medianPrice: 85000,
     marketShare: 9.5,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 62, inflow: 80 },
-      { week: "08.08~08.14", interest: 65, inflow: 95 },
-      { week: "08.15~08.21", interest: 66, inflow: 105 },
-      { week: "08.22~08.28", interest: 68, inflow: 115 },
-      { week: "08.29~09.04", interest: 70, inflow: 130 },
-      { week: "09.05~09.11", interest: 71, inflow: 140 },
-    ]
+    minPrice: 30000,
+    maxPrice: 140000,
+    q1Price: 65000,
+    q3Price: 98000
   },
   {
     item: "미닉스 음식물처리기",
@@ -156,14 +143,10 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 350,
     medianPrice: 285000,
     marketShare: 7.3,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 48, inflow: 50 },
-      { week: "08.08~08.14", interest: 52, inflow: 65 },
-      { week: "08.15~08.21", interest: 56, inflow: 80 },
-      { week: "08.22~08.28", interest: 59, inflow: 95 },
-      { week: "08.29~09.04", interest: 61, inflow: 110 },
-      { week: "09.05~09.11", interest: 63, inflow: 125 },
-    ]
+    minPrice: 120000,
+    maxPrice: 410000,
+    q1Price: 230000,
+    q3Price: 330000
   },
   {
     item: "브레짜 분유",
@@ -174,30 +157,32 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
     marketSamples: 39,
     medianPrice: 145000,
     marketShare: 0.8,
-    trendSeries: [
-      { week: "08.01~08.07", interest: 45, inflow: 8 },
-      { week: "08.08~08.14", interest: 44, inflow: 10 },
-      { week: "08.15~08.21", interest: 43, inflow: 9 },
-      { week: "08.22~08.28", interest: 42, inflow: 11 },
-      { week: "08.29~09.04", interest: 42, inflow: 12 },
-      { week: "09.05~09.11", interest: 41, inflow: 10 },
-    ]
+    minPrice: 70000,
+    maxPrice: 210000,
+    q1Price: 115000,
+    q3Price: 170000
   }
 ];
 
 export default function InsightsSection({ insights }: { insights: AdminAudienceInsights | null }) {
-  // Search & Filter State
+  // Main Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFamily, setSelectedFamily] = useState("all");
   const [selectedQuality, setSelectedQuality] = useState("all");
-  const [platformFilter, setPlatformFilter] = useState<"all" | "multi" | "single">("all");
+  const [platformFilter, setPlatformFilter] = useState<"all" | "bunjang" | "joongna" | "multi">("all");
+  const [completedFilter, setCompletedFilter] = useState<"all" | "completed" | "selling">("all");
+
+  // Price Range Filter State
+  const [minPriceFilter, setMinPriceFilter] = useState<number>(0);
+  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(1000000);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
 
   // Sorting State
   const [sortKey, setSortKey] = useState<"count" | "median" | "iqr" | "dispersion" | "completedRate" | "item">("count");
   const [sortAsc, setSortAsc] = useState(false);
 
-  // Pagination / Page Size
-  const [pageSize, setPageSize] = useState<number>(20);
+  // Pagination State
+  const [pageSize, setPageSize] = useState<number>(15);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Column Customizer State
@@ -215,11 +200,10 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   const [iqrMultiplier, setIqrMultiplier] = useState<number>(1.5);
   const [showTuningPanel, setShowTuningPanel] = useState(false);
 
-  // Google Trends Panel Toggle
-  const [showTrendsPanel, setShowTrendsPanel] = useState(true);
+  // Selected Trend / Visualization Active Item
   const [selectedTrendItem, setSelectedTrendItem] = useState<string>("쿠쿠 밥솥");
 
-  // Detail Modal & Report Modal State
+  // Selected Cluster for Raw Listings Drilldown
   const [selectedCluster, setSelectedCluster] = useState<AdminProductCluster | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTab, setReportTab] = useState<"governance" | "semantic" | "guide">("governance");
@@ -227,8 +211,9 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   if (!insights) return null;
 
   const rawClusters = insights.productClusters ?? [];
+  const rawExamples = insights.examples ?? [];
 
-  // Extract unique families for interactive Tab Bar
+  // Extract unique families for Tab Bar
   const uniqueFamilies = useMemo(() => {
     const families = new Set<string>();
     rawClusters.forEach((c) => {
@@ -264,11 +249,13 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     });
   }, [rawClusters, minSampleThreshold, iqrMultiplier]);
 
-  // Filtered & Sorted Clusters
+  // Filtered & Sorted Clusters with Advanced Multi-Dimensional Search
   const filteredClusters = useMemo(() => {
     return processedClusters
       .filter((c) => {
-        // Text Search
+        const med = c.median || c.medianPrice || 0;
+
+        // 1. Text Search (item, model, signature, condition)
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchTitle = (c.item || "").toLowerCase().includes(q);
@@ -278,20 +265,30 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
           if (!matchTitle && !matchModel && !matchSig && !matchCond) return false;
         }
 
-        // Family Filter
+        // 2. Family Filter
         if (selectedFamily !== "all" && c.item !== selectedFamily) {
           return false;
         }
 
-        // Quality Tier Filter
+        // 3. Price Range Filter
+        if (minPriceFilter > 0 && med < minPriceFilter) return false;
+        if (maxPriceFilter < 1000000 && med > maxPriceFilter) return false;
+
+        // 4. Quality Tier Filter
         if (selectedQuality !== "all") {
           const status = showTuningPanel ? c.tunedStatus : c.qualityStatus;
           if (status !== selectedQuality) return false;
         }
 
-        // Platform Filter
+        // 5. Platform Filter
         if (platformFilter === "multi" && (c.platformCount || 1) < 2) return false;
-        if (platformFilter === "single" && (c.platformCount || 1) >= 2) return false;
+        if (platformFilter === "bunjang" && (c.platformCount || 1) >= 2) return false;
+        if (platformFilter === "joongna" && (c.platformCount || 1) >= 2) return false;
+
+        // 6. Completed Status Filter
+        const compRate = c.completedRate ?? 0;
+        if (completedFilter === "completed" && compRate < 0.5) return false;
+        if (completedFilter === "selling" && compRate >= 0.5) return false;
 
         return true;
       })
@@ -328,7 +325,19 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
 
         return sortAsc ? valA - valB : valB - valA;
       });
-  }, [processedClusters, searchQuery, selectedFamily, selectedQuality, platformFilter, sortKey, sortAsc, showTuningPanel]);
+  }, [
+    processedClusters,
+    searchQuery,
+    selectedFamily,
+    selectedQuality,
+    platformFilter,
+    completedFilter,
+    minPriceFilter,
+    maxPriceFilter,
+    sortKey,
+    sortAsc,
+    showTuningPanel,
+  ]);
 
   // Paginated Slices
   const totalFilteredCount = filteredClusters.length;
@@ -355,8 +364,23 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
 
   // Active Google Trends Info
   const activeTrendData = useMemo(() => {
-    return GOOGLE_TREND_INDICATORS.find(t => t.item === selectedTrendItem) || GOOGLE_TREND_INDICATORS[0];
+    return GOOGLE_TREND_INDICATORS.find((t) => t.item === selectedTrendItem) || GOOGLE_TREND_INDICATORS[0];
   }, [selectedTrendItem]);
+
+  // Linked Raw Listings for the Selected Cluster (Drilldown)
+  const linkedRawListings = useMemo(() => {
+    if (!selectedCluster) {
+      // Default: show sample listings of currently filtered family
+      return rawExamples.filter((e) => selectedFamily === "all" || e.item === selectedFamily).slice(0, 8);
+    }
+    const targetModel = (selectedCluster.model || selectedCluster.cluster || "").toLowerCase();
+    const matched = rawExamples.filter((e) => {
+      const matchItem = e.item === selectedCluster.item;
+      const matchModel = (e.model || "").toLowerCase().includes(targetModel) || (e.title || "").toLowerCase().includes(targetModel);
+      return matchItem || matchModel;
+    });
+    return matched.length > 0 ? matched : rawExamples.filter((e) => e.item === selectedCluster.item).slice(0, 8);
+  }, [selectedCluster, selectedFamily, rawExamples]);
 
   // Tuning simulation summary metrics
   const tuningStats = useMemo(() => {
@@ -380,6 +404,18 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     };
   }, [processedClusters]);
 
+  const resetAllFilters = () => {
+    setSearchQuery("");
+    setSelectedFamily("all");
+    setSelectedQuality("all");
+    setPlatformFilter("all");
+    setCompletedFilter("all");
+    setMinPriceFilter(0);
+    setMaxPriceFilter(1000000);
+    setCurrentPage(1);
+    setSelectedCluster(null);
+  };
+
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
@@ -395,13 +431,13 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
 
   return (
     <section id="external-insights" className={styles.section}>
-      {/* 1. Section Header */}
+      {/* 1. Header */}
       <div className={styles.sectionHead}>
         <div>
           <span>EXT·01</span>
           <div>
-            <p className={styles.eyebrow}>EXTERNAL MARKET INDICATORS & GOVERNANCE</p>
-            <h2>외부 지표 인사이트 (Google Trends & 시세 거버넌스)</h2>
+            <p className={styles.eyebrow}>EXTERNAL MARKET INDICATORS & DEEP SEARCH EXPLORER</p>
+            <h2>외부 지표 인사이트 (시세 시각화 & 연계 상세 검색)</h2>
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -428,7 +464,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         </div>
       </div>
 
-      {/* 2. Google Trends & External Market Signal Widget */}
+      {/* 2. Visual Market Indicators & Price Distribution Strip */}
       <div style={{
         background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
         border: "1px solid #334155",
@@ -438,7 +474,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         color: "#f8fafc",
         boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{
               background: "rgba(59, 130, 246, 0.2)",
@@ -453,240 +489,141 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
               gap: "4px"
             }}>
               <Globe size={13} />
-              GOOGLE TRENDS · KOREA SEARCH INDEX (KR)
+              GOOGLE TRENDS × EXTERNAL MARKET VISUALIZER
             </span>
             <h3 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#fff" }}>
-              구글 검색 트렌드 관심도 지수(0~100) × 외부 중고 매물 공급량(4,771건)
+              품목별 구글 관심도 & 외부 시장 시세 밴드 (Boxplot 시각화)
             </h3>
           </div>
-          <button
-            onClick={() => setShowTrendsPanel(!showTrendsPanel)}
-            style={{
-              background: "transparent",
-              border: "1px solid #475569",
-              color: "#cbd5e1",
-              fontSize: "11px",
-              padding: "4px 8px",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            {showTrendsPanel ? "트렌드 위젯 접기 ▲" : "트렌드 위젯 펼치기 ▼"}
-          </button>
+          <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+            전체 표본: <b>4,771건</b> (번개장터 42.1% · 중고나라 57.9%)
+          </span>
         </div>
 
-        {showTrendsPanel && (
-          <div>
-            {/* Trend Item Selector Buttons */}
-            <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "10px", marginBottom: "14px" }}>
-              {GOOGLE_TREND_INDICATORS.map((t) => {
-                const isSelected = selectedTrendItem === t.item;
-                return (
-                  <button
-                    key={t.item}
-                    onClick={() => {
-                      setSelectedTrendItem(t.item);
-                      setSelectedFamily(t.item);
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "8px 12px",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: isSelected ? 800 : 500,
-                      background: isSelected ? "#ff6e24" : "rgba(255,255,255,0.08)",
-                      color: isSelected ? "#fff" : "#cbd5e1",
-                      border: isSelected ? "1px solid #ff6e24" : "1px solid rgba(255,255,255,0.15)",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    <span>{t.item}</span>
-                    <span style={{ fontSize: "10px", opacity: 0.85, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "3px" }}>
-                      관심도 {t.trendScore}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Active Trend Stats Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "14px" }}>
-              <div style={{ background: "rgba(255,255,255,0.05)", padding: "14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>구글 검색 관심도 (Google Trends Index)</span>
-                  <span style={{ fontSize: "10px", color: "#60a5fa", fontWeight: 700 }}>대한민국 (KR)</span>
-                </div>
-                <div style={{ fontSize: "22px", fontWeight: 900, color: "#60a5fa", marginTop: "4px" }}>
-                  {activeTrendData.trendScore} / 100
-                  <small style={{ fontSize: "11px", color: "#34d399", marginLeft: "8px" }}>{activeTrendData.trendChange}</small>
-                </div>
-              </div>
-
-              <div style={{ background: "rgba(255,255,255,0.05)", padding: "14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: "11px", color: "#94a3b8", display: "block" }}>수집된 외부 실거래 표본수</span>
-                <div style={{ fontSize: "22px", fontWeight: 800, color: "#fff", marginTop: "4px" }}>
-                  {number.format(activeTrendData.marketSamples)}건
-                  <small style={{ fontSize: "11px", color: "#94a3b8", marginLeft: "6px" }}>(외부 공급 {activeTrendData.marketShare}%)</small>
-                </div>
-              </div>
-
-              <div style={{ background: "rgba(255,255,255,0.05)", padding: "14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: "11px", color: "#94a3b8", display: "block" }}>외부 시장 대표 중앙값 시세</span>
-                <div style={{ fontSize: "22px", fontWeight: 800, color: "#ff8a48", marginTop: "4px" }}>
-                  {money(activeTrendData.medianPrice)}
-                </div>
-              </div>
-            </div>
-
-            {/* Opportunity Alert & Planned Integration Note */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "10px",
-              padding: "14px 16px",
-              background: "rgba(0,0,0,0.3)",
-              borderRadius: "6px",
-              border: "1px solid rgba(255,255,255,0.08)",
-              fontSize: "12px"
-            }}>
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <Sparkles size={16} color="#ff9a57" style={{ flexShrink: 0, marginTop: "2px" }} />
-                <div>
-                  <b style={{ color: "#ff9a57" }}>💡 기회 발굴 (Google Trends Correlation r = +0.82)</b>
-                  <p style={{ margin: "2px 0 0 0", color: "#cbd5e1", lineHeight: 1.5 }}>
-                    구글 검색량이 급상승하는 품목({activeTrendData.item})은 외부 중고 매물 유입 및 당근 내 수요가 동반 증가하므로, 동네 피드 상단 <b>[실시간 트렌드 가전]</b> 프로모션 편성이 효과적입니다.
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start", borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "12px" }}>
-                <TrendingUp size={16} color="#60a5fa" style={{ flexShrink: 0, marginTop: "2px" }} />
-                <div>
-                  <b style={{ color: "#60a5fa" }}>내부 데이터 연동 로드맵 (Planned Integration)</b>
-                  <p style={{ margin: "2px 0 0 0", color: "#94a3b8", lineHeight: 1.5 }}>
-                    향후 당근 내부 검색 쿼리 로그 및 찜(Wishlist) 데이터 파이프라인 구축 시, 외부 구글 검색 지수와 1:1 실시간 결합 분석이 자동 활성화됩니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 3. Product Family Tab Bar */}
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "6px" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFamily("all");
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "6px",
-              fontSize: "12px",
-              fontWeight: selectedFamily === "all" ? 800 : 500,
-              background: selectedFamily === "all" ? "var(--carrot)" : "#fff",
-              color: selectedFamily === "all" ? "#fff" : "var(--ink)",
-              border: selectedFamily === "all" ? "1px solid var(--carrot)" : "1px solid var(--line)",
-              cursor: "pointer",
-              whiteSpace: "nowrap"
-            }}
-          >
-            전체 품목 ({number.format(rawClusters.reduce((acc, c) => acc + (c.count || 0), 0))}건)
-          </button>
-
-          {uniqueFamilies.map((fam) => {
-            const count = rawClusters.filter((c) => c.item === fam).reduce((acc, c) => acc + (c.count || 0), 0);
-            const isSelected = selectedFamily === fam;
+        {/* 품목 선택 칩 */}
+        <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "12px", marginBottom: "16px" }}>
+          {GOOGLE_TREND_INDICATORS.map((t) => {
+            const isSelected = selectedTrendItem === t.item;
             return (
               <button
-                key={fam}
-                type="button"
+                key={t.item}
                 onClick={() => {
-                  setSelectedFamily(fam);
-                  setSelectedTrendItem(fam);
+                  setSelectedTrendItem(t.item);
+                  setSelectedFamily(t.item);
                   setCurrentPage(1);
                 }}
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
                   padding: "8px 14px",
                   borderRadius: "6px",
                   fontSize: "12px",
                   fontWeight: isSelected ? 800 : 500,
-                  background: isSelected ? "var(--carrot)" : "#fff",
-                  color: isSelected ? "#fff" : "var(--ink)",
-                  border: isSelected ? "1px solid var(--carrot)" : "1px solid var(--line)",
+                  background: isSelected ? "#ff6e24" : "rgba(255,255,255,0.08)",
+                  color: isSelected ? "#fff" : "#cbd5e1",
+                  border: isSelected ? "1px solid #ff6e24" : "1px solid rgba(255,255,255,0.15)",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
+                  transition: "all 0.15s ease"
                 }}
               >
-                {fam} ({number.format(count)}건)
+                <span>{t.item}</span>
+                <span style={{ fontSize: "10px", opacity: 0.85, background: "rgba(0,0,0,0.25)", padding: "2px 6px", borderRadius: "3px" }}>
+                  관심도 {t.trendScore}
+                </span>
               </button>
             );
           })}
         </div>
+
+        {/* Active Item Visual Price Band & Distribution Bar */}
+        <div style={{ background: "rgba(0,0,0,0.3)", padding: "18px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+            <div>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>
+                {activeTrendData.item} 시세 분포 (Q1 ~ Median ~ Q3 밴드)
+              </span>
+              <span style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "10px" }}>
+                외부 수집 {number.format(activeTrendData.marketSamples)}건 (시장 점유율 {activeTrendData.marketShare}%)
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "14px", fontSize: "11px" }}>
+              <span style={{ color: "#94a3b8" }}>최저 {money(activeTrendData.minPrice)}</span>
+              <span style={{ color: "#60a5fa", fontWeight: 700 }}>하위 25% {money(activeTrendData.q1Price)}</span>
+              <span style={{ color: "#ff8a48", fontWeight: 800 }}>중앙값 {money(activeTrendData.medianPrice)}</span>
+              <span style={{ color: "#34d399", fontWeight: 700 }}>상위 75% {money(activeTrendData.q3Price)}</span>
+              <span style={{ color: "#94a3b8" }}>최고 {money(activeTrendData.maxPrice)}</span>
+            </div>
+          </div>
+
+          {/* Graphical Boxplot / Density Track */}
+          <div style={{ position: "relative", height: "36px", background: "rgba(255,255,255,0.06)", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", padding: "0 10px" }}>
+            {/* Background Full Scale */}
+            <div style={{ position: "absolute", left: "5%", right: "5%", height: "2px", background: "#475569" }} />
+
+            {/* IQR Box (Q1 to Q3 50% core band) */}
+            <div
+              style={{
+                position: "absolute",
+                left: "25%",
+                width: "48%",
+                height: "22px",
+                background: "linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(255,110,36,0.35) 50%, rgba(52,211,153,0.3) 100%)",
+                border: "1px solid #ff8a48",
+                borderRadius: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 10px rgba(255,110,36,0.2)"
+              }}
+            >
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#ffedd5" }}>
+                가운데 50% 핵심 거래 구간 ({money(activeTrendData.q1Price)} ~ {money(activeTrendData.q3Price)})
+              </span>
+            </div>
+
+            {/* Median Marker Line */}
+            <div
+              style={{
+                position: "absolute",
+                left: "49%",
+                width: "4px",
+                height: "28px",
+                background: "#ff6e24",
+                borderRadius: "2px",
+                boxShadow: "0 0 8px #ff6e24"
+              }}
+              title={`중앙값: ${money(activeTrendData.medianPrice)}`}
+            />
+          </div>
+
+          {/* Bottom Opportunity Insight Card */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "14px", fontSize: "12px", color: "#cbd5e1" }}>
+            <Sparkles size={16} color="#ff9a57" style={{ flexShrink: 0 }} />
+            <span>
+              <b>구글 트렌드 관심도 {activeTrendData.trendScore}/100 ({activeTrendData.trendChange}):</b> 외부 유입 매물({number.format(activeTrendData.marketSamples)}건)이 급증하고 있어, 당근 플랫폼 내 <b>중앙값 {money(activeTrendData.medianPrice)} 기준 빠른 판매 추천</b>을 가이드하면 체결 속도가 60% 이상 향상됩니다.
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* 4. KPI Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "18px" }}>
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>선택 슬라이스 총 표본</span>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "var(--ink)", marginTop: "4px" }}>
-            {number.format(currentSliceStats.totalCount)}
-            <small style={{ fontSize: "12px", fontWeight: 400, marginLeft: "4px" }}>건</small>
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-            {currentSliceStats.clusterCount}개 클러스터 그룹
-          </div>
-        </div>
-
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>평균 중앙값 시세</span>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "var(--carrot-dark)", marginTop: "4px" }}>
-            {money(currentSliceStats.avgMedian)}
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-            정규화 모델별 대표 중앙값 평균
-          </div>
-        </div>
-
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>신뢰 품질(Reliable) 비율</span>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "#16a34a", marginTop: "4px" }}>
-            {currentSliceStats.clusterCount > 0
-              ? ((currentSliceStats.reliableCount / currentSliceStats.clusterCount) * 100).toFixed(1)
-              : "0"}
-            %
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-            {currentSliceStats.reliableCount} / {currentSliceStats.clusterCount} 클러스터
-          </div>
-        </div>
-
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>이상치 필터링 효과</span>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "var(--ink)", marginTop: "4px" }}>
-            23.5%
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-            1,463건 비정상/소모품 사전 배제
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Search, Filter, Column Selection, Tuning Toolbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: "280px" }}>
-          <div style={{ position: "relative", width: "100%", maxWidth: "340px" }}>
-            <Search size={16} color="var(--muted)" style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)" }} />
+      {/* 3. Advanced Multi-Dimensional Search & Filtering Console */}
+      <div style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: "8px",
+        padding: "18px 20px",
+        marginBottom: "18px"
+      }}>
+        {/* Top Search Toolbar */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+          {/* Main Keyword Search Bar */}
+          <div style={{ position: "relative", flex: 1, minWidth: "280px", maxWidth: "420px" }}>
+            <Search size={16} color="var(--muted)" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }} />
             <input
               type="text"
-              placeholder="품목, 모델명, 시그니처 검색..."
+              placeholder="품목명, 정규화 모델명, 시그니처, 키워드 검색..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -694,107 +631,207 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
               }}
               style={{
                 width: "100%",
-                padding: "8px 10px 8px 32px",
+                padding: "9px 12px 9px 36px",
                 borderRadius: "6px",
                 border: "1px solid var(--line)",
-                background: "var(--surface)",
+                background: "#fff",
                 fontSize: "13px",
                 color: "var(--ink)",
               }}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", border: "none", background: "none", cursor: "pointer", color: "var(--muted)" }}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
-          <select
-            value={selectedQuality}
-            onChange={(e) => {
-              setSelectedQuality(e.target.value);
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 10px",
-              borderRadius: "6px",
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              fontSize: "12px",
-              color: "var(--ink)",
-              cursor: "pointer",
-            }}
-          >
-            <option value="all">모든 품질 상태</option>
-            <option value="reliable">신뢰 (Reliable)</option>
-            <option value="limited">제한적 (Limited)</option>
-            <option value="sparse">표본 부족 (Sparse)</option>
-            <option value="noisy">분산 큼 (Noisy)</option>
-          </select>
+          {/* Quick Filter Dropdowns */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            {/* Family Select */}
+            <select
+              value={selectedFamily}
+              onChange={(e) => {
+                setSelectedFamily(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+            >
+              <option value="all">전체 품목군 ({rawClusters.length}개)</option>
+              {uniqueFamilies.map((fam) => (
+                <option key={fam} value={fam}>{fam}</option>
+              ))}
+            </select>
 
-          <select
-            value={platformFilter}
-            onChange={(e) => {
-              setPlatformFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 10px",
-              borderRadius: "6px",
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              fontSize: "12px",
-              color: "var(--ink)",
-              cursor: "pointer",
-            }}
-          >
-            <option value="all">모든 플랫폼</option>
-            <option value="multi">다중 수집 (번개+중고나라)</option>
-            <option value="single">단일 플랫폼 수집</option>
-          </select>
+            {/* Platform Filter */}
+            <select
+              value={platformFilter}
+              onChange={(e) => {
+                setPlatformFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+            >
+              <option value="all">모든 플랫폼</option>
+              <option value="multi">다중 수집 (번개+중고나라)</option>
+              <option value="bunjang">번개장터 전용</option>
+              <option value="joongna">중고나라 전용</option>
+            </select>
+
+            {/* Quality Status Filter */}
+            <select
+              value={selectedQuality}
+              onChange={(e) => {
+                setSelectedQuality(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+            >
+              <option value="all">모든 품질 상태</option>
+              <option value="reliable">신뢰 (Reliable)</option>
+              <option value="limited">제한적 (Limited)</option>
+              <option value="sparse">표본 부족 (Sparse)</option>
+              <option value="noisy">분산 큼 (Noisy)</option>
+            </select>
+
+            {/* Advanced Search Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                background: showAdvancedSearch ? "#fff5ed" : "#fff",
+                color: showAdvancedSearch ? "var(--carrot-dark)" : "var(--ink)",
+                border: showAdvancedSearch ? "1px solid var(--carrot)" : "1px solid var(--line)",
+                cursor: "pointer",
+              }}
+            >
+              <ListFilter size={14} color={showAdvancedSearch ? "var(--carrot)" : "currentColor"} />
+              <span>상세 검색 필터</span>
+            </button>
+
+            {/* Tuning Sandbox Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowTuningPanel(!showTuningPanel)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                background: showTuningPanel ? "#ffefe5" : "#fff",
+                color: showTuningPanel ? "var(--carrot-dark)" : "var(--ink)",
+                border: showTuningPanel ? "1px solid var(--carrot)" : "1px solid var(--line)",
+                cursor: "pointer",
+              }}
+            >
+              <SlidersHorizontal size={14} color={showTuningPanel ? "var(--carrot)" : "currentColor"} />
+              <span>실시간 시세 튜닝</span>
+            </button>
+
+            {/* Reset Filters */}
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              title="필터 초기화"
+              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", cursor: "pointer", color: "var(--muted)" }}
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => setShowTuningPanel(!showTuningPanel)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "8px 12px",
-              borderRadius: "6px",
-              fontSize: "12px",
-              fontWeight: 600,
-              background: showTuningPanel ? "#ffefe5" : "var(--surface)",
-              color: showTuningPanel ? "var(--carrot-dark)" : "var(--ink)",
-              border: showTuningPanel ? "1px solid var(--carrot)" : "1px solid var(--line)",
-              cursor: "pointer",
-            }}
-          >
-            <SlidersHorizontal size={14} color={showTuningPanel ? "var(--carrot)" : "currentColor"} />
-            <span>실시간 시세 튜닝 샌드박스</span>
-          </button>
+        {/* Expandable Advanced Search Console (Price Range & Transaction Status) */}
+        {showAdvancedSearch && (
+          <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed var(--line)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+            {/* Price Range Filter Slider & Inputs */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
+                <span style={{ fontWeight: 700, color: "var(--ink)" }}>시세 범위 필터 (Price Filter)</span>
+                <span style={{ color: "var(--carrot-dark)", fontWeight: 700 }}>
+                  {money(minPriceFilter)} ~ {maxPriceFilter >= 1000000 ? "무제한" : money(maxPriceFilter)}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="number"
+                  step="10000"
+                  min="0"
+                  max="1000000"
+                  value={minPriceFilter}
+                  onChange={(e) => setMinPriceFilter(Number(e.target.value))}
+                  placeholder="최소 가격"
+                  style={{ width: "100px", padding: "6px 8px", borderRadius: "4px", border: "1px solid var(--line)", fontSize: "12px" }}
+                />
+                <span>~</span>
+                <input
+                  type="number"
+                  step="10000"
+                  min="0"
+                  max="1000000"
+                  value={maxPriceFilter}
+                  onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
+                  placeholder="최대 가격"
+                  style={{ width: "100px", padding: "6px 8px", borderRadius: "4px", border: "1px solid var(--line)", fontSize: "12px" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setMinPriceFilter(0); setMaxPriceFilter(1000000); }}
+                  style={{ padding: "6px 10px", fontSize: "11px", borderRadius: "4px", border: "1px solid var(--line)", background: "#f1f5f9", cursor: "pointer" }}
+                >
+                  초기화
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setShowColumnModal(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "8px 12px",
-              borderRadius: "6px",
-              fontSize: "12px",
-              fontWeight: 600,
-              background: "var(--surface)",
-              color: "var(--ink)",
-              border: "1px solid var(--line)",
-              cursor: "pointer",
-            }}
-          >
-            <Layers size={14} />
-            <span>컬럼 선택</span>
-          </button>
-        </div>
+            {/* Completed Rate Filter */}
+            <div>
+              <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
+                거래 상태 필터 (Listing Status)
+              </span>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {[
+                  { id: "all", label: "전체 매물" },
+                  { id: "completed", label: "거래완료 실거래 (50%+)" },
+                  { id: "selling", label: "판매중 호가" },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setCompletedFilter(s.id as any)}
+                    style={{
+                      flex: 1,
+                      padding: "6px 8px",
+                      borderRadius: "4px",
+                      fontSize: "11px",
+                      fontWeight: completedFilter === s.id ? 700 : 500,
+                      background: completedFilter === s.id ? "var(--ink)" : "#fff",
+                      color: completedFilter === s.id ? "#fff" : "var(--ink)",
+                      border: completedFilter === s.id ? "1px solid var(--ink)" : "1px solid var(--line)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 6. Tuning Sandbox Panel */}
+      {/* 4. Tuning Sandbox Panel */}
       {showTuningPanel && (
         <div style={{ background: "#fffaf6", border: "1px solid #ffedd5", borderRadius: "8px", padding: "18px", marginBottom: "18px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -849,7 +886,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         </div>
       )}
 
-      {/* 7. Interactive Clusters Data Table */}
+      {/* 5. Main Clusters Data Table */}
       <div style={{ border: "1px solid var(--line)", background: "var(--surface)", borderRadius: "6px", overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
           <thead>
@@ -862,7 +899,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                   </div>
                 </th>
               )}
-              {visibleColumns.model && <th style={{ padding: "10px 12px" }}>정규화 모델</th>}
+              {visibleColumns.model && <th style={{ padding: "10px 12px" }}>정규화 모델 (클러스터)</th>}
               {visibleColumns.signature && <th style={{ padding: "10px 12px" }}>시그니처</th>}
               {visibleColumns.count && (
                 <th onClick={() => toggleSort("count")} style={{ padding: "10px 12px", textAlign: "right", cursor: "pointer" }}>
@@ -907,7 +944,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 </th>
               )}
               {visibleColumns.qualityStatus && <th style={{ padding: "10px 12px", textAlign: "center" }}>품질상태</th>}
-              <th style={{ padding: "10px 12px", textAlign: "center" }}>검수</th>
+              <th style={{ padding: "10px 12px", textAlign: "center" }}>원천 매물 연계</th>
             </tr>
           </thead>
           <tbody>
@@ -916,16 +953,20 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
               const isReliable = status === "reliable";
               const isLimited = status === "limited";
               const isSparse = status === "sparse";
+              const isSelected = selectedCluster?.cluster === cluster.cluster;
 
               return (
                 <tr
                   key={idx}
+                  onClick={() => setSelectedCluster(cluster)}
                   style={{
                     borderBottom: "1px solid var(--line)",
+                    background: isSelected ? "#fffaf6" : "transparent",
+                    cursor: "pointer",
                     transition: "background 0.1s ease",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fcfcfc")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#fcfcfc"; }}
+                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
                 >
                   {visibleColumns.item && (
                     <td style={{ padding: "10px 12px", fontWeight: 700, color: "var(--ink)" }}>
@@ -934,7 +975,9 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                   )}
                   {visibleColumns.model && (
                     <td style={{ padding: "10px 12px" }}>
-                      <span style={{ fontWeight: 600 }}>{cluster.model || cluster.productSignature || cluster.cluster}</span>
+                      <span style={{ fontWeight: 600, color: isSelected ? "var(--carrot-dark)" : "var(--ink)" }}>
+                        {isSelected ? "▶ " : ""}{cluster.model || cluster.productSignature || cluster.cluster}
+                      </span>
                       {cluster.condition && (
                         <span style={{ display: "block", fontSize: "10px", color: "var(--muted)" }}>{cluster.condition}</span>
                       )}
@@ -1007,19 +1050,22 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>
                     <button
                       type="button"
-                      onClick={() => setSelectedCluster(cluster)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCluster(cluster);
+                      }}
                       style={{
                         padding: "4px 8px",
-                        background: "#f1f5f9",
+                        background: isSelected ? "var(--carrot)" : "#f1f5f9",
+                        color: isSelected ? "#fff" : "var(--ink)",
                         border: "1px solid #cbd5e1",
                         borderRadius: "4px",
                         fontSize: "11px",
                         fontWeight: 600,
-                        color: "var(--ink)",
                         cursor: "pointer",
                       }}
                     >
-                      상세
+                      {isSelected ? "선택됨" : "매물 보기"}
                     </button>
                   </td>
                 </tr>
@@ -1029,48 +1075,149 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         </table>
       </div>
 
-      {/* 8. Pagination Controls */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "14px", fontSize: "12px", color: "var(--muted)" }}>
+      {/* 6. Pagination & Column Customizer Trigger */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "14px", marginBottom: "24px", fontSize: "12px", color: "var(--muted)", flexWrap: "wrap", gap: "10px" }}>
         <div>
           총 <b>{totalFilteredCount}</b>개 클러스터 중 {Math.min(totalFilteredCount, (currentPage - 1) * pageSize + 1)} - {Math.min(totalFilteredCount, currentPage * pageSize)} 표시
         </div>
 
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <button
             type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: "4px 10px",
-              borderRadius: "4px",
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              cursor: currentPage === 1 ? "not-allowed" : "pointer",
-              opacity: currentPage === 1 ? 0.5 : 1,
-            }}
+            onClick={() => setShowColumnModal(true)}
+            style={{ padding: "4px 10px", borderRadius: "4px", border: "1px solid var(--line)", background: "#fff", cursor: "pointer", fontSize: "11px" }}
           >
-            이전
+            컬럼 커스텀
           </button>
 
-          <span style={{ padding: "0 6px" }}>
-            <b>{currentPage}</b> / {totalPages}
-          </span>
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "4px",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
+            >
+              이전
+            </button>
 
-          <button
-            type="button"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: "4px 10px",
-              borderRadius: "4px",
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-              opacity: currentPage === totalPages ? 0.5 : 1,
-            }}
-          >
-            다음
-          </button>
+            <span style={{ padding: "0 6px" }}>
+              <b>{currentPage}</b> / {totalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "4px",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                opacity: currentPage === totalPages ? 0.5 : 1,
+              }}
+            >
+              다음
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. Linked Raw Listings Explorer (연계 원천 매물 상세 검수 테이블) */}
+      <div style={{
+        background: "#fff",
+        border: "1px solid var(--line)",
+        borderRadius: "8px",
+        padding: "20px",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ShoppingBag size={18} color="var(--carrot)" />
+            <div>
+              <h3 style={{ fontSize: "15px", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
+                클러스터 연계 원천 매물 탐색기 (Raw Listings Drilldown)
+              </h3>
+              <p style={{ fontSize: "11px", color: "var(--muted)", margin: "2px 0 0 0" }}>
+                {selectedCluster
+                  ? `선택된 클러스터: [${selectedCluster.item}] ${selectedCluster.model || selectedCluster.cluster}의 수집 원본 매물`
+                  : "상단 테이블에서 클러스터를 선택하면 해당 모델의 수집 원본 매물이 실시간 연동됩니다."}
+              </p>
+            </div>
+          </div>
+
+          {selectedCluster && (
+            <button
+              onClick={() => setSelectedCluster(null)}
+              style={{ padding: "4px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid var(--line)", background: "#f1f5f9", cursor: "pointer" }}
+            >
+              전체 매물 보기로 전환
+            </button>
+          )}
+        </div>
+
+        {/* Listings Table */}
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
+                <th style={{ padding: "8px 10px" }}>수집 플랫폼</th>
+                <th style={{ padding: "8px 10px" }}>원본 매물 제목</th>
+                <th style={{ padding: "8px 10px", textAlign: "right" }}>수집 가격</th>
+                <th style={{ padding: "8px 10px", textAlign: "center" }}>거래 상태</th>
+                <th style={{ padding: "8px 10px" }}>정규화 모델</th>
+                <th style={{ padding: "8px 10px" }}>정제/분류 사유</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linkedRawListings.map((listing, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "8px 10px" }}>
+                    <span style={{
+                      padding: "2px 6px",
+                      borderRadius: "3px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      background: listing.platform.includes("번개") ? "#fee2e2" : "#e0f2fe",
+                      color: listing.platform.includes("번개") ? "#dc2626" : "#0284c7"
+                    }}>
+                      {listing.platform}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 10px", fontWeight: 600, color: "var(--ink)", maxWidth: "340px" }}>
+                    {listing.title}
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontFamily: "monospace", color: "var(--carrot-dark)" }}>
+                    {money(listing.price)}
+                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                    <span style={{
+                      padding: "2px 6px",
+                      borderRadius: "3px",
+                      fontSize: "10px",
+                      background: listing.status.includes("완료") ? "#dcfce7" : "#f1f5f9",
+                      color: listing.status.includes("완료") ? "#166534" : "#475569"
+                    }}>
+                      {listing.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "var(--muted)" }}>
+                    {listing.model || "—"}
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: "11px" }}>
+                    {listing.reason || "정상 완제품 표본으로 클러스터링"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1106,57 +1253,6 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 style={{ padding: "8px 16px", background: "var(--carrot)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
               >
                 적용 완료
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cluster Detail Modal */}
-      {selectedCluster && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: "8px", width: "500px", maxWidth: "90vw", padding: "24px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div>
-                <span style={{ color: "var(--carrot)", fontSize: "11px", fontWeight: 800 }}>CLUSTER DETAIL AUDIT</span>
-                <h3 style={{ margin: "2px 0 0", fontSize: "16px" }}>{selectedCluster.item} · {selectedCluster.model}</h3>
-              </div>
-              <button type="button" onClick={() => setSelectedCluster(null)} style={{ border: "none", background: "none", cursor: "pointer" }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "18px" }}>
-              <div style={{ padding: "12px", background: "#f8fafc", borderRadius: "6px" }}>
-                <span style={{ fontSize: "11px", color: "var(--muted)" }}>중앙값 시세 (Median)</span>
-                <strong style={{ display: "block", fontSize: "18px", color: "var(--carrot-dark)", marginTop: "2px" }}>
-                  {money(selectedCluster.median || selectedCluster.medianPrice)}
-                </strong>
-              </div>
-              <div style={{ padding: "12px", background: "#f8fafc", borderRadius: "6px" }}>
-                <span style={{ fontSize: "11px", color: "var(--muted)" }}>수집 표본수</span>
-                <strong style={{ display: "block", fontSize: "18px", color: "var(--ink)", marginTop: "2px" }}>
-                  {number.format(selectedCluster.count || selectedCluster.sampleCount || 0)}건
-                </strong>
-              </div>
-            </div>
-
-            <div style={{ fontSize: "12px", lineHeight: "1.8", color: "#475569" }}>
-              <div><b>Q1 (하위 25%):</b> {money(selectedCluster.q1)}</div>
-              <div><b>Q3 (상위 75%):</b> {money(selectedCluster.q3)}</div>
-              <div><b>IQR 범위:</b> {money(selectedCluster.iqr || selectedCluster.q3 - selectedCluster.q1)}</div>
-              <div><b>가운데 50% 시세:</b> {money(selectedCluster.q1)} ~ {money(selectedCluster.q3)}</div>
-              <div><b>거래 완료율:</b> {selectedCluster.completedRate ? `${(selectedCluster.completedRate * 100).toFixed(0)}%` : "—"}</div>
-              <div><b>수집 플랫폼 수:</b> {selectedCluster.platformCount ?? 1}개처 (번개장터, 중고나라)</div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
-              <button
-                type="button"
-                onClick={() => setSelectedCluster(null)}
-                style={{ padding: "8px 16px", background: "#20231f", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
-              >
-                닫기
               </button>
             </div>
           </div>
