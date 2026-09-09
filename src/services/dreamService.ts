@@ -1,3 +1,5 @@
+import { authorizedFetch } from "@/services/tradeService";
+
 export interface DreamFacility {
   id: string;
   name: string;
@@ -71,4 +73,17 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
       checklist: item.checklist,
     };
   });
+}
+
+// 꿈방울(기부 가능 포인트) 잔액 — 결제할 때마다 자동 적립되는 값(일반결제 1%, 중고거래
+// 0.1%·5,000원 이상만)이라 여기선 조회만 한다. 나의 당근 화면의 "포인트" 배지에 씀.
+export async function getDreamPointsBalance(signal?: AbortSignal): Promise<number> {
+  const response = await authorizedFetch("/api/v1/dream/points", {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("포인트를 불러오지 못했습니다.");
+
+  const payload: { balance: number } = await response.json();
+  return payload.balance;
 }

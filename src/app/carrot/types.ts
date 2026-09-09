@@ -54,6 +54,9 @@ export type SubPage =
   | { type: "chat-room-list"; productId: string; productTitle: string }
   | { type: "payment-amount"; chatRoomId: string }
   | { type: "payment-detail"; chatRoomId: string; transactionId: string }
+  | { type: "wallet-charge" }
+  // storeId가 있으면(QR URL로 바로 진입한 경우) 카메라 스캔 없이 곧장 금액 입력으로 간다.
+  | { type: "wallet-pay"; storeId?: number }
   | { type: "my-menu" }
   | { type: "all-services" }
   | { type: "merge-game" }
