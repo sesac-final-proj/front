@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Search, Database, TrendingUp, Download, ChartColumn, HeartHandshake, Bell, Settings, PanelsTopLeft, X } from "lucide-react";
+import { Activity, Search, Database, TrendingUp, Download, ChartColumn, HeartHandshake, Bell, Settings, PanelsTopLeft, X, Headphones } from "lucide-react";
 import styles from "./portal.module.css";
 
 const groups = [
   { label: "거래 운영", items: [["/admin", "거래 대시보드", Activity], ["/admin/trades", "거래 데이터 탐색", Search], ["/admin/quality", "수집 품질", Database]] },
   { label: "타 플랫폼과 비교", items: [["/admin/insights", "비교 인사이트", TrendingUp], ["/admin/sources", "수집원 관리", Download], ["/admin/price-model", "가격 모델", ChartColumn]] },
-  { label: "서비스 운영", items: [["/admin/donations", "꿈가지 분석", HeartHandshake]] },
+  { label: "서비스 운영", items: [["/admin/donations", "꿈가지 분석", HeartHandshake], ["/admin/support", "고객 문의", Headphones]] },
   { label: "시스템", items: [["/admin/notices", "공지·기부", Bell], ["/admin/system", "구현 현황", PanelsTopLeft], ["/admin/settings", "환경설정", Settings]] },
 ] as const;
 

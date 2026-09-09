@@ -2,6 +2,7 @@ export * from "./MenuCard";
 export * from "./MyScreen";
 export * from "./MyMenuScreen";
 export * from "./SettingsScreen";
+export * from "./CustomerSupportScreen";
 export * from "./ManagementScreen";
 export * from "./FavoriteScreen";
 export * from "./DreamFacilityCallout";

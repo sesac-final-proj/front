@@ -37,6 +37,7 @@ import {
   MyScreen,
   MyMenuScreen,
   SettingsScreen,
+  CustomerSupportScreen,
   ManagementScreen,
   FavoriteScreen,
   DreamDashboardScreen,
@@ -1691,7 +1692,10 @@ export default function GajiMarketApp() {
               onLocationToggle={() => setLocationAllowed((value) => !value)}
               onLogout={handleLogout}
               onWithdraw={handleWithdraw}
+              onOpenSupport={() => setSubPage({ type: "customer-support" })}
             />
+          ) : subPage?.type === "customer-support" ? (
+            <CustomerSupportScreen onBack={() => setSubPage({ type: "settings" })} />
           ) : subPage?.type === "sales" ? (
             <ManagementScreen
               title="판매관리"
