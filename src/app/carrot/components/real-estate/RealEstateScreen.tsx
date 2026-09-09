@@ -29,8 +29,8 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
   const [selectedDistrict, setSelectedDistrict] = useState(() => districtFromNeighborhood(activeNeighborhood));
   const [searchDraft, setSearchDraft] = useState("");
   const [query, setQuery] = useState("");
-  const [houseType, setHouseType] = useState<HouseTypeFilter>("all");
-  const [rentType, setRentType] = useState<RentTypeFilter>("monthly");
+  const [houseType, setHouseType] = useState<HouseTypeFilter>("apartment");
+  const [rentType, setRentType] = useState<RentTypeFilter>("all");
   const [depositMax, setDepositMax] = useState<number | undefined>();
   const [monthlyRentMax, setMonthlyRentMax] = useState<number | undefined>();
   const [usePyeong, setUsePyeong] = useState(false);
@@ -56,7 +56,6 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
           houseType,
           depositMax,
           monthlyRentMax,
-          year: new Date().getFullYear(),
           bounds: view === "map" && !outsideSeoul ? mapBounds : null,
         },
         controller.signal,
@@ -91,13 +90,31 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
     if (!isOutside) setMapBounds(bounds);
   }, []);
 
+  useEffect(() => {
+    if (activeNeighborhood) {
+      setSelectedDistrict(districtFromNeighborhood(activeNeighborhood));
+    }
+  }, [activeNeighborhood]);
+
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = searchDraft.trim().replace(/^서울특별시\s*/, "");
-    const district = SEOUL_DISTRICTS.find((item) => value.includes(item));
-    if (district) {
-      setSelectedDistrict(district);
+    if (!value) {
       setQuery("");
+      return;
+    }
+    const explicitDistrict = SEOUL_DISTRICTS.find((item) => value.includes(item));
+    if (explicitDistrict) {
+      setSelectedDistrict(explicitDistrict);
+      setQuery("");
+      setMapBounds(null);
+      setSelectedBuildingId(null);
+      return;
+    }
+    const mapped = districtFromNeighborhood(value);
+    if (mapped) {
+      setSelectedDistrict(mapped);
+      setQuery(value);
       setMapBounds(null);
       setSelectedBuildingId(null);
       return;
@@ -200,6 +217,39 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
       <datalist id="real-estate-districts">
         {SEOUL_DISTRICTS.map((district) => <option key={district} value={district} />)}
       </datalist>
+
+      <div style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "0 16px 12px", scrollbarWidth: "none" }}>
+        {SEOUL_DISTRICTS.map((dist) => {
+          const isSelected = selectedDistrict === dist;
+          return (
+            <button
+              key={dist}
+              type="button"
+              style={{
+                padding: "6px 13px",
+                borderRadius: "20px",
+                fontSize: "13px",
+                fontWeight: isSelected ? 700 : 500,
+                backgroundColor: isSelected ? "#ff6f0f" : "#f1f3f5",
+                color: isSelected ? "#ffffff" : "#495057",
+                border: isSelected ? "1px solid #ff6f0f" : "1px solid transparent",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                transition: "all 0.15s ease",
+              }}
+              onClick={() => {
+                setSelectedDistrict(dist);
+                setQuery("");
+                setMapBounds(null);
+                setSelectedBuildingId(null);
+              }}
+            >
+              {dist}
+            </button>
+          );
+        })}
+      </div>
 
       <div className={styles.realEstateTypeGrid}>
         {REAL_ESTATE_PROPERTY_TYPES.map((type) => {

@@ -132,16 +132,28 @@ export function DreamDashboardScreen({
                 onClick={() => selectFacility(isSelected ? null : facility)}
               >
                 <div>
-                  <strong>{facility.name}</strong>
+                  <strong>
+                    {facility.name}
+                    {facility.isRepresentative && (
+                      <span className={styles.dreamTrustBadge}>신뢰 {facility.districtRank}순위</span>
+                    )}
+                  </strong>
                   <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
                 </div>
-                <em>{progress}%</em>
+                <em>{facility.totalScore !== null ? `${facility.totalScore}점` : `${progress}%`}</em>
                 <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
                   <span style={{ width: `${Math.min(progress, 100)}%` }} />
                 </div>
               </button>
               {isSelected && (
                 <div className={styles.dreamFacilityExpandedDetails}>
+                  {facility.checklist && (
+                    <div className={styles.dreamTrustChecklist} aria-label={`${facility.name} 신뢰 판단 근거`}>
+                      {Object.values(facility.checklist).slice(0, 4).map((label) => (
+                        <span key={label}>{label}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className={styles.dreamFacilityDetailMeta}>
                     {facility.address && <p><strong>주소:</strong> {facility.address}</p>}
                     {facility.phone && <p><strong>전화:</strong> {facility.phone}</p>}

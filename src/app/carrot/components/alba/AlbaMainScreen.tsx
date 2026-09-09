@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { AlbaItem } from "@/types";
-import { StateBlock } from "../common";
+import { IconButton, ScreenHeader, StateBlock } from "../common";
 import { AlbaCardComponent } from "./AlbaCardComponent";
 
 export interface AlbaMainScreenProps {
@@ -75,33 +75,44 @@ export function AlbaMainScreen({
   return (
     <section className={styles.albaScreen}>
       <div className={styles.albaScrollContent}>
-        <header className={styles.albaHeader}>
-        <button type="button" onClick={onBack} aria-label="닫기" className={styles.iconButton}>
-          <X size={26} />
-        </button>
-        <h1>당근알바</h1>
-        <div className={styles.albaHeaderActions}>
-          <button type="button" onClick={() => setCurrentTab("search")} className={styles.iconButton} aria-label="알바 검색">
-            <Search size={24} />
-          </button>
-          <button type="button" className={styles.iconButton} aria-label="메뉴">
-            <Menu size={26} />
-          </button>
+        <div className={styles.albaHeader}>
+          <ScreenHeader
+            compact
+            title="당근알바"
+            leading={
+              <IconButton label="당근알바 닫기" onClick={onBack}>
+                <X size={27} />
+              </IconButton>
+            }
+            actions={
+              <>
+                <IconButton label="알바 검색" onClick={() => setCurrentTab("search")}>
+                  <Search size={27} />
+                </IconButton>
+                <IconButton label="구인글 관리" onClick={() => setCurrentTab("manage")}>
+                  <Menu size={29} />
+                </IconButton>
+              </>
+            }
+          />
         </div>
-        </header>
 
       {currentTab === "home" && (
         <>
           <section className={styles.albaTopSection}>
+            <div className={styles.albaSectionIntro}>
+              <h2>{localName}에서 일해요</h2>
+              <p>가까운 이웃과 연결되는 동네 일자리를 만나보세요.</p>
+            </div>
             <button
               type="button"
               className={styles.albaPopularCard}
               onClick={() => setSelectedCategory(null)}
             >
               <span className={styles.albaPopularCardCopy}>
-                <span>우리동네</span>
+                <span>{localName} 맞춤 공고</span>
                 <strong>
-                  지금 많이 보는 공고
+                  지금 많이 보는 알바
                   <ChevronRight size={16} />
                 </strong>
                 <span className={styles.albaPopularDescription}>{localName} 근처에서 빠르게 지원할 수 있는 알바를 모았어요.</span>
@@ -143,7 +154,7 @@ export function AlbaMainScreen({
               <h2>
                 {selectedCategory ? selectedCategory : `${localName} 인기 알바`}
               </h2>
-              <small>{filteredAlbas.length}개 공고</small>
+              <small>총 {filteredAlbas.length}개</small>
             </div>
 
             {filteredAlbas.length === 0 ? (
@@ -262,6 +273,7 @@ export function AlbaMainScreen({
           type="button"
           className={`${styles.albaNavBtn} ${currentTab === "home" ? styles.albaNavBtnActive : ""}`}
           onClick={() => setCurrentTab("home")}
+          aria-current={currentTab === "home" ? "page" : undefined}
         >
           <Home size={22} />
           <span>알바 홈</span>
@@ -270,6 +282,7 @@ export function AlbaMainScreen({
           type="button"
           className={`${styles.albaNavBtn} ${currentTab === "search" ? styles.albaNavBtnActive : ""}`}
           onClick={() => setCurrentTab("search")}
+          aria-current={currentTab === "search" ? "page" : undefined}
         >
           <Search size={22} />
           <span>알바 검색</span>
@@ -278,6 +291,7 @@ export function AlbaMainScreen({
           type="button"
           className={`${styles.albaNavBtn} ${currentTab === "applications" ? styles.albaNavBtnActive : ""}`}
           onClick={() => setCurrentTab("applications")}
+          aria-current={currentTab === "applications" ? "page" : undefined}
         >
           <BriefcaseBusiness size={22} />
           <span>지원 내역</span>
@@ -286,6 +300,7 @@ export function AlbaMainScreen({
           type="button"
           className={`${styles.albaNavBtn} ${currentTab === "manage" ? styles.albaNavBtnActive : ""}`}
           onClick={() => setCurrentTab("manage")}
+          aria-current={currentTab === "manage" ? "page" : undefined}
         >
           <FileText size={22} />
           <span>구인글 관리</span>

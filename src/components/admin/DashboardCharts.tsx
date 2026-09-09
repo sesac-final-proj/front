@@ -1,0 +1,16 @@
+"use client";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { DashboardOverview } from "@/lib/admin/dashboard-api";
+import { EmptyState } from "./AdminUI";
+import styles from "./portal.module.css";
+export function CollectionTrendChart({ data }: { data: DashboardOverview["collection_trend"] }) {
+  if (!data.some(row => row.transaction_count)) return <EmptyState message="최근 14일 동안 수집된 거래가 없습니다." />;
+  return <div className={styles.chart} role="img" aria-label={data.map(row => `${row.date}: ${row.transaction_count}건`).join(", ")}><ResponsiveContainer width="100%" height="100%"><BarChart data={data} margin={{ top: 10, right: 4, left: -22, bottom: 0 }} accessibilityLayer><CartesianGrid vertical={false} stroke="#F0F1ED" /><XAxis dataKey="date" tickFormatter={value => String(value).slice(5).replace("-", ".")} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8b9184" }} minTickGap={12} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8b9184" }} /><Tooltip labelFormatter={label => String(label)} cursor={{ fill: "#F7F7F5" }} /><Bar name="수집 거래" dataKey="transaction_count" fill="#FF9D5B" radius={[4,4,0,0]} maxBarSize={24} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
+}
+export function TradeStatusCard({ data }: { data: DashboardOverview["trade_status"] }) {
+ return <article className={styles.card}><div className={styles.cardHead}><div><h2>거래 상태</h2><p>누적 수집 거래의 현재 상태</p></div></div><HorizontalBars data={data.map(row => ({ name: row.status, count: row.transaction_count }))} /></article>;
+}
+export function HorizontalBars({ data }: { data: { name: string; count: number }[] }) {
+ if (!data.length) return <EmptyState message="표시할 데이터가 없습니다." />;
+ return <div className={styles.chart} role="img" aria-label={data.map(row => `${row.name}: ${row.count}건`).join(", ")}><ResponsiveContainer width="100%" height="100%"><BarChart layout="vertical" data={data} margin={{ right: 20, left: 0 }} accessibilityLayer><CartesianGrid horizontal={false} stroke="#F0F1ED" /><XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8b9184" }} /><YAxis type="category" dataKey="name" width={108} tick={{ fontSize: 11, fill: "#656b60" }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: "#F7F7F5" }} /><Bar name="거래 수" dataKey="count" fill="#ADB9A1" radius={[0,4,4,0]} maxBarSize={18} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
+}

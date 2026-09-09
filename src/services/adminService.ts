@@ -19,8 +19,19 @@ export interface AdminDataStatus {
   priced_transactions: number;
   region_count: number;
   latest_collected_at: string | null;
+  average_price: number | null;
+  unmatched_region_transactions: number;
+  status_counts: { status: string; transaction_count: number }[];
+  daily_counts: { date: string; transaction_count: number }[];
+  price_band_counts: { label: string; transaction_count: number }[];
   region_counts: { region_name: string; transaction_count: number }[];
-  category_counts: { category: string; transaction_count: number }[];
+  category_counts: {
+    category: string;
+    transaction_count: number;
+    priced_count: number;
+    completed_count: number;
+    average_price: number | null;
+  }[];
   recent_transactions: {
     id: number;
     product_title: string;
@@ -80,12 +91,23 @@ export function getAdminAuthToken(): string | null {
 
 let adminRefreshPromise: Promise<string> | null = null;
 
+export function clearAdminSession() {
+  localStorage.removeItem(ADMIN_AUTH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY);
+}
+
+function expireAdminSession(): never {
+  clearAdminSession();
+  if (window.location.pathname !== "/admin/login") window.location.replace("/admin/login");
+  throw new Error("관리자 세션이 만료되었습니다. 다시 로그인해 주세요.");
+}
+
 async function refreshAdminAccessToken(): Promise<string> {
   if (!adminRefreshPromise) {
     adminRefreshPromise = (async () => {
       const refreshToken =
         typeof window !== "undefined" ? window.localStorage.getItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY) : null;
-      if (!refreshToken) throw new Error("관리자 로그인이 필요합니다.");
+      if (!refreshToken) return expireAdminSession();
 
       const response = await fetch(apiUrl("/api/v1/auth/admin/refresh"), {
         method: "POST",
@@ -100,6 +122,11 @@ async function refreshAdminAccessToken(): Promise<string> {
         throw new Error("관리자 세션이 만료되었습니다.");
       }
       const payload: { access_token: string; refresh_token: string } = await response.json();
+      if (!payload.access_token || !payload.refresh_token) return expireAdminSession();
+      // A logout or a new login while refresh was in flight must win.
+      if (localStorage.getItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY) !== refreshToken) {
+        throw new Error("관리자 세션이 변경되었습니다.");
+      }
       window.localStorage.setItem(ADMIN_AUTH_TOKEN_STORAGE_KEY, payload.access_token);
       window.localStorage.setItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY, payload.refresh_token);
       return payload.access_token;
@@ -110,23 +137,31 @@ async function refreshAdminAccessToken(): Promise<string> {
   return adminRefreshPromise;
 }
 
-export async function adminAuthorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function adminAuthorizedFetch(path: string, init: RequestInit = {}, options: { passwordValidation?: boolean } = {}): Promise<Response> {
   const token = getAdminAuthToken();
-  if (!token) throw new Error("관리자 로그인이 필요합니다.");
+  if (!token) return expireAdminSession();
 
   const withAuth = (t: string): RequestInit => ({
     ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${t}` },
+    headers: (() => { const headers = new Headers(init.headers); headers.set("Authorization", `Bearer ${t}`); return headers; })(),
+    cache: "no-store",
   });
 
   let response = await fetch(apiUrl(path), withAuth(token));
   if (response.status === 401) {
+    // The password endpoint also uses 401 for an incorrect current password.
+    if (options.passwordValidation) {
+      const payload = await response.clone().json().catch(() => null);
+      if (payload?.detail === "현재 비밀번호가 올바르지 않습니다.") return response;
+    }
     try {
-      const newToken = await refreshAdminAccessToken();
+      const currentToken = getAdminAuthToken();
+      const newToken = currentToken && currentToken !== token ? currentToken : await refreshAdminAccessToken();
       response = await fetch(apiUrl(path), withAuth(newToken));
     } catch {
-      throw new Error("관리자 권한이 필요합니다.");
+      return expireAdminSession();
     }
+    if (response.status === 401 && !options.passwordValidation) return expireAdminSession();
   }
   return response;
 }
@@ -175,6 +210,7 @@ export async function getAdminDreamStatus(): Promise<AdminDreamStatus> {
 
 export async function logoutAdmin() {
   const refreshToken = localStorage.getItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY);
+  clearAdminSession();
   try {
     if (refreshToken) {
       await fetch(apiUrl("/api/v1/auth/admin/logout"), {
@@ -187,4 +223,13 @@ export async function logoutAdmin() {
     localStorage.removeItem(ADMIN_AUTH_TOKEN_STORAGE_KEY);
     localStorage.removeItem(ADMIN_REFRESH_TOKEN_STORAGE_KEY);
   }
+}
+
+export async function changeAdminPassword(current_password: string, new_password: string) {
+  const response = await adminAuthorizedFetch("/api/v1/auth/admin/password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  }, { passwordValidation: true });
+  if (!response.ok) throw new Error(await errorMessage(response, "비밀번호를 변경하지 못했습니다."));
 }

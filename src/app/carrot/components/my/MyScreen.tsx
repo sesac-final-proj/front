@@ -7,7 +7,6 @@ import {
   QrCode,
   Heart,
   Clock3,
-  Gem,
   ReceiptText,
   ShoppingBag,
   UsersRound,
@@ -137,11 +136,6 @@ export function MyScreen({
         <button type="button" onClick={onOpenRecentlyViewed}>
           <Clock3 size={31} />
           최근 본
-        </button>
-        <button type="button">
-          <Gem size={31} />
-          혜택
-          <strong>{unreadCount > 0 ? unreadCount : 1}</strong>
         </button>
       </section>
       <MenuCard
