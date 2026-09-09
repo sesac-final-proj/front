@@ -1371,11 +1371,18 @@ export default function GajiMarketApp() {
       viewCount: 0,
       commentCount: 0,
       reactionCount: 0,
+      mine: true,
     };
 
     setPosts((current) => [post, ...current]);
     setActiveTab("community");
     setSubPage(null);
+  }
+
+  // 동네생활 글은 백엔드가 없는 로컬 mock이라 서버 호출 없이 posts 목록에서만 제거한다.
+  function deleteMyPost(postId: string) {
+    setPosts((current) => current.filter((p) => p.id !== postId));
+    goBack();
   }
 
   
@@ -1514,7 +1521,7 @@ export default function GajiMarketApp() {
               }
             />
           ) : subPage?.type === "community-detail" && selectedPost ? (
-            <CommunityDetailScreen post={selectedPost} onBack={goBack} />
+            <CommunityDetailScreen post={selectedPost} onBack={goBack} onDelete={deleteMyPost} />
           ) : subPage?.type === "community-form" ? (
             <CommunityFormScreen onBack={goBack} onSubmit={submitCommunityPost} />
           ) : subPage?.type === "together-intro" ? (
