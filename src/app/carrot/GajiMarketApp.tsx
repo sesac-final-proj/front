@@ -1183,13 +1183,9 @@ export default function GajiMarketApp() {
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
         attachImageIfAny(String(id), imageFile);
-        if (isFree) {
-          setActiveTab("my");
-          setSubPage({ type: "sales" });
-        } else {
-          const params = new URLSearchParams({ title, price: String(Math.max(0, price)), productId: String(id) });
-          router.push(`/analysis?${params.toString()}`);
-        }
+        // 등록 완료 후 가격비교/애널리틱스로 이탈하지 않고 즉시 당근 사이트(물품 상세/홈)로 복귀
+        setActiveTab("home");
+        setSubPage({ type: "product-detail", id: String(id) });
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
