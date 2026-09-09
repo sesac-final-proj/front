@@ -195,6 +195,7 @@ export function HomeScreen({
   hasMore,
   isLoadingMore,
   onOpenRegion,
+  onSwapNeighborhood,
   onOpenSearch,
   onOpenNotifications,
   onOpenMenu,
@@ -216,6 +217,8 @@ export function HomeScreen({
   hasMore: boolean;
   isLoadingMore: boolean;
   onOpenRegion: () => void;
+  // 상단의 동네 이름을 더블클릭하면 그 동네로 곧장 전환 — 시트를 열 필요 없이.
+  onSwapNeighborhood: (dongName: string) => void;
   onOpenSearch: () => void;
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
@@ -262,11 +265,26 @@ export function HomeScreen({
       <div style={pullContentStyle}>
       <ScreenHeader
         title={
-          <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
-            <span>{activeNeighborhood}</span>
-            {secondaryNeighborhood && <span>· {secondaryNeighborhood}</span>}
-            <ChevronDown size={16} />
-          </button>
+          <div className={styles.neighborhoodSwitch}>
+            <button type="button" onDoubleClick={() => onSwapNeighborhood(activeNeighborhood)}>
+              {activeNeighborhood}
+            </button>
+            {secondaryNeighborhood && (
+              <>
+                <span className={styles.neighborhoodSwitchDim}>·</span>
+                <button
+                  type="button"
+                  className={styles.neighborhoodSwitchDim}
+                  onDoubleClick={() => onSwapNeighborhood(secondaryNeighborhood)}
+                >
+                  {secondaryNeighborhood}
+                </button>
+              </>
+            )}
+            <button type="button" onClick={onOpenRegion} aria-label="동네 설정">
+              <ChevronDown size={16} />
+            </button>
+          </div>
         }
         actions={
           <>
