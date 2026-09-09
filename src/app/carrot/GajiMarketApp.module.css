@@ -1415,6 +1415,19 @@
   inset: 0;
   overflow: hidden;
   background: #181d24;
+  transition: transform 320ms cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
+  touch-action: pan-x pan-y;
+}
+
+.mapCanvas[data-sheet="expanded"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 300ms ease;
 }
 
 .naverMapFrame {
@@ -4298,9 +4311,95 @@
   text-align: right;
 }
 
+.dreamFacilityItemCard {
+  border: 1px solid var(--dream-border);
+  border-radius: 16px;
+  background: var(--dream-surface);
+  box-shadow: 0 2px 8px rgba(37, 33, 43, 0.06);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  overflow: hidden;
+}
+
+.dreamFacilityItemCard + .dreamFacilityItemCard {
+  margin-top: 10px;
+}
+
+.dreamFacilityItemCard .dreamFacilityItem {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
 .dreamFacilitySelected {
   border-color: #ffbd8a;
   background: var(--dream-surface-peach);
+}
+
+.dreamFacilityExpandedDetails {
+  padding: 12px 16px 16px 16px;
+  border-top: 1px dashed var(--dream-border);
+}
+
+.dreamFacilityDetailMeta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--dream-text-secondary);
+}
+
+.dreamFacilityDetailMeta p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dreamFacilityDetailMeta strong {
+  color: var(--dream-text-primary);
+  font-weight: 600;
+}
+
+.homepageLogoBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  margin-right: 6px;
+  padding: 3px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.homepageLogoBadge img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.dreamFacilityHomepageButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: #ff8a45;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.dreamFacilityHomepageButton:hover {
+  background: #e67634;
+  text-decoration: none;
 }
 
 .dreamProgressTrack {
@@ -4743,7 +4842,9 @@
     0 18px 44px rgba(0, 0, 0, 0.32);
 }
 
+.bottomNav .navButton,
 .bottomNav button {
+  position: relative;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -4758,14 +4859,44 @@
   font-weight: 650;
   cursor: pointer;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+  transition: color 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
 }
 
-.bottomNav button > span {
+.bottomNav .navActivePill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--color-primary-container);
+  box-shadow: 0 4px 14px rgba(255, 111, 15, 0.2);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bottomNav button > span,
+.bottomNav .navButton > span,
+.bottomNav .navIcon,
+.bottomNav .navLabel,
+.bottomNav em {
+  position: relative;
+  z-index: 1;
+}
+
+.bottomNav .navIcon {
   position: relative;
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
+}
+
+.bottomNav .navLabel {
+  display: block;
+  font-size: 12px;
+  line-height: 15px;
+  letter-spacing: -0.2px;
 }
 
 .bottomNav em {
@@ -4778,13 +4909,24 @@
   font-size: 10px;
   line-height: 14px;
   font-weight: 700;
+  z-index: 2;
 }
 
 .bottomNav .navActive {
-  background: var(--color-primary-container);
   color: var(--color-primary);
   font-weight: 800;
   text-shadow: none;
+}
+
+.tabContentTransition {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mapViewport .tabContentTransition {
+  height: 100%;
 }
 
 .toast {
