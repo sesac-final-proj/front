@@ -36,10 +36,10 @@ export default function SourcesSection({
     <section id="external-sources" className={styles.section}>
       <div className={styles.sectionHead}>
         <div>
-          <span>EXT·03</span>
+          <span>EXT·02</span>
           <div>
             <p className={styles.eyebrow}>COMPETITOR INTELLIGENCE & SOURCING STRATEGY</p>
-            <h2>외부 수집원 관리 & 시장 경쟁력 분석</h2>
+            <h2>외부 지표 수집원 관리 & 시장 경쟁력 분석</h2>
           </div>
         </div>
         <small>번개장터·중고나라 4,771건 실시간 크롤링 거버넌스</small>

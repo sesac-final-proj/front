@@ -407,7 +407,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
           <span>EXT·01</span>
           <div>
             <p className={styles.eyebrow}>CROSS-PLATFORM AUDIENCE & EXTERNAL FUSION INTELLIGENCE</p>
-            <h2>타 플랫폼 시세 & 외부 지표 융합 인사이트</h2>
+            <h2>외부 지표 인사이트 & 감성 결합 분석실</h2>
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1541,7 +1541,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
                 <span style={{ color: "var(--carrot)", fontSize: "11px", fontWeight: 800 }}>EXECUTIVE GOVERNANCE REPORT</span>
-                <h3 style={{ margin: "2px 0 0", fontSize: "18px" }}>타 플랫폼 가격 분석 거버넌스 및 품질 보고서</h3>
+                <h3 style={{ margin: "2px 0 0", fontSize: "18px" }}>외부 지표 및 가격 분석 거버넌스 보고서</h3>
               </div>
               <button type="button" onClick={() => setShowReportModal(false)} style={{ border: "none", background: "none", cursor: "pointer" }}>
                 <X size={20} />
