@@ -70,7 +70,7 @@ test("every sidebar destination has its own route", async () => {
     ["/admin/trades", "거래 데이터 탐색"], ["/admin/quality", "수집 품질"],
     ["/admin/insights", "비교 인사이트"], ["/admin/sources", "수집원 관리"],
     ["/admin/price-model", "가격 모델"], ["/admin/donations", "꿈가지 분석"],
-    ["/admin/notices", "공지·기부 운영"], ["/admin/system", "구현 현황"],
+    ["/admin/notices", "공지·기부"], ["/admin/system", "구현 현황"],
     ["/admin/settings", "환경설정"],
   ];
   for (const [path, heading] of destinations) {

@@ -8,7 +8,7 @@ export default function InsightsSection({insights}: {insights: AdminAudienceInsi
 
 
 return <>        {insights && <section id="external-interpretation" className={styles.section}>
-          <div className={styles.sectionHead}><div><span>EXT·01</span><div><p className={styles.eyebrow}>EXTERNAL MARKET ONLY</p><h2>외부 거래 비교 브리핑</h2></div></div><small>중고나라·번개장터 정제 표본 {number.format(insights.population.rows)}건</small></div>
+          <div className={styles.sectionHead}><div><span>EXT·01</span><div><p className={styles.eyebrow}>EXTERNAL MARKET ONLY</p><h2>타 플랫폼 비교 브리핑</h2></div></div><small>중고나라·번개장터 정제 표본 {number.format(insights.population.rows)}건</small></div>
           <div className={styles.briefHero}>
             <div><span>핵심 해석</span><h3>{insights.interpretation.finding}</h3></div>
             <div><b>운영 제안</b><p>{insights.interpretation.action}</p><small>{insights.interpretation.caveat}</small></div>
@@ -37,7 +37,7 @@ return <>        {insights && <section id="external-interpretation" className={s
         </section>}
 
         {insights && <section id="external-keywords" className={`${styles.section} ${styles.continuedSection}`}>
-          <div className={styles.sectionHead}><div><span>EXT·02</span><div><p className={styles.eyebrow}>EXTERNAL SEMANTIC LAYER</p><h2>외부 거래 키워드와 LLM 카테고리</h2></div></div><small>{insights.llm.provider} · {insights.llm.model}</small></div>
+          <div className={styles.sectionHead}><div><span>EXT·02</span><div><p className={styles.eyebrow}>EXTERNAL SEMANTIC LAYER</p><h2>타 플랫폼 키워드와 LLM 카테고리</h2></div></div><small>{insights.llm.provider} · {insights.llm.model}</small></div>
           <div className={styles.llmNote}><Sparkles size={18} /><p><b>역할을 분리했습니다.</b> 가격·분포·빈도는 통계 코드가 계산하고, LLM은 집계 결과와 실제 제목을 읽어 의미 카테고리와 검수 관점을 붙였습니다. {insights.llm.guardrail}</p></div>
           <div className={styles.semanticGrid}>
             {insights.llmCategories.map((category) => <article key={category.name}>

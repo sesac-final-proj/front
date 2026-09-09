@@ -5,7 +5,7 @@ export default function NoticesSection() {
 
 
 return <>        {<section id="delivery" className={styles.section}>
-          <div className={styles.sectionHead}><div><span>OPS·02</span><div><p className={styles.eyebrow}>SERVICE OPERATIONS</p><h2>공지·기부 운영 준비 현황</h2></div></div><small>첨부 구현 현황 문서 반영</small></div>
+          <div className={styles.sectionHead}><div><span>SYS·03</span><div><p className={styles.eyebrow}>SYSTEM READINESS</p><h2>공지·기부 준비 현황</h2></div></div><small>첨부 구현 현황 문서 반영</small></div>
           <div className={styles.readinessHero}>
             <div><span>운영 원칙</span><h3>연결되지 않은 기능은<br />숫자를 만들지 않습니다.</h3></div>
             <p>현재 저장소에 실제 API와 원장이 있는 기능만 운영 지표로 표시합니다. 화면만 있거나 로컬 상태인 기능은 연결 조건과 다음 작업을 명확히 구분했습니다.</p>

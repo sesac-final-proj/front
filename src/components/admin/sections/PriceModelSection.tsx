@@ -9,7 +9,7 @@ export default function PriceModelSection({validation}: {validation: ModelValida
 
 const selectedModel = validation?.models.find(model => model.name === validation.selectedModel) ?? validation?.models[0];
 return <>        {validation && selectedModel && <section id="external-models" className={styles.section}>
-          <div className={styles.sectionHead}><div><span>EXT·04</span><div><p className={styles.eyebrow}>EXTERNAL MODEL VALIDATION</p><h2>외부 거래 가격 모델</h2></div></div><small>Optuna 20회 · 시간순 홀드아웃 · 결정계수(R²)</small></div>
+          <div className={styles.sectionHead}><div><span>EXT·04</span><div><p className={styles.eyebrow}>EXTERNAL MODEL VALIDATION</p><h2>타 플랫폼 가격 모델</h2></div></div><small>Optuna 20회 · 시간순 홀드아웃 · 결정계수(R²)</small></div>
           <div className={styles.modelIntro}>
             <div><span className={styles.modelBadge}>검증 완료</span><h3>모델을 맹신하지 않고<br />설명력을 운영 기준으로 씁니다.</h3></div>
             <p>{number.format(validation.rows)}개 정제 표본을 학습·테스트 시간순으로 분리했습니다. R²와 MAE, 교차검증 편차를 함께 확인하고 낮은 설명력 구간은 클러스터 중앙값을 우선합니다.</p>
