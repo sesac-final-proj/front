@@ -71,6 +71,7 @@ export type SubPage =
   | { type: "together-form"; category?: TogetherCategory }
   | { type: "together-detail"; id: string }
   | { type: "settings" }
+  | { type: "customer-support" }
   | { type: "sales" }
   | { type: "favorites" }
   | { type: "recently-viewed" }

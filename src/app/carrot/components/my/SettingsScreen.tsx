@@ -29,6 +29,7 @@ export interface SettingsScreenProps {
   onLocationToggle: () => void;
   onLogout: () => void;
   onWithdraw: () => void;
+  onOpenSupport: () => void;
 }
 
 export function SettingsScreen({
@@ -39,6 +40,7 @@ export function SettingsScreen({
   onLocationToggle,
   onLogout,
   onWithdraw,
+  onOpenSupport,
 }: SettingsScreenProps) {
   return (
     <section className={styles.screen}>
@@ -82,7 +84,7 @@ export function SettingsScreen({
         title="고객지원"
         items={[
           { label: "공지사항", icon: Bell },
-          { label: "고객센터", icon: Headphones },
+          { label: "고객센터", icon: Headphones, onClick: onOpenSupport },
           { label: "의견 남기기", icon: Mail },
           { label: "로그아웃", icon: LogOut, onClick: onLogout },
           { label: "탈퇴하기", icon: X, onClick: onWithdraw },

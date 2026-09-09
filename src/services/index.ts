@@ -6,3 +6,4 @@ export * from "./realEstateService";
 export * from "./restaurantService";
 export * from "./togetherService";
 export * from "./tradeService";
+export * from "./supportService";
