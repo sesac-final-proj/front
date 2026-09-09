@@ -7,7 +7,6 @@ import {
   QrCode,
   Heart,
   Clock3,
-  Gem,
   ReceiptText,
   ShoppingBag,
   UsersRound,
@@ -25,9 +24,12 @@ import { PromoCard, IconGrid, MenuCard } from "./MenuCard";
 export interface MyScreenProps {
   nickname?: string;
   activeNeighborhood: string;
+  temperature?: number;
   unreadCount: number;
   favoriteCount: number;
   myProducts: ProductListItem[];
+  // null이면 아직 로딩 중 — 그동안은 이전처럼 "0원"으로 보여준다.
+  walletBalance?: number | null;
   onOpenSettings: () => void;
   onOpenMenu: () => void;
   onOpenAllServices: () => void;
@@ -37,14 +39,18 @@ export interface MyScreenProps {
   onOpenFavorites: () => void;
   onOpenRecentlyViewed: () => void;
   onOpenApartment?: () => void;
+  onOpenWalletCharge: () => void;
+  onOpenWalletPay: () => void;
 }
 
 export function MyScreen({
   nickname,
   activeNeighborhood,
+  temperature = 36.5,
   unreadCount,
   favoriteCount,
   myProducts,
+  walletBalance,
   onOpenSettings,
   onOpenMenu,
   onOpenAllServices,
@@ -54,6 +60,8 @@ export function MyScreen({
   onOpenFavorites,
   onOpenRecentlyViewed,
   onOpenApartment,
+  onOpenWalletCharge,
+  onOpenWalletPay,
 }: MyScreenProps) {
   const services: IconItem[] = [
     { label: "중고거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
@@ -69,7 +77,7 @@ export function MyScreen({
   return (
     <section className={styles.screen}>
       <ScreenHeader
-        title="나의 가지"
+        title="나의 당근"
         titleAccessory={
           <button type="button" className={styles.dreamEntryButton} onClick={onOpenDream} aria-label="꿈가지">
             <span className={styles.dreamEntryLabel} aria-hidden="true">
@@ -98,24 +106,24 @@ export function MyScreen({
           <UserRound size={42} fill="currentColor" />
         </div>
         <div>
-          <strong>{nickname ? `${nickname}님` : "주황가지님"}</strong>
+          <strong>{nickname ? `${nickname}님` : "로그인 필요"}</strong>
           <span>{activeNeighborhood} · 신뢰온도</span>
         </div>
-        <span className={styles.temperature}>40.1°C</span>
+        <span className={styles.temperature}>{temperature.toFixed(1)}°C</span>
         <ChevronRight size={26} />
       </button>
       <section className={styles.payCard}>
         <div className={styles.payHeader}>
           <BrandWordmark />
-          <button type="button">충전</button>
+          <button type="button" onClick={onOpenWalletCharge}>충전</button>
           <button type="button">송금</button>
-          <button type="button" className={styles.payButton}>
+          <button type="button" className={styles.payButton} onClick={onOpenWalletPay}>
             <QrCode size={19} /> 결제
           </button>
         </div>
         <div className={styles.payBalance}>
           <button type="button">
-            머니 <strong>0원</strong> <ChevronRight size={18} />
+            머니 <strong>{(walletBalance ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
           <button type="button">
             포인트 <strong>44원</strong> <ChevronRight size={18} />
@@ -132,11 +140,6 @@ export function MyScreen({
         <button type="button" onClick={onOpenRecentlyViewed}>
           <Clock3 size={31} />
           최근 본
-        </button>
-        <button type="button">
-          <Gem size={31} />
-          혜택
-          <strong>{unreadCount > 0 ? unreadCount : 1}</strong>
         </button>
       </section>
       <MenuCard

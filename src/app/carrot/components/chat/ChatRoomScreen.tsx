@@ -36,6 +36,8 @@ export interface ChatRoomScreenProps {
   onUpdateStatus: (tradeStatus: ChatTradeStatus) => void;
   onBlock: (userId: number) => void;
   onReport: (userId: number, reason: string) => void;
+  onOpenPayment: () => void;
+  onViewPayment: (transactionId: string) => void;
 }
 
 export function ChatRoomScreen({
@@ -51,6 +53,8 @@ export function ChatRoomScreen({
   onUpdateStatus,
   onBlock,
   onReport,
+  onOpenPayment,
+  onViewPayment,
 }: ChatRoomScreenProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -207,23 +211,44 @@ export function ChatRoomScreen({
           </span>
         </div>
       </div>
-      {/* 당근페이: 결제 로직은 추후 추가 예정 — 지금은 자리만 잡아둔 비활성 버튼. */}
-      <button type="button" className={styles.chatPayButton} disabled title="곧 지원 예정이에요">
-        <Wallet size={18} />
-        당근페이
-      </button>
+      {/* 당근페이는 구매자만 보낸다 — 판매자가 자기 자신에게 송금할 일은 없다. */}
+      {room.tradeRole === "BUYER" && (
+        <button
+          type="button"
+          className={styles.chatPayButton}
+          onClick={onOpenPayment}
+          disabled={room.productTradeStatus === "SOLD"}
+          title={room.productTradeStatus === "SOLD" ? "이미 거래가 완료됐어요" : undefined}
+        >
+          <Wallet size={18} />
+          당근페이
+        </button>
+      )}
       <div className={styles.messageStack}>
-        {messages.map((message, index) => (
-          <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
-            {message.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
-              <img src={message.imageUrl} alt="전송된 사진" className={styles.messageImage} />
-            ) : (
-              <p>{message.text}</p>
-            )}
-            <span>{message.time}</span>
-          </div>
-        ))}
+        {messages.map((message, index) =>
+          message.payment ? (
+            <button
+              type="button"
+              key={`payment-${message.payment.transactionId}`}
+              className={`${styles.paymentMessageCard} ${message.mine ? styles.paymentMessageCardMine : ""}`}
+              onClick={() => onViewPayment(message.payment!.transactionId)}
+            >
+              <Wallet size={16} />
+              <span>{message.mine ? "송금완료" : "머니를 받았어요"}</span>
+              <strong>{message.payment.amount.toLocaleString("ko-KR")}원</strong>
+            </button>
+          ) : (
+            <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
+              {message.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- NCP Object Storage 원본 URL
+                <img src={message.imageUrl} alt="전송된 사진" className={styles.messageImage} />
+              ) : (
+                <p>{message.text}</p>
+              )}
+              <span>{message.time}</span>
+            </div>
+          ),
+        )}
       </div>
       <form className={styles.messageComposer} onSubmit={onSubmit}>
         <label className={styles.messageImageButton} aria-label="사진 보내기">

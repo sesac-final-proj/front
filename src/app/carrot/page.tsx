@@ -1,5 +1,10 @@
 import GajiMarketApp from "./GajiMarketApp";
+import AuthGate from "./AuthGate";
 
 export default function CarrotPrototypePage() {
-  return <GajiMarketApp />;
+  return (
+    <AuthGate>
+      <GajiMarketApp />
+    </AuthGate>
+  );
 }

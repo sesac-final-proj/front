@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import styles from "./GajiMarketApp.module.css";
 
 // Components (Barrel Export from ./components)
@@ -14,6 +15,7 @@ import {
   AllServicesScreen,
   RegionSearchScreen,
   SearchScreen,
+  DaangnSplash,
   // trade
   HomeScreen,
   ProductDetailScreen,
@@ -29,6 +31,8 @@ import {
   // chat
   ChatsScreen,
   ChatRoomScreen,
+  PaymentAmountScreen,
+  PaymentDetailScreen,
   // my
   MyScreen,
   MyMenuScreen,
@@ -37,6 +41,8 @@ import {
   FavoriteScreen,
   DreamDashboardScreen,
   DreamNoticeScreen,
+  WalletChargeScreen,
+  WalletPayScreen,
   // real-estate
   RealEstateScreen,
   // alba
@@ -61,6 +67,7 @@ import {
   createProduct,
   setFavorite,
   logout as logoutRequest,
+  withdrawAccount,
   AuthRequiredError,
   getTogetherPosts,
   createTogetherPost,
@@ -85,6 +92,7 @@ import {
   type ChatTradeStatus,
 } from "@/services/chatService";
 import { blockUser, reportUser } from "@/services/safetyService";
+import { getWalletBalance, sendPayment as sendWalletPayment, chargeWallet, payByQr } from "@/services/walletService";
 
 // Types
 import type {
@@ -169,6 +177,13 @@ export default function GajiMarketApp() {
     logoutRequest().finally(() => router.replace("/onboarding"));
   }
 
+  function handleWithdraw() {
+    if (!window.confirm("정말 탈퇴하시겠어요?\n작성한 글과 채팅 내역은 남지만, 계정 정보는 삭제되고 되돌릴 수 없어요.")) return;
+    withdrawAccount()
+      .then(() => router.replace("/onboarding"))
+      .catch(() => window.alert("탈퇴 처리에 실패했어요. 잠시 후 다시 시도해주세요."));
+  }
+
   function changeTheme(value: ThemeMode) {
     setSessionTheme(value);
     try {
@@ -202,48 +217,85 @@ export default function GajiMarketApp() {
     writeNeighborhoodCache({ primary: activeNeighborhood, secondary: secondaryNeighborhood });
   }, [activeNeighborhood, secondaryNeighborhood]);
 
-  // 로그인 필수: 토큰이 없거나 만료됐으면(getMe 실패) 온보딩으로 보낸다.
-  // 네트워크 일시 오류도 신원 확인이 안 된 것이므로 동일하게 처리한다.
+  // 이 시점엔 AuthGate가 이미 로그인 여부를 확인한 뒤라 여기서 또 실패한다고
+  // 곧장 로그아웃 취급하면 안 된다 — 네트워크 순단/서버 일시 오류로 여기 getMe()만
+  // 어쩌다 실패해도 (AuthGate 통과 직후라 방금 로그인 확인은 됐는데) 온보딩으로
+  // 튕겨나가던 버그가 있었다. 진짜 인증 실패(AuthRequiredError)일 때만 리다이렉트하고,
+  // 그 외엔 몇 번 재시도한다.
   useEffect(() => {
-    getMe()
-      .then((fetchedMe) => {
-        setMe(fetchedMe);
-        // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
-        if (fetchedMe.region) {
-          setActiveNeighborhood(fetchedMe.region.dongName);
-        }
-        setAuthChecked(true);
-      })
-      .catch(() => {
-        router.replace("/onboarding");
-      });
+    let cancelled = false;
+    function run(attempt: number) {
+      getMe()
+        .then((fetchedMe) => {
+          if (cancelled) return;
+          if (fetchedMe.role === "admin") {
+            // 관리자 계정은 모바일 당근 소비자 세션으로 진입하지 않고 온보딩으로 분리
+            handleLogout();
+            return;
+          }
+          if (!fetchedMe.nicknameSet) {
+            router.replace("/onboarding/profile");
+            return;
+          }
+          setMe(fetchedMe);
+          // 서버에 저장된 대표 동네가 로컬 캐시보다 우선 — 다른 기기에서 바꿨을 수도 있으니.
+          if (fetchedMe.region) {
+            setActiveNeighborhood(fetchedMe.region.dongName);
+          }
+          setAuthChecked(true);
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          if (error instanceof AuthRequiredError) {
+            router.replace("/onboarding");
+            return;
+          }
+          if (attempt + 1 < 3) {
+            window.setTimeout(() => run(attempt + 1), 1200);
+          } else {
+            console.error("내 정보를 불러오지 못했습니다.", error);
+          }
+        });
+    }
+    run(0);
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   // 판매내역/찜 목록은 일반 목록(products)을 mine/isFavorite로 거르는 방식으로는
   // 못 만든다 — 그 두 값이 실서버 데이터에 대해 항상 false라 새로고침(새 세션)마다
   // 빈 목록이 됐었다(버그). 서버가 이미 created_by/찜 여부로 걸러주는 전용
   // 엔드포인트를 그대로 쓴다.
+  // 판매내역/찜목록 각각 다시 받아온다 — 최초 로딩 effect와 각 화면의 당겨서
+  // 새로고침(pull-to-refresh) 둘 다 이 두 함수를 그대로 재사용한다.
+  const refreshMyProducts = useCallback(async (signal?: AbortSignal) => {
+    const page = await getMyProducts(signal);
+    setMyProducts(page.items.map((item) => ({ ...toProductListItem(item), mine: true })));
+  }, []);
+  const refreshFavorites = useCallback(async (signal?: AbortSignal) => {
+    const page = await getMyFavorites(signal);
+    setFavoriteProducts(page.items.map((item) => ({ ...toProductListItem(item), isFavorite: true })));
+  }, []);
+
   useEffect(() => {
     // me는 로그아웃 전환 없이 null -> 값으로만 바뀌므로(로그아웃은 페이지 리로드),
     // 로그인 전 상태는 그냥 초기값([])을 쓰면 된다 — 여기서 다시 비울 필요 없음.
     if (!me) return;
     const controller = new AbortController();
-    getMyProducts(controller.signal)
-      .then((page) => setMyProducts(page.items.map((item) => ({ ...toProductListItem(item), mine: true }))))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("판매내역을 불러오지 못했습니다.", error);
-      });
-    getMyFavorites(controller.signal)
-      .then((page) =>
-        setFavoriteProducts(page.items.map((item) => ({ ...toProductListItem(item), isFavorite: true }))),
-      )
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("찜 목록을 불러오지 못했습니다.", error);
-      });
+    // refreshMyProducts/refreshFavorites 내부에서 setState를 동기 호출한다 —
+    // effect가 로그인 시점에 최초 1회 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshMyProducts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("판매내역을 불러오지 못했습니다.", error);
+    });
+    refreshFavorites(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("찜 목록을 불러오지 못했습니다.", error);
+    });
     return () => controller.abort();
-  }, [me]);
+  }, [me, refreshMyProducts, refreshFavorites]);
 
   const [recentNeighborhoods, setRecentNeighborhoods] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -256,7 +308,10 @@ export default function GajiMarketApp() {
 
   // 동네 검색은 이제 "대표 전환"이 아니라 항상 "2번째 동네 추가"다 — 빈 슬롯이 있을 때만
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
+  // RegionSearchScreen이 이미 등록된 동네를 목록에서 빼주지만, 최근 동네 칩 등으로
+  // 우회해서 들어올 수도 있어 여기서도 한 번 더 막는다(중복 등록 방지의 최종 관문).
   function addNeighborhood(dongName: string) {
+    if (dongName === activeNeighborhood) return;
     const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
@@ -301,12 +356,10 @@ export default function GajiMarketApp() {
   // 차단/신고엔 상대방 user id가 필요한데 채팅방 응답엔 없어서, 메시지에 실려오는
   // sender_id로부터 알아낸다 — 아직 메시지가 하나도 없으면 모르는 채로 남는다.
   const [roomOtherUserId, setRoomOtherUserId] = useState<Record<string, number>>({});
+  // 당근페이 잔액 — 송금 화면 진입할 때마다 새로 받아온다(다른 채팅방에서 이미
+  // 써버렸을 수 있어서 캐시하지 않음). null이면 아직 로딩 중.
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
-  const [hasNetworkError, setHasNetworkError] = useState(false);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  // 찜 API가 401(로그인 필요)을 돌려줬을 때만 true — isGuestMode 스위치와 별개로,
-  // 지금은 실제 로그인 세션이 없어서 찜을 시도하면 항상 여기로 떨어진다.
-  const [authRequired, setAuthRequired] = useState(false);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
 
   const openApartmentFlow = useCallback(() => {
@@ -318,14 +371,34 @@ export default function GajiMarketApp() {
   }, [verifiedApartment]);
 
   // 채팅방 목록. 로그인 전엔 서버가 401을 주므로 me가 로드된 뒤에만 시도한다.
+  // 최초 로딩 effect와 채팅목록 화면의 당겨서 새로고침 둘 다 이 함수를 재사용한다.
+  const refreshChats = useCallback(async (signal?: AbortSignal) => {
+    const page = await listChatRooms(signal);
+    setChats(page.items.map(toChatRoomUi));
+  }, []);
+
   useEffect(() => {
     if (!me) return;
     const controller = new AbortController();
-    listChatRooms(controller.signal)
-      .then((page) => setChats(page.items.map(toChatRoomUi)))
+    // effect가 로그인 시점에 최초 1회 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshChats(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("채팅 목록을 불러오지 못했습니다.", error);
+    });
+    return () => controller.abort();
+  }, [me, refreshChats]);
+
+  // 당근머니 잔액 — My탭 배지랑 당근페이 송금 화면이 같은 값을 쓴다. 로그인 시점에
+  // 한 번 받아두고, 송금 화면을 열 때마다(openPayment) 백그라운드로 다시 받아온다.
+  useEffect(() => {
+    if (!me) return;
+    const controller = new AbortController();
+    getWalletBalance(controller.signal)
+      .then(setWalletBalance)
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("채팅 목록을 불러오지 못했습니다.", error);
+        console.error("잔액을 불러오지 못했습니다.", error);
       });
     return () => controller.abort();
   }, [me]);
@@ -473,40 +546,49 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => console.error("활동동네를 저장하지 못했습니다.", error));
   }, [me, regionId]);
 
+  // 홈 피드 1페이지를 다시 받아온다 — 동네/필터가 바뀔 때(effect)와 홈 화면의
+  // 당겨서 새로고침(pull-to-refresh) 둘 다 이걸 그대로 재사용한다.
+  const refreshProducts = useCallback(
+    async (signal?: AbortSignal) => {
+      productPageRef.current = 1;
+      if (noRegionMatch) {
+        setProducts([]);
+        setProductsTotal(0);
+        return;
+      }
+      const page = await listProducts(
+        {
+          page: 1,
+          size: 60,
+          regionId,
+          category: productFilters.category,
+          tradeType: productFilters.tradeType,
+          priceMin: productFilters.priceMin,
+          priceMax: productFilters.priceMax,
+          sort: productFilters.sort,
+          excludeSold: productFilters.excludeSold,
+        },
+        signal,
+      );
+      setProducts(page.items.map(toProductListItem));
+      setProductsTotal(page.total);
+    },
+    [noRegionMatch, regionId, productFilters],
+  );
+
   useEffect(() => {
     if (!regionsLoaded) return; // region 목록 오기 전엔 아직 필터를 확정할 수 없어 대기(부팅 스켈레톤이 가려줌)
-    productPageRef.current = 1;
-    if (noRegionMatch) {
-      setProducts([]);
-      setProductsTotal(0);
-      return;
-    }
     const controller = new AbortController();
-    listProducts(
-      {
-        page: 1,
-        size: 60,
-        regionId,
-        category: productFilters.category,
-        tradeType: productFilters.tradeType,
-        priceMin: productFilters.priceMin,
-        priceMax: productFilters.priceMax,
-        sort: productFilters.sort,
-        excludeSold: productFilters.excludeSold,
-      },
-      controller.signal,
-    )
-      .then((page) => {
-        setProducts(page.items.map(toProductListItem));
-        setProductsTotal(page.total);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        // 실패하면 mock 목록을 그대로 둔다 (화면이 빈 채로 남지 않도록)
-        console.error("상품 목록을 불러오지 못했습니다.", error);
-      });
+    // refreshProducts 내부에서 noRegionMatch면 setProducts([])를 동기 호출한다 —
+    // effect가 동네/필터 변화에 반응해 다시 불러오는 본연의 목적이라 정당한 케이스.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshProducts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // 실패하면 mock 목록을 그대로 둔다 (화면이 빈 채로 남지 않도록)
+      console.error("상품 목록을 불러오지 못했습니다.", error);
+    });
     return () => controller.abort();
-  }, [regionsLoaded, noRegionMatch, regionId, productFilters]);
+  }, [regionsLoaded, refreshProducts]);
 
   // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
   const loadMoreProducts = useCallback(() => {
@@ -552,8 +634,7 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("최근 본 목록을 불러오지 못했습니다.", error);
         }
@@ -602,9 +683,6 @@ export default function GajiMarketApp() {
   );
 
   const filteredProducts = useMemo(() => {
-    if (hasNetworkError) {
-      return [];
-    }
     return products.filter((product) => {
       // ponytail: 실거래 API엔 동네 검색/지역ID 조회 엔드포인트가 아직 없어서
       // activeNeighborhood로 실서버 데이터를 거를 방법이 없음 — 백엔드에 지역 조회가
@@ -612,7 +690,7 @@ export default function GajiMarketApp() {
       // 판매중/예약중/거래완료 전부 홈 피드에 그대로 노출한다(상태로 숨기지 않음).
       return productFilter === "전체" || product.category === productFilter;
     });
-  }, [hasNetworkError, productFilter, products]);
+  }, [productFilter, products]);
 
   const filteredPosts = useMemo(() => {
     const scopedPosts = posts.filter(
@@ -689,6 +767,7 @@ export default function GajiMarketApp() {
   }, [togetherPosts, togetherCategoryFilter]);
 
   function navigateTab(tab: TabId) {
+    const isSameTab = activeTab === tab && !subPage;
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
@@ -696,7 +775,10 @@ export default function GajiMarketApp() {
       setMapSheetState("half");
     }
     window.requestAnimationFrame(() => {
-      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+      document.querySelector("[data-app-scroll]")?.scrollTo({
+        top: 0,
+        behavior: isSameTab ? "smooth" : "instant",
+      });
     });
   }
 
@@ -751,6 +833,10 @@ export default function GajiMarketApp() {
       setSubPage({ type: "product-detail", id: subPage.productId });
       return;
     }
+    if (subPage?.type === "payment-amount" || subPage?.type === "payment-detail") {
+      setSubPage({ type: "chat-room", id: subPage.chatRoomId });
+      return;
+    }
     if (subPage?.type === "product-form" && subPage.editId) {
       setSubPage({ type: "product-detail", id: subPage.editId });
       return;
@@ -772,10 +858,6 @@ export default function GajiMarketApp() {
   }
 
   function toggleFavorite(productId: string) {
-    if (isGuestMode) {
-      setSheet("status");
-      return;
-    }
     const product = products.find((p) => p.id === productId);
     if (!product) return;
     const nextFavorited = !product.isFavorite;
@@ -814,8 +896,7 @@ export default function GajiMarketApp() {
           ),
         );
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("찜 상태를 바꾸지 못했습니다.", error);
         }
@@ -846,8 +927,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("메시지를 불러오지 못했습니다.", error);
         }
@@ -876,8 +956,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("메시지를 보내지 못했습니다.", error);
         }
@@ -901,8 +980,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("이미지를 보내지 못했습니다.", error);
         }
@@ -919,8 +997,7 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("채팅방을 나가지 못했습니다.", error);
           alert("채팅방을 나가지 못했습니다.");
@@ -951,11 +1028,110 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("거래상태를 변경하지 못했습니다.", error);
           alert("거래상태를 변경하지 못했습니다.");
+        }
+      });
+  }
+
+  function openPayment(chatId: string) {
+    setSubPage({ type: "payment-amount", chatRoomId: chatId });
+    // 이전에 연 값이 있으면 그대로 보여준 채로 백그라운드에서 새로 받아온다 —
+    // My탭 잔액 배지랑 같은 state라 매번 null로 밀면 그쪽도 깜빡인다.
+    getWalletBalance()
+      .then(setWalletBalance)
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("잔액을 불러오지 못했습니다.", error);
+        }
+      });
+  }
+
+  function viewPayment(chatId: string, transactionId: string) {
+    setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId });
+  }
+
+  function submitPayment(chatId: string, amount: number) {
+    const numericId = Number(chatId);
+    if (!Number.isFinite(numericId)) return;
+    sendWalletPayment(numericId, amount)
+      .then((message) => {
+        setRoomMessages((current) => ({
+          ...current,
+          [chatId]: [...(current[chatId] ?? []), toChatMessageUi(message, me?.id)],
+        }));
+        setChats((current) =>
+          current.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: `${amount.toLocaleString("ko-KR")}원을 보냈어요`,
+                  lastMessageAt: "방금 전",
+                  // 백엔드가 송금 시점에 거래완료로 바꿔주므로(계획 문서 3-2절) 프론트도
+                  // 곧장 반영 — 안 그러면 새로고침 전까진 여전히 "판매중"으로 보인다.
+                  productTradeStatus: "SOLD",
+                }
+              : chat,
+          ),
+        );
+        const room = chats.find((chat) => chat.id === chatId);
+        if (room?.productId) {
+          setProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
+          setMyProducts((prev) => prev.map((p) => (p.id === room.productId ? { ...p, tradeStatus: "SOLD" } : p)));
+        }
+        // 송금 직후 내 정보 화면의 당근페이 잔액도 갱신 — 안 그러면 화면을 새로
+        // 열기 전까진 송금 전 잔액이 그대로 보인다.
+        getWalletBalance()
+          .then(setWalletBalance)
+          .catch((error: unknown) => console.error("잔액을 갱신하지 못했습니다.", error));
+        if (message.payment) {
+          setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId: String(message.payment.transactionId) });
+        } else {
+          setSubPage({ type: "chat-room", id: chatId });
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("송금하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "송금하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitWalletCharge(amount: number) {
+    chargeWallet(amount)
+      .then((balance) => {
+        setWalletBalance(balance);
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("충전하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "충전하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitWalletPay(merchantName: string, amount: number) {
+    payByQr(merchantName, amount)
+      .then((balance) => {
+        setWalletBalance(balance);
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("결제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "결제하지 못했습니다.");
         }
       });
   }
@@ -965,8 +1141,7 @@ export default function GajiMarketApp() {
       .then(() => alert("차단했습니다. 이제 이 사람과는 채팅을 주고받을 수 없어요."))
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("차단하지 못했습니다.", error);
           alert("차단하지 못했습니다.");
@@ -979,8 +1154,7 @@ export default function GajiMarketApp() {
       .then(() => alert(`신고가 접수되었습니다. (${reason})\n운영팀에서 확인 후 처리하겠습니다.`))
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
-          setSheet("status");
+          router.replace("/onboarding");
         } else {
           console.error("신고 접수에 실패했습니다.", error);
           alert("신고 접수에 실패했습니다.");
@@ -1010,11 +1184,6 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
-
-    if (isGuestMode) {
-      setSheet("status");
-      return;
-    }
 
     createProduct({
       title,
@@ -1053,16 +1222,20 @@ export default function GajiMarketApp() {
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
         attachImageIfAny(String(id), imageFile);
-        setActiveTab("my");
-        setSubPage({ type: "sales" });
+        if (isFree) {
+          setActiveTab("my");
+          setSubPage({ type: "sales" });
+        } else {
+          const params = new URLSearchParams({ title, price: String(Math.max(0, price)), productId: String(id) });
+          router.push(`/analysis?${params.toString()}`);
+        }
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
+          router.replace("/onboarding");
         } else {
           console.error("글을 등록하지 못했습니다.", error);
         }
-        setSheet("status");
       });
   }
 
@@ -1104,11 +1277,10 @@ export default function GajiMarketApp() {
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
-          setAuthRequired(true);
+          router.replace("/onboarding");
         } else {
           console.error("글을 수정하지 못했습니다.", error);
         }
-        setSheet("status");
       });
   }
 
@@ -1187,6 +1359,14 @@ export default function GajiMarketApp() {
     subPage?.type === "community-detail" ? posts.find((post) => post.id === subPage.id) : undefined;
   const selectedChat =
     subPage?.type === "chat-room" ? chats.find((chat) => chat.id === subPage.id) : undefined;
+  const paymentRoom =
+    subPage?.type === "payment-amount" || subPage?.type === "payment-detail"
+      ? chats.find((chat) => chat.id === subPage.chatRoomId)
+      : undefined;
+  const paymentMessage =
+    subPage?.type === "payment-detail"
+      ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
+      : undefined;
 
   const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
@@ -1197,7 +1377,7 @@ export default function GajiMarketApp() {
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
   // /onboarding으로 리다이렉트하는 중이라, 그 사이 화면이 잠깐 보였다 사라지는 걸 막는다.
   if (!authChecked) {
-    return <div className={styles.stage} data-theme={theme} />;
+    return <DaangnSplash theme={theme} message="당근을 시작하는 중..." subMessage="동네 이웃들과 따뜻한 이야기를 나눠요" />;
   }
 
   return (
@@ -1237,8 +1417,7 @@ export default function GajiMarketApp() {
                   })
                   .catch((error: unknown) => {
                     if (error instanceof AuthRequiredError) {
-                      setAuthRequired(true);
-                      setSheet("status");
+                      router.replace("/onboarding");
                     } else {
                       console.error("채팅방을 열지 못했습니다.", error);
                     }
@@ -1295,20 +1474,48 @@ export default function GajiMarketApp() {
               }}
             />
           ) : subPage?.type === "chat-room" && selectedChat ? (
-            <ChatRoomScreen
-              room={selectedChat}
-              messages={roomMessages[selectedChat.id] ?? []}
-              draft={messageDraft}
-              onDraftChange={setMessageDraft}
-              onSubmit={(event) => submitMessage(event, selectedChat.id)}
-              onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
+            <motion.div
+              key={`chat-room-${selectedChat.id}`}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+            >
+              <ChatRoomScreen
+                room={selectedChat}
+                messages={roomMessages[selectedChat.id] ?? []}
+                draft={messageDraft}
+                onDraftChange={setMessageDraft}
+                onSubmit={(event) => submitMessage(event, selectedChat.id)}
+                onSendImage={(file) => submitImageMessage(selectedChat.id, file)}
+                onBack={goBack}
+                otherUserId={roomOtherUserId[selectedChat.id]}
+                onLeave={() => leaveChat(selectedChat.id)}
+                onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
+                onBlock={blockChatPartner}
+                onReport={reportChatPartner}
+                onOpenPayment={() => openPayment(selectedChat.id)}
+                onViewPayment={(transactionId) => viewPayment(selectedChat.id, transactionId)}
+              />
+            </motion.div>
+          ) : subPage?.type === "payment-amount" && paymentRoom ? (
+            <PaymentAmountScreen
+              room={paymentRoom}
+              balance={walletBalance}
               onBack={goBack}
-              otherUserId={roomOtherUserId[selectedChat.id]}
-              onLeave={() => leaveChat(selectedChat.id)}
-              onUpdateStatus={(status) => updateChatStatus(selectedChat.id, status)}
-              onBlock={blockChatPartner}
-              onReport={reportChatPartner}
+              onSubmit={(amount) => submitPayment(subPage.chatRoomId, amount)}
             />
+          ) : subPage?.type === "payment-detail" && paymentRoom && paymentMessage?.payment ? (
+            <PaymentDetailScreen
+              room={paymentRoom}
+              payment={paymentMessage.payment}
+              mine={paymentMessage.mine}
+              onBack={goBack}
+            />
+          ) : subPage?.type === "wallet-charge" ? (
+            <WalletChargeScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletCharge} />
+          ) : subPage?.type === "wallet-pay" ? (
+            <WalletPayScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletPay} />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
               rooms={productChatRooms}
@@ -1340,6 +1547,7 @@ export default function GajiMarketApp() {
             <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
+              activeNeighborhood={activeNeighborhood}
               onBack={goBack}
               onVerify={(aptName) => {
                 setVerifiedApartment(aptName);
@@ -1401,12 +1609,9 @@ export default function GajiMarketApp() {
               onThemeChange={changeTheme}
               onBack={goBack}
               locationAllowed={locationAllowed}
-              isGuestMode={isGuestMode}
               onLocationToggle={() => setLocationAllowed((value) => !value)}
-              onGuestToggle={() => setIsGuestMode((value) => !value)}
-              onNetworkErrorToggle={() => setHasNetworkError((value) => !value)}
-              hasNetworkError={hasNetworkError}
               onLogout={handleLogout}
+              onWithdraw={handleWithdraw}
             />
           ) : subPage?.type === "sales" ? (
             <ManagementScreen
@@ -1415,12 +1620,14 @@ export default function GajiMarketApp() {
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
               onStatusChange={updateProductStatus}
+              onRefresh={refreshMyProducts}
             />
           ) : subPage?.type === "favorites" ? (
             <FavoriteScreen
               products={favoriteProducts}
               onBack={goBack}
               onProductClick={(id) => setSubPage({ type: "product-detail", id })}
+              onRefresh={refreshFavorites}
             />
           ) : subPage?.type === "recently-viewed" ? (
             <FavoriteScreen
@@ -1444,116 +1651,137 @@ export default function GajiMarketApp() {
             <RegionSearchScreen
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
+              excludedNeighborhoods={[activeNeighborhood]}
               onBack={() => {
                 setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");
               }}
               onPick={addNeighborhood}
             />
-          ) : activeTab === "home" ? (
-            <HomeScreen
-              isLoading={isBooting}
-              hasError={hasNetworkError}
-              activeNeighborhood={activeNeighborhood}
-              secondaryNeighborhood={secondaryNeighborhood}
-              productFilter={productFilter}
-              products={filteredProducts}
-              onLoadMore={loadMoreProducts}
-              hasMore={products.length < productsTotal}
-              isLoadingMore={isLoadingMoreProducts}
-              onOpenRegion={() => setSheet("region")}
-              onOpenSearch={() => setSubPage({ type: "search" })}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenMenu={() => {
-                setActiveTab("my");
-                setSubPage({ type: "my-menu" });
-              }}
-              onFilterChange={(value) => {
-                if (value === "부동산") {
-                  openRealEstate();
-                  return;
-                }
-                setProductFilter(value);
-              }}
-              onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              onRetry={() => setHasNetworkError(false)}
-              categories={categories}
-              filters={productFilters}
-              onApplyFilters={setProductFilters}
-            />
-          ) : activeTab === "community" ? (
-            <CommunityScreen
-              activeTab={communityTab}
-              activeFilter={communityFilter}
-              posts={filteredPosts}
-              togetherPosts={filteredTogetherPosts}
-              togetherCategoryFilter={togetherCategoryFilter}
-              onTogetherCategoryChange={setTogetherCategoryFilter}
-              onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
-              onTogetherPostClick={(id) => setSubPage({ type: "together-detail", id })}
-              isLoading={isBooting}
-              onTabChange={setCommunityTab}
-              onFilterChange={setCommunityFilter}
-              onOpenSearch={() => setSubPage({ type: "search" })}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenMenu={() => {
-                setActiveTab("my");
-                setSubPage({ type: "settings" });
-              }}
-              onPostClick={(id) => setSubPage({ type: "community-detail", id })}
-            />
-          ) : activeTab === "map" ? (
-            <MapScreen
-              activeNeighborhood={activeNeighborhood}
-              secondaryNeighborhood={secondaryNeighborhood}
-              categories={LOCAL_CATEGORIES}
-              selectedCategory={mapCategory}
-              sheetState={mapSheetState}
-              query={mapQuery}
-              businesses={businesses}
-              allDangerSignals={dangerSignals}
-              hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
-              searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
-              onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
-              locationAllowed={locationAllowed}
-              theme={theme}
-              onCategoryChange={setMapCategory}
-              onSheetStateChange={setMapSheetState}
-              onQueryChange={setMapQuery}
-              onRequestLocation={() => setLocationAllowed(true)}
-              onOpenProfile={() => {
-                setActiveTab("my");
-                setSubPage(null);
-              }}
-            />
-          ) : activeTab === "chats" ? (
-            <ChatsScreen
-              rooms={filteredChats}
-              activeFilter={chatFilter}
-              isLoading={isBooting}
-              unreadCount={totalUnread}
-              onFilterChange={setChatFilter}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenSettings={() => setSubPage({ type: "settings" })}
-              onOpenChat={openChat}
-            />
           ) : (
-            <MyScreen
-              nickname={me?.nickname}
-              activeNeighborhood={activeNeighborhood}
-              unreadCount={totalUnread}
-              favoriteCount={favoriteProducts.length}
-              myProducts={myProducts}
-              onOpenSettings={() => setSubPage({ type: "settings" })}
-              onOpenMenu={() => setSubPage({ type: "my-menu" })}
-              onOpenAllServices={() => setSubPage({ type: "all-services" })}
-              onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
-              onOpenAlba={() => setSubPage({ type: "alba" })}
-              onOpenSales={() => setSubPage({ type: "sales" })}
-              onOpenFavorites={() => setSubPage({ type: "favorites" })}
-              onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
-              onOpenApartment={openApartmentFlow}
-            />
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className={styles.tabContentTransition}
+            >
+              {activeTab === "home" ? (
+                <HomeScreen
+                  isLoading={isBooting}
+                  activeNeighborhood={activeNeighborhood}
+                  secondaryNeighborhood={secondaryNeighborhood}
+                  productFilter={productFilter}
+                  products={filteredProducts}
+                  onRefresh={refreshProducts}
+                  onLoadMore={loadMoreProducts}
+                  hasMore={products.length < productsTotal}
+                  isLoadingMore={isLoadingMoreProducts}
+                  onOpenRegion={() => setSheet("region")}
+                  onOpenSearch={() => setSubPage({ type: "search" })}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenMenu={() => {
+                    setActiveTab("my");
+                    setSubPage({ type: "my-menu" });
+                  }}
+                  onFilterChange={(value) => {
+                    if (value === "알바") {
+                      setSubPage({ type: "alba" });
+                      return;
+                    }
+                    if (value === "부동산") {
+                      openRealEstate();
+                      return;
+                    }
+                    setProductFilter(value);
+                  }}
+                  onProductClick={(id) => setSubPage({ type: "product-detail", id })}
+                  categories={categories}
+                  filters={productFilters}
+                  onApplyFilters={setProductFilters}
+                />
+              ) : activeTab === "community" ? (
+                <CommunityScreen
+                  activeTab={communityTab}
+                  activeFilter={communityFilter}
+                  posts={filteredPosts}
+                  togetherPosts={filteredTogetherPosts}
+                  togetherCategoryFilter={togetherCategoryFilter}
+                  onTogetherCategoryChange={setTogetherCategoryFilter}
+                  onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
+                  onTogetherPostClick={(id) => setSubPage({ type: "together-detail", id })}
+                  isLoading={isBooting}
+                  onTabChange={setCommunityTab}
+                  onFilterChange={setCommunityFilter}
+                  onOpenSearch={() => setSubPage({ type: "search" })}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenMenu={() => {
+                    setActiveTab("my");
+                    setSubPage({ type: "settings" });
+                  }}
+                  onPostClick={(id) => setSubPage({ type: "community-detail", id })}
+                  verifiedApartment={verifiedApartment}
+                  onOpenApartment={openApartmentFlow}
+                  activeNeighborhood={activeNeighborhood}
+                />
+              ) : activeTab === "map" ? (
+                <MapScreen
+                  activeNeighborhood={activeNeighborhood}
+                  secondaryNeighborhood={secondaryNeighborhood}
+                  categories={LOCAL_CATEGORIES}
+                  selectedCategory={mapCategory}
+                  sheetState={mapSheetState}
+                  query={mapQuery}
+                  businesses={businesses}
+                  allDangerSignals={dangerSignals}
+                  hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
+                  searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
+                  onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
+                  locationAllowed={locationAllowed}
+                  theme={theme}
+                  onCategoryChange={setMapCategory}
+                  onSheetStateChange={setMapSheetState}
+                  onQueryChange={setMapQuery}
+                  onRequestLocation={() => setLocationAllowed(true)}
+                  onOpenProfile={() => {
+                    setActiveTab("my");
+                    setSubPage(null);
+                  }}
+                />
+              ) : activeTab === "chats" ? (
+                <ChatsScreen
+                  rooms={filteredChats}
+                  activeFilter={chatFilter}
+                  isLoading={isBooting}
+                  unreadCount={totalUnread}
+                  onFilterChange={setChatFilter}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenSettings={() => setSubPage({ type: "settings" })}
+                  onOpenChat={openChat}
+                  onRefresh={refreshChats}
+                />
+              ) : (
+                <MyScreen
+                  nickname={me?.nickname}
+                  activeNeighborhood={activeNeighborhood}
+                  unreadCount={totalUnread}
+                  favoriteCount={favoriteProducts.length}
+                  myProducts={myProducts}
+                  walletBalance={walletBalance}
+                  onOpenSettings={() => setSubPage({ type: "settings" })}
+                  onOpenMenu={() => setSubPage({ type: "my-menu" })}
+                  onOpenAllServices={() => setSubPage({ type: "all-services" })}
+                  onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
+                  onOpenAlba={() => setSubPage({ type: "alba" })}
+                  onOpenSales={() => setSubPage({ type: "sales" })}
+                  onOpenFavorites={() => setSubPage({ type: "favorites" })}
+                  onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
+                  onOpenApartment={openApartmentFlow}
+                  onOpenWalletCharge={() => setSubPage({ type: "wallet-charge" })}
+                  onOpenWalletPay={() => setSubPage({ type: "wallet-pay" })}
+                />
+              )}
+            </motion.div>
           )}
         </main>
 
@@ -1619,18 +1847,6 @@ export default function GajiMarketApp() {
             setSubPage({ type: "together-intro" });
           }}
           totalUnread={totalUnread}
-          hasNetworkError={hasNetworkError}
-          isGuestMode={isGuestMode}
-          authRequired={authRequired}
-          onRetry={() => {
-            setHasNetworkError(false);
-            setSheet(null);
-          }}
-          onGuestOff={() => {
-            setIsGuestMode(false);
-            setAuthRequired(false);
-            setSheet(null);
-          }}
         />
         {toastMessage && <div className={styles.toast}>{toastMessage}</div>}
       </div>

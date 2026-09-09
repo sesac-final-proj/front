@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Eye,
   Heart,
-  MapPin,
   Menu,
   MessageCircle,
   MoreVertical,
@@ -24,7 +23,9 @@ import {
   PRODUCT_FILTERS,
 } from "../../constants";
 import { formatPrice, hasActiveProductFilters } from "../../utils";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { IconButton } from "../common/IconButton";
+import { PullToRefreshIndicator } from "../common/PullToRefreshIndicator";
 import { ScreenHeader } from "../common/ScreenHeader";
 import { StateBlock } from "../common/StateBlock";
 
@@ -184,11 +185,12 @@ export function ProductSkeletonList() {
 
 export function HomeScreen({
   isLoading,
-  hasError,
+  hasError = false,
   activeNeighborhood,
   secondaryNeighborhood,
   productFilter,
   products,
+  onRefresh,
   onLoadMore,
   hasMore,
   isLoadingMore,
@@ -204,11 +206,12 @@ export function HomeScreen({
   onApplyFilters,
 }: {
   isLoading: boolean;
-  hasError: boolean;
+  hasError?: boolean;
   activeNeighborhood: string;
   secondaryNeighborhood: string | null;
   productFilter: string;
   products: ProductListItem[];
+  onRefresh: () => Promise<void>;
   onLoadMore: () => void;
   hasMore: boolean;
   isLoadingMore: boolean;
@@ -218,7 +221,7 @@ export function HomeScreen({
   onOpenMenu: () => void;
   onFilterChange: (filter: string) => void;
   onProductClick: (id: string) => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   categories: string[];
   filters: ProductFilters;
   onApplyFilters: (filters: ProductFilters) => void;
@@ -246,8 +249,17 @@ export function HomeScreen({
     return () => observer.disconnect();
   }, [sentinelNode, hasMore, onLoadMore]);
 
+  // 당겨서 새로고침(pull-to-refresh) — PWA(standalone)에서는 브라우저 기본 당겨서
+  // 새로고침이 globals.css의 overscroll-behavior:none에 막혀 있어서(위로 스와이프할 때
+  // 화면이 고무줄처럼 밀리는 것도 같이 막아주는 값이라 이건 유지) 직접 구현한다.
+  // 맨 위(scrollTop 0)에서 아래로 당길 때만 동작하고, 그 외엔 평소처럼 그냥 스크롤된다.
+  const { pullOffset, isRefreshing, contentStyle: pullContentStyle, handlers: pullHandlers } =
+    usePullToRefresh(onRefresh);
+
   return (
-    <section className={styles.screen}>
+    <section className={styles.screen} {...pullHandlers}>
+      <PullToRefreshIndicator pullOffset={pullOffset} isRefreshing={isRefreshing} />
+      <div style={pullContentStyle}>
       <ScreenHeader
         title={
           <button type="button" className={styles.neighborhoodSwitch} onClick={onOpenRegion}>
@@ -256,7 +268,6 @@ export function HomeScreen({
             <ChevronDown size={16} />
           </button>
         }
-        leading={<MapPin className={styles.titlePin} size={28} fill="currentColor" />}
         actions={
           <>
             <IconButton label="검색" onClick={onOpenSearch}>
@@ -283,6 +294,7 @@ export function HomeScreen({
           {hasActiveProductFilters(filters) && <span className={styles.notificationDot} />}
         </button>
         <ChipScroller items={PRODUCT_FILTERS} value={productFilter} onChange={onFilterChange} />
+      </div>
       </div>
 
       {showFilterSheet && (
@@ -405,6 +417,7 @@ export function HomeScreen({
         </>
       )}
 
+      <div style={pullContentStyle}>
       {hasError ? (
         <StateBlock
           title="목록을 불러오지 못했어요"
@@ -437,6 +450,7 @@ export function HomeScreen({
           )}
         </div>
       )}
+      </div>
     </section>
   );
 }

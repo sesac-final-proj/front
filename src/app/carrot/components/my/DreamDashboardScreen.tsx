@@ -90,7 +90,7 @@ export function DreamDashboardScreen({
         />
         <button type="button" className={styles.dreamMapTitle} onClick={onChangeNeighborhood} aria-label={`모금 지역 변경, 현재 ${activeNeighborhood}`}>
           <span className={styles.dreamMapTitleCopy}>
-            <span>우리 동네 모금가지</span>
+            <span>우리 동네 모금기지</span>
             <strong>{district}</strong>
             <small>{activeNeighborhood === "송파삼성래미안" ? "송파나루역 - 송파삼성래미안" : "우리 동네 나눔 소식"}</small>
           </span>
@@ -120,22 +120,62 @@ export function DreamDashboardScreen({
         {facilityStatus === "ready" && visibleFacilities.length === 0 && <p className={styles.dreamEmpty}>이 구에서 확인된 어린이 센터가 없어요.</p>}
         {visibleFacilities.map((facility) => {
           const progress = facility.targetAmount > 0 ? Math.round((facility.currentAmount / facility.targetAmount) * 100) : 0;
+          const isSelected = facility.id === visibleSelectedFacilityId;
           return (
-            <button
-              type="button"
+            <div
               key={facility.id}
-              className={`${styles.dreamFacilityItem} ${facility.id === visibleSelectedFacilityId ? styles.dreamFacilitySelected : ""}`}
-              onClick={() => selectFacility(facility)}
+              className={`${styles.dreamFacilityItemCard} ${isSelected ? styles.dreamFacilitySelected : ""}`}
             >
-              <div>
-                <strong>{facility.name}</strong>
-                <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
-              </div>
-              <em>{progress}%</em>
-              <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
-                <span style={{ width: `${Math.min(progress, 100)}%` }} />
-              </div>
-            </button>
+              <button
+                type="button"
+                className={styles.dreamFacilityItem}
+                onClick={() => selectFacility(isSelected ? null : facility)}
+              >
+                <div>
+                  <strong>
+                    {facility.name}
+                    {facility.isRepresentative && (
+                      <span className={styles.dreamTrustBadge}>신뢰 {facility.districtRank}순위</span>
+                    )}
+                  </strong>
+                  <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
+                </div>
+                <em>{facility.totalScore !== null ? `${facility.totalScore}점` : `${progress}%`}</em>
+                <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <span style={{ width: `${Math.min(progress, 100)}%` }} />
+                </div>
+              </button>
+              {isSelected && (
+                <div className={styles.dreamFacilityExpandedDetails}>
+                  {facility.checklist && (
+                    <div className={styles.dreamTrustChecklist} aria-label={`${facility.name} 신뢰 판단 근거`}>
+                      {Object.values(facility.checklist).slice(0, 4).map((label) => (
+                        <span key={label}>{label}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={styles.dreamFacilityDetailMeta}>
+                    {facility.address && <p><strong>주소:</strong> {facility.address}</p>}
+                    {facility.phone && <p><strong>전화:</strong> {facility.phone}</p>}
+                    {facility.operationStatus && <p><strong>운영 상태:</strong> {facility.operationStatus}</p>}
+                    {facility.establishedDate && <p><strong>인허가일:</strong> {facility.establishedDate}</p>}
+                  </div>
+                  {facility.homepageUrl && (
+                    <a
+                      className={styles.dreamFacilityHomepageButton}
+                      href={facility.homepageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className={styles.homepageLogoBadge}>
+                        <Image src="/brand/daangn-mark.svg" alt="" width={16} height={16} />
+                      </span>
+                      <span>시설 정보와 홈페이지 보기 ➔</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </section>

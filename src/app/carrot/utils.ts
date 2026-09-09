@@ -264,6 +264,15 @@ export function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefine
     text: dto.content ?? "",
     time: formatRelativeTime(dto.createdAt),
     imageUrl: dto.messageType === "IMAGE" ? (dto.imageUrl ?? undefined) : undefined,
+    payment:
+      dto.messageType === "PAYMENT" && dto.payment
+        ? {
+            transactionId: String(dto.payment.transactionId),
+            amount: dto.payment.amount,
+            balanceAfter: dto.payment.balanceAfter,
+            createdAt: dto.createdAt,
+          }
+        : undefined,
   };
 }
 

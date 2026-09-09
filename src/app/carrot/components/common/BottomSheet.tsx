@@ -12,7 +12,6 @@ import {
 import styles from "../../GajiMarketApp.module.css";
 import type { SheetId } from "../../types";
 import { formatBadge } from "../../utils";
-import { StateBlock } from "./StateBlock";
 
 export function BottomSheet({
   sheet,
@@ -26,11 +25,6 @@ export function BottomSheet({
   onCommunityWrite,
   onTogetherWrite,
   totalUnread,
-  hasNetworkError,
-  isGuestMode,
-  authRequired,
-  onRetry,
-  onGuestOff,
 }: {
   sheet: SheetId;
   activeNeighborhood: string;
@@ -43,11 +37,6 @@ export function BottomSheet({
   onCommunityWrite: () => void;
   onTogetherWrite?: () => void;
   totalUnread: number;
-  hasNetworkError: boolean;
-  isGuestMode: boolean;
-  authRequired: boolean;
-  onRetry: () => void;
-  onGuestOff: () => void;
 }) {
   if (!sheet) return null;
 
@@ -85,28 +74,43 @@ export function BottomSheet({
                 { name: activeNeighborhood, target: "primary" as const },
                 ...(secondaryNeighborhood ? [{ name: secondaryNeighborhood, target: "secondary" as const }] : []),
               ].map(({ name, target }) => (
-                <div className={styles.myRegionRow} key={target}>
-                  <button
-                    type="button"
+                // 로우 전체를 눌러도 그 동네가 대표로 바뀐다 — 라디오는 이제 상태만
+                // 보여주는 장식이고, 실제 선택은 로우 버튼이 담당한다.
+                <button
+                  type="button"
+                  className={styles.myRegionRow}
+                  key={target}
+                  aria-label={`${name}을 대표 동네로 설정`}
+                  onClick={() => onSelectPrimary(name)}
+                >
+                  <span
                     className={`${styles.myRegionRadio} ${target === "primary" ? styles.myRegionRadioSelected : ""}`}
-                    aria-label={`${name}을 대표 동네로 설정`}
-                    onClick={() => onSelectPrimary(name)}
                   >
                     <span className={target === "primary" ? styles.myRegionRadioOn : ""} />
-                  </button>
+                  </span>
                   <span className={styles.myRegionName}>{name}</span>
                   {/* 동네가 1개뿐이면 마지막 하나는 못 지운다 — secondary가 있을 때만 X가 보인다. */}
                   {secondaryNeighborhood && (
-                    <button
-                      type="button"
+                    <span
+                      role="button"
+                      tabIndex={0}
                       className={styles.myRegionRemove}
                       aria-label={`${name} 삭제`}
-                      onClick={() => onRemoveNeighborhood(target)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveNeighborhood(target);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.stopPropagation();
+                        event.preventDefault();
+                        onRemoveNeighborhood(target);
+                      }}
                     >
                       <X size={18} />
-                    </button>
+                    </span>
                   )}
-                </div>
+                </button>
               ))}
             </div>
             {!secondaryNeighborhood && (
@@ -126,26 +130,6 @@ export function BottomSheet({
               <p>관심 상품과 판매 상태 변경 알림이 여기에 모입니다.</p>
               <p>상품을 예약중으로 바꾸면 관련 화면에 같은 배지가 표시됩니다.</p>
             </div>
-          </>
-        )}
-        {sheet === "status" && (
-          <>
-            <h2>상태 안내</h2>
-            {isGuestMode || authRequired ? (
-              <StateBlock
-                title="로그인이 필요해요"
-                body="비로그인 사용자는 탐색만 가능하고 관심, 채팅, 글쓰기는 제한됩니다."
-                actionLabel="로그인 상태로 전환"
-                onAction={onGuestOff}
-              />
-            ) : hasNetworkError ? (
-              <StateBlock
-                title="네트워크 오류"
-                body="화면 데이터는 유지하고 재시도할 수 있게 처리했습니다."
-                actionLabel="재시도"
-                onAction={onRetry}
-              />
-            ) : null}
           </>
         )}
       </section>

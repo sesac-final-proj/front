@@ -23,7 +23,14 @@ export interface ChatRoomDto {
   productTradeStatus: ChatTradeStatus | null;
 }
 
-export type MessageType = "TEXT" | "IMAGE";
+export type MessageType = "TEXT" | "IMAGE" | "PAYMENT";
+
+export interface ChatMessagePaymentDto {
+  transactionId: number;
+  amount: number;
+  // 송금한 사람(sender) 기준 거래 후 잔액.
+  balanceAfter: number;
+}
 
 export interface ChatMessageDto {
   id: number;
@@ -33,6 +40,9 @@ export interface ChatMessageDto {
   content: string | null;
   imageUrl: string | null;
   createdAt: string;
+  // messageType === "PAYMENT"일 때만 채워진다 — 당근페이 서비스(walletService)가
+  // 만든 메시지라 chats 엔드포인트 응답에도 이 필드가 실려온다.
+  payment: ChatMessagePaymentDto | null;
 }
 
 interface ApiChatRoom {
@@ -58,7 +68,14 @@ interface ApiChatRoomPage {
   total: number;
 }
 
-interface ApiChatMessage {
+interface ApiChatMessagePayment {
+  transaction_id: number;
+  amount: number;
+  balance_after: number;
+}
+
+// walletService가 응답 변환에 재사용할 수 있게 export.
+export interface ApiChatMessage {
   id: number;
   chat_room_id: number;
   sender_id: number;
@@ -66,6 +83,7 @@ interface ApiChatMessage {
   content: string | null;
   image_url: string | null;
   created_at: string;
+  payment: ApiChatMessagePayment | null;
 }
 
 interface ApiChatMessagePage {
@@ -93,7 +111,8 @@ function toChatRoom(item: ApiChatRoom): ChatRoomDto {
   };
 }
 
-function toChatMessage(item: ApiChatMessage): ChatMessageDto {
+// walletService의 송금 응답도 이 변환을 그대로 쓰기 때문에 export한다.
+export function toChatMessage(item: ApiChatMessage): ChatMessageDto {
   return {
     id: item.id,
     chatRoomId: item.chat_room_id,
@@ -102,6 +121,13 @@ function toChatMessage(item: ApiChatMessage): ChatMessageDto {
     content: item.content,
     imageUrl: item.image_url,
     createdAt: item.created_at,
+    payment: item.payment
+      ? {
+          transactionId: item.payment.transaction_id,
+          amount: item.payment.amount,
+          balanceAfter: item.payment.balance_after,
+        }
+      : null,
   };
 }
 

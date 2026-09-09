@@ -50,8 +50,34 @@ export interface RentTransactionQuery {
   limit?: number;
 }
 
-function apiUrl(path: string) {
-  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+async function fetchRentWithFallback(params: URLSearchParams, signal?: AbortSignal): Promise<ApiRentResponse> {
+  // 1차: FastAPI 백엔드 직접 호출 (서울시 공공데이터 실시간 연동)
+  try {
+    const url = `${BACKEND_BASE_URL}/api/real-estate/rent?${params.toString()}`;
+    const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.items)) {
+        return data as ApiRentResponse;
+      }
+    }
+  } catch {
+    // 1차 실패 시 아래 Next.js 라우트 호출로 부드럽게 전환
+  }
+
+  // 2차: Next.js API 라우트
+  const fallbackUrl = `/api/real-estate/rent?${params.toString()}`;
+  const response = await fetch(fallbackUrl, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail ?? "실거래 정보를 불러오지 못했습니다.");
+  }
+  return (await response.json()) as ApiRentResponse;
 }
 
 export async function getRentTransactions(
@@ -73,16 +99,7 @@ export async function getRentTransactions(
     Object.entries(query.bounds).forEach(([key, value]) => params.set(key, String(value)));
   }
 
-  const response = await fetch(apiUrl(`/api/real-estate/rent?${params}`), {
-    signal,
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.detail ?? "실거래 정보를 불러오지 못했습니다.");
-  }
-
-  const payload: ApiRentResponse = await response.json();
+  const payload = await fetchRentWithFallback(params, signal);
   return {
     items: payload.items.map((item) => ({
       id: item.id,

@@ -27,6 +27,18 @@ export function DreamFacilityCallout({
       </div>
       <strong>{facility.name}</strong>
       <p>{facility.facilityType} · {facility.neighborhoodName}</p>
+      {facility.isRepresentative && (
+        <div className={styles.dreamTrustCallout}>
+          <span>신뢰처리 상위 {facility.districtRank}순위</span>
+          {facility.totalScore !== null && <strong>{facility.totalScore}점</strong>}
+        </div>
+      )}
+      <dl className={styles.dreamFacilityCalloutDetails}>
+        <div><dt>주소</dt><dd>{facility.address}</dd></div>
+        {facility.phone && <div><dt>전화</dt><dd>{facility.phone}</dd></div>}
+        {facility.establishedDate && <div><dt>인허가일</dt><dd>{facility.establishedDate}</dd></div>}
+        {facility.operationStatus && <div><dt>운영 상태</dt><dd>{facility.operationStatus}</dd></div>}
+      </dl>
       <div className={styles.dreamFacilityCalloutStats}>
         <div>
           <span>현재 모금액</span>
@@ -44,6 +56,14 @@ export function DreamFacilityCallout({
         <small>{facility.donationCount}명의 이웃이 함께 참여했어요</small>
         <em>{progress}%</em>
       </div>
+      {facility.homepageUrl && (
+        <a className={styles.dreamFacilityHomepage} href={facility.homepageUrl} target="_blank" rel="noreferrer">
+          <span className={styles.homepageLogoBadge}>
+            <Image src="/brand/daangn-mark.svg" alt="" width={16} height={16} />
+          </span>
+          <span>시설 정보와 홈페이지 보기</span>
+        </a>
+      )}
     </aside>
   );
 }

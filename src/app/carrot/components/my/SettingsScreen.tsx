@@ -26,12 +26,9 @@ export interface SettingsScreenProps {
   onThemeChange: (theme: ThemeMode) => void;
   onBack: () => void;
   locationAllowed: boolean;
-  isGuestMode: boolean;
-  hasNetworkError: boolean;
   onLocationToggle: () => void;
-  onGuestToggle: () => void;
-  onNetworkErrorToggle: () => void;
   onLogout: () => void;
+  onWithdraw: () => void;
 }
 
 export function SettingsScreen({
@@ -39,12 +36,9 @@ export function SettingsScreen({
   onThemeChange,
   onBack,
   locationAllowed,
-  isGuestMode,
-  hasNetworkError,
   onLocationToggle,
-  onGuestToggle,
-  onNetworkErrorToggle,
   onLogout,
+  onWithdraw,
 }: SettingsScreenProps) {
   return (
     <section className={styles.screen}>
@@ -83,14 +77,6 @@ export function SettingsScreen({
           위치 권한
           <span className={locationAllowed ? styles.switchOn : ""} />
         </button>
-        <button type="button" onClick={onGuestToggle}>
-          비로그인 모드
-          <span className={isGuestMode ? styles.switchOn : ""} />
-        </button>
-        <button type="button" onClick={onNetworkErrorToggle}>
-          네트워크 오류 상태
-          <span className={hasNetworkError ? styles.switchOn : ""} />
-        </button>
       </section>
       <MenuCard
         title="고객지원"
@@ -99,13 +85,13 @@ export function SettingsScreen({
           { label: "고객센터", icon: Headphones },
           { label: "의견 남기기", icon: Mail },
           { label: "로그아웃", icon: LogOut, onClick: onLogout },
-          { label: "탈퇴하기", icon: X },
-          { label: "가지마켓 알아보기", icon: Sparkles },
+          { label: "탈퇴하기", icon: X, onClick: onWithdraw },
+          { label: "우리 동네 지도 알아보기", icon: Sparkles },
           { label: "약관 및 정책", icon: BookOpen },
         ]}
       />
       <button type="button" className={styles.companyInfo}>
-        (주) 가지마켓 사업자 정보 <ChevronRight size={18} />
+        (주) 우리 동네 지도 사업자 정보 <ChevronRight size={18} />
       </button>
     </section>
   );
