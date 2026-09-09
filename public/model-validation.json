@@ -1,182 +1,520 @@
 {
-  "rows": 4913,
+  "rows": 4771,
   "target": "등록가(KRW)",
   "selectedModel": "RandomForest",
+  "selectedR2": 0.5,
+  "selectedMAE": 56597,
   "split": {
     "method": "시간순 80/20 홀드아웃",
-    "trainRows": 3930,
-    "testRows": 983,
-    "trainUntil": "2026-08-05T12:10:48",
-    "testFrom": "2026-08-05T12:10:53"
+    "trainRows": 3816,
+    "testRows": 955,
+    "trainUntil": "2026-08-05T10:25:34",
+    "testFrom": "2026-08-05T10:44:01"
   },
-  "baseline": {
-    "name": "학습 중앙값",
-    "testR2": -0.157,
-    "testMAE": 91537
-  },
-  "models": [
+  "baselines": [
     {
-      "name": "LightGBM",
-      "trainR2": 0.3731,
-      "cvR2Mean": 0.2461,
-      "cvR2Std": 0.0584,
-      "testR2": 0.4311,
-      "testMAE": 57211,
-      "testMedianAE": 33099,
-      "overfitGap": -0.058,
-      "overfitRisk": "보통",
-      "bestParams": {
-        "n_estimators": 542,
-        "learning_rate": 0.04782819897597913,
-        "num_leaves": 26,
-        "max_depth": 5,
-        "min_child_samples": 12,
-        "subsample": 0.8179398494349039,
-        "colsample_bytree": 0.7698722797647489,
-        "reg_alpha": 0.0017233922827978331,
-        "reg_lambda": 1.6258726768818066
-      },
-      "featureImportance": [
-        {
-          "feature": "listed_month",
-          "importancePct": 19.83
-        },
-        {
-          "feature": "condition_중고",
-          "importancePct": 4.8
-        },
-        {
-          "feature": "listed_year",
-          "importancePct": 3.46
-        },
-        {
-          "feature": "listed_quarter_2025Q3",
-          "importancePct": 3.3
-        },
-        {
-          "feature": "listed_quarter_2026Q2",
-          "importancePct": 3.27
-        },
-        {
-          "feature": "model_CALF_V3",
-          "importancePct": 3.15
-        },
-        {
-          "feature": "platform_elecmart",
-          "importancePct": 3.08
-        },
-        {
-          "feature": "condition_새상품",
-          "importancePct": 2.94
-        },
-        {
-          "feature": "search_keyword_풀리오 마사지기",
-          "importancePct": 2.67
-        },
-        {
-          "feature": "model_전기보온밥솥_3인용",
-          "importancePct": 2.34
-        }
-      ]
+      "name": "전체 중앙값 베이스라인",
+      "testR2": -0.1704,
+      "testMAE": 89595,
+      "testRMSE": 140290,
+      "testMedAE": 50100
     },
     {
+      "name": "품목군 중앙값 베이스라인",
+      "testR2": 0.1475,
+      "testMAE": 70679,
+      "testRMSE": 119735,
+      "testMedAE": 41000
+    },
+    {
+      "name": "계층적 모델 중앙값 베이스라인",
+      "testR2": 0.5414,
+      "testMAE": 54725,
+      "testRMSE": 87818,
+      "testMedAE": 33000
+    }
+  ],
+  "models": [
+    {
       "name": "RandomForest",
-      "trainR2": 0.4328,
-      "cvR2Mean": 0.3377,
-      "cvR2Std": 0.145,
-      "testR2": 0.4681,
-      "testMAE": 57461,
-      "testMedianAE": 34400,
-      "overfitGap": -0.0353,
-      "overfitRisk": "낮음",
+      "trainR2": 0.6998,
+      "cvR2Mean": 0.5137,
+      "cvR2Std": 0.0846,
+      "testR2": 0.5,
+      "testMAE": 56597,
+      "testRMSE": 91695,
+      "testMedianAE": 34008,
+      "testMAPE": 51.51,
+      "overfitGap": 0.1998,
+      "overfitRisk": "보통",
       "bestParams": {
-        "n_estimators": 192,
-        "max_depth": 14,
+        "n_estimators": 189,
+        "max_depth": 18,
         "min_samples_leaf": 1,
-        "min_samples_split": 19,
+        "min_samples_split": 11,
         "max_features": 0.5,
-        "max_samples": 0.8560204063533432
+        "max_samples": 0.9239653055431372
       },
       "featureImportance": [
         {
           "feature": "search_keyword_미닉스 음식물처리기",
-          "importancePct": 15.16
+          "importancePct": 11.9
+        },
+        {
+          "feature": "condition_group_미개봉/새상품",
+          "importancePct": 9.53
+        },
+        {
+          "feature": "condition_group_상태미기재",
+          "importancePct": 7.66
         },
         {
           "feature": "model_BOOSTER_PRO",
-          "importancePct": 12.73
+          "importancePct": 7.21
         },
         {
           "feature": "search_keyword_쿠쿠 밥솥",
-          "importancePct": 6.56
-        },
-        {
-          "feature": "model_V6",
-          "importancePct": 5.49
-        },
-        {
-          "feature": "model_SPOT_AND_SCRUB",
-          "importancePct": 5.42
-        },
-        {
-          "feature": "condition_새상품",
-          "importancePct": 4.22
+          "importancePct": 4.17
         },
         {
           "feature": "search_keyword_다이슨 청소기",
-          "importancePct": 3.39
+          "importancePct": 4.05
         },
         {
-          "feature": "model_CRP-FHB0610FD",
-          "importancePct": 3.0
-        },
-        {
-          "feature": "model_NECK_PULLER",
-          "importancePct": 2.74
+          "feature": "product_signature_메디큐브 부스터프로|BOOSTER_PRO|용량 미기재|상태미기재",
+          "importancePct": 3.58
         },
         {
           "feature": "search_keyword_풀리오 마사지기",
-          "importancePct": 2.71
+          "importancePct": 3.52
+        },
+        {
+          "feature": "listed_month",
+          "importancePct": 2.91
+        },
+        {
+          "feature": "product_signature_다이슨 청소기|V6|용량 미기재|상태미기재",
+          "importancePct": 1.95
         }
       ]
+    },
+    {
+      "name": "LightGBM",
+      "trainR2": 0.6191,
+      "cvR2Mean": 0.4266,
+      "cvR2Std": 0.0226,
+      "testR2": 0.4402,
+      "testMAE": 58051,
+      "testRMSE": 97024,
+      "testMedianAE": 34923,
+      "testMAPE": 56.33,
+      "overfitGap": 0.1789,
+      "overfitRisk": "보통",
+      "bestParams": {
+        "n_estimators": 398,
+        "learning_rate": 0.1057642657018019,
+        "num_leaves": 41,
+        "max_depth": 7,
+        "min_child_samples": 15,
+        "subsample": 0.8150089277340933,
+        "colsample_bytree": 0.8666557880757614,
+        "reg_alpha": 0.003198024245251773,
+        "reg_lambda": 3.3160244172835647
+      },
+      "featureImportance": [
+        {
+          "feature": "listed_month",
+          "importancePct": 19.17
+        },
+        {
+          "feature": "listed_quarter_2026Q1",
+          "importancePct": 3.96
+        },
+        {
+          "feature": "listed_year",
+          "importancePct": 3.41
+        },
+        {
+          "feature": "platform_elecmart",
+          "importancePct": 2.93
+        },
+        {
+          "feature": "capacity_value",
+          "importancePct": 2.56
+        },
+        {
+          "feature": "model_CALF_V3",
+          "importancePct": 2.38
+        },
+        {
+          "feature": "condition_중고",
+          "importancePct": 2.38
+        },
+        {
+          "feature": "product_signature_풀리오 마사지기|CALF_V3|용량 미기재|상태미기재",
+          "importancePct": 2.35
+        },
+        {
+          "feature": "product_signature_다이슨 청소기|제품군 공통|용량 미기재|미개봉/새상품",
+          "importancePct": 2.32
+        },
+        {
+          "feature": "product_signature_풀리오 마사지기|THIGH_FULLIGE|용량 미기재|상태미기재",
+          "importancePct": 2.21
+        }
+      ]
+    },
+    {
+      "name": "XGBoost",
+      "trainR2": 0.6625,
+      "cvR2Mean": 0.4884,
+      "cvR2Std": 0.1079,
+      "testR2": 0.4949,
+      "testMAE": 55635,
+      "testRMSE": 92161,
+      "testMedianAE": 33319,
+      "testMAPE": 52.72,
+      "overfitGap": 0.1676,
+      "overfitRisk": "보통",
+      "bestParams": {
+        "n_estimators": 241,
+        "learning_rate": 0.051211779757401,
+        "max_depth": 6,
+        "min_child_weight": 3,
+        "subsample": 0.8835558684167139,
+        "colsample_bytree": 0.7418481581956126,
+        "reg_alpha": 0.00035372645768101327,
+        "reg_lambda": 0.0012242924059718244
+      },
+      "featureImportance": [
+        {
+          "feature": "product_signature_메디큐브 부스터프로|BOOSTER_PRO|용량 미기재|상태미기재",
+          "importancePct": 8.88
+        },
+        {
+          "feature": "model_BOOSTER_PRO",
+          "importancePct": 4.79
+        },
+        {
+          "feature": "search_keyword_미닉스 음식물처리기",
+          "importancePct": 4.08
+        },
+        {
+          "feature": "search_keyword_쿠쿠 밥솥",
+          "importancePct": 3.62
+        },
+        {
+          "feature": "product_signature_다이슨 청소기|WASH_G1|용량 미기재|상태미기재",
+          "importancePct": 3.44
+        },
+        {
+          "feature": "product_signature_메디큐브 부스터프로|BOOSTER_PRO_MINI|용량 미기재|상태미기재",
+          "importancePct": 2.58
+        },
+        {
+          "feature": "search_keyword_메디큐브 부스터 프로",
+          "importancePct": 2.54
+        },
+        {
+          "feature": "product_signature_풀리오 마사지기|NECK_PULLER|용량 미기재|상태미기재",
+          "importancePct": 2.38
+        },
+        {
+          "feature": "search_keyword_풀리오 마사지기",
+          "importancePct": 2.09
+        },
+        {
+          "feature": "condition_group_상태미기재",
+          "importancePct": 2.04
+        }
+      ]
+    },
+    {
+      "name": "HistGradientBoosting",
+      "trainR2": 0.594,
+      "cvR2Mean": 0.4578,
+      "cvR2Std": 0.0623,
+      "testR2": 0.452,
+      "testMAE": 57560,
+      "testRMSE": 95997,
+      "testMedianAE": 34793,
+      "testMAPE": 51.29,
+      "overfitGap": 0.142,
+      "overfitRisk": "보통",
+      "bestParams": {
+        "max_iter": 244,
+        "learning_rate": 0.041131789115693235,
+        "max_depth": 5,
+        "min_samples_leaf": 12,
+        "l2_regularization": 0.013148098648891743
+      },
+      "featureImportance": []
+    }
+  ],
+  "splitComparison": [
+    {
+      "split": "Time-Series (80/20)",
+      "model": "Baseline (Global Median)",
+      "testR2": -0.1704,
+      "testMAE": 89595,
+      "testMedAE": 50100
+    },
+    {
+      "split": "Time-Series (80/20)",
+      "model": "Baseline (Product Family Median)",
+      "testR2": 0.1475,
+      "testMAE": 70679,
+      "testMedAE": 41000
+    },
+    {
+      "split": "Time-Series (80/20)",
+      "model": "Baseline (Hierarchical Model Median)",
+      "testR2": 0.5414,
+      "testMAE": 54725,
+      "testMedAE": 33000
+    },
+    {
+      "split": "Time-Series (80/20)",
+      "model": "RandomForest",
+      "testR2": 0.4687,
+      "testMAE": 58799,
+      "testMedAE": 35254
+    },
+    {
+      "split": "Time-Series (80/20)",
+      "model": "LightGBM",
+      "testR2": 0.3689,
+      "testMAE": 60640,
+      "testMedAE": 35398
+    },
+    {
+      "split": "Time-Series (80/20)",
+      "model": "XGBoost",
+      "testR2": 0.5826,
+      "testMAE": 53315,
+      "testMedAE": 33319
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "Baseline (Global Median)",
+      "testR2": -0.1078,
+      "testMAE": 87135,
+      "testMedAE": 55000
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "Baseline (Product Family Median)",
+      "testR2": 0.1052,
+      "testMAE": 72470,
+      "testMedAE": 41000
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "Baseline (Hierarchical Model Median)",
+      "testR2": 0.5707,
+      "testMAE": 50691,
+      "testMedAE": 30000
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "RandomForest",
+      "testR2": 0.6852,
+      "testMAE": 46650,
+      "testMedAE": 27559
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "LightGBM",
+      "testR2": 0.5,
+      "testMAE": 52720,
+      "testMedAE": 28307
+    },
+    {
+      "split": "Random Split (80/20)",
+      "model": "XGBoost",
+      "testR2": 0.6745,
+      "testMAE": 46238,
+      "testMedAE": 27543
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "Baseline (Global Median)",
+      "testR2": -0.0107,
+      "testMAE": 92922,
+      "testMedAE": 65000
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "Baseline (Product Family Median)",
+      "testR2": 0.0208,
+      "testMAE": 93767,
+      "testMedAE": 81500
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "Baseline (Hierarchical Model Median)",
+      "testR2": 0.0208,
+      "testMAE": 93767,
+      "testMedAE": 81500
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "RandomForest",
+      "testR2": 0.1535,
+      "testMAE": 89662,
+      "testMedAE": 61437
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "LightGBM",
+      "testR2": 0.2547,
+      "testMAE": 87665,
+      "testMedAE": 73063
+    },
+    {
+      "split": "Group Split (normalized_model)",
+      "model": "XGBoost",
+      "testR2": 0.2331,
+      "testMAE": 87792,
+      "testMedAE": 75088
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "Baseline (Global Median)",
+      "testR2": -0.1519,
+      "testMAE": 74244,
+      "testMedAE": 50000
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "Baseline (Product Family Median)",
+      "testR2": -0.1443,
+      "testMAE": 78930,
+      "testMedAE": 54000
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "Baseline (Hierarchical Model Median)",
+      "testR2": 0.0002,
+      "testMAE": 74205,
+      "testMedAE": 50000
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "RandomForest",
+      "testR2": -0.296,
+      "testMAE": 87404,
+      "testMedAE": 72519
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "LightGBM",
+      "testR2": -0.1536,
+      "testMAE": 81558,
+      "testMedAE": 64685
+    },
+    {
+      "split": "Group Split (product_signature)",
+      "model": "XGBoost",
+      "testR2": -0.1715,
+      "testMAE": 81324,
+      "testMedAE": 66711
     }
   ],
   "selectedCategoryMetrics": [
     {
       "item": "다이슨 청소기",
-      "count": 250,
-      "r2": 0.4405,
-      "mae": 87376
+      "count": 242,
+      "r2": 0.4305,
+      "mae": 94430,
+      "medae": 63861
     },
     {
       "item": "메디큐브 부스터 프로",
-      "count": 238,
-      "r2": 0.1082,
-      "mae": 60459
+      "count": 225,
+      "r2": 0.0948,
+      "mae": 57851,
+      "medae": 36879
     },
     {
       "item": "미닉스 음식물처리기",
       "count": 60,
-      "r2": -0.4167,
-      "mae": 52252
+      "r2": -0.0495,
+      "mae": 41536,
+      "medae": 31641
+    },
+    {
+      "item": "브레짜 분유",
+      "count": 7,
+      "r2": 0.2967,
+      "mae": 33800,
+      "medae": 35276
     },
     {
       "item": "쿠쿠 밥솥",
-      "count": 338,
-      "r2": 0.1477,
-      "mae": 42161
+      "count": 331,
+      "r2": 0.1409,
+      "mae": 39700,
+      "medae": 26563
     },
     {
       "item": "풀리오 마사지기",
       "count": 90,
-      "r2": 0.4245,
-      "mae": 26959
+      "r2": 0.4454,
+      "mae": 25686,
+      "medae": 15735
     }
   ],
-  "leakageGuard": "가격 기반 comparison_cluster 제외",
+  "selectedPlatformMetrics": [
+    {
+      "platform": "elecmart",
+      "count": 612,
+      "r2": 0.4755,
+      "mae": 54329,
+      "medae": 31024
+    },
+    {
+      "platform": "joonggonara",
+      "count": 343,
+      "r2": 0.5294,
+      "mae": 60643,
+      "medae": 39706
+    }
+  ],
+  "selectedPriceTierMetrics": [
+    {
+      "tier": "Q1 (저가)",
+      "priceRange": "10,000 ~ 63,000",
+      "count": 244,
+      "mae": 29269,
+      "medae": 20817
+    },
+    {
+      "tier": "Q2 (중저가)",
+      "priceRange": "64,000 ~ 120,000",
+      "count": 251,
+      "mae": 21698,
+      "medae": 17117
+    },
+    {
+      "tier": "Q3 (중고가)",
+      "priceRange": "124,000 ~ 200,000",
+      "count": 223,
+      "mae": 64683,
+      "medae": 63566
+    },
+    {
+      "tier": "Q4 (고가)",
+      "priceRange": "204,000 ~ 1,100,000",
+      "count": 237,
+      "mae": 114083,
+      "medae": 102724
+    }
+  ],
+  "leakageGuard": "가격 기반 comparison_cluster 제외, 제품명·모델·용량·상태 product_signature 사용",
   "clusterSummary": {
-    "count": 243,
-    "cuckoo10Rows": 479,
+    "count": 219,
+    "cuckoo10Rows": 468,
     "productYearRows": 24,
     "unknownRows": 0,
     "duplicateIds": 0
