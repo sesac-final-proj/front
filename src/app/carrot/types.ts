@@ -126,6 +126,7 @@ export type CommunityPost = {
   viewCount: number;
   commentCount: number;
   reactionCount: number;
+  mine?: boolean;
 };
 
 export type ChatRoom = {
