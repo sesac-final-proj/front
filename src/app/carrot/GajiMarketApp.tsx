@@ -79,6 +79,7 @@ import {
   updateProduct,
   uploadProductImage,
   listCategories,
+  deleteProduct,
 } from "@/services";
 import {
   createOrGetChatRoom,
@@ -1326,6 +1327,29 @@ export default function GajiMarketApp() {
       });
   }
 
+  // 확인(window.confirm)은 ProductDetailScreen에서 이미 받고 호출한다.
+  function deleteMyProduct(productId: string) {
+    const numericId = Number(productId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteProduct(numericId)
+      .then(() => {
+        setProducts((current) => current.filter((p) => p.id !== productId));
+        setMyProducts((current) => current.filter((p) => p.id !== productId));
+        setFavoriteProducts((current) => current.filter((p) => p.id !== productId));
+        setRecentlyViewedProducts((current) => current.filter((p) => p.id !== productId));
+        goBack();
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
   function submitCommunityPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1472,6 +1496,7 @@ export default function GajiMarketApp() {
                 setProducts((prev) => prev.filter((p) => p.id !== id));
               }}
               onEdit={(id) => setSubPage({ type: "product-form", editId: id })}
+              onDelete={deleteMyProduct}
             />
           ) : subPage?.type === "product-form" ? (
             <ProductFormScreen

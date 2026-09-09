@@ -354,6 +354,15 @@ export async function updateProduct(
   return toTradeProduct(payload);
 }
 
+// 본인 글 삭제. 서버가 찜/최근본/가격분석/걸려있던 채팅방 참조까지 같이 정리한다
+// (연결된 채팅 기록 자체는 보존 — trades/service.py delete_product 참고).
+export async function deleteProduct(productId: number): Promise<void> {
+  const response = await authorizedFetch(`/api/v1/trades/products/${productId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("글을 삭제하지 못했습니다.");
+}
+
 // 상품 이미지는 1장만 유지(재업로드하면 덮어씀). NCP Object Storage에 서버를 거치지
 // 않고 직접 PUT — presign → 브라우저에서 NCP로 PUT → object_key 등록, 3단계.
 export async function uploadProductImage(productId: number, file: File): Promise<string> {

@@ -10,6 +10,7 @@ import {
   Heart,
   MessageCircle,
   MoreVertical,
+  Trash2,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem, TradeStatus } from "../../types";
@@ -91,6 +92,7 @@ export function ProductDetailScreen({
   onHideSeller,
   onReportProduct,
   onEdit,
+  onDelete,
 }: {
   product: ProductListItem;
   onBack: () => void;
@@ -100,6 +102,7 @@ export function ProductDetailScreen({
   onHideSeller: (productId: string) => void;
   onReportProduct: (productId: string, reason: string) => void;
   onEdit: (productId: string) => void;
+  onDelete: (productId: string) => void;
 }) {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -217,17 +220,32 @@ export function ProductDetailScreen({
             </div>
             <div className={styles.productActionGroup}>
               {product.mine ? (
-                <button
-                  type="button"
-                  className={styles.productActionBtn}
-                  onClick={() => {
-                    setShowMoreSheet(false);
-                    onEdit(product.id);
-                  }}
-                >
-                  <FileText size={22} />
-                  <span>글 수정하기</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.productActionBtn}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      onEdit(product.id);
+                    }}
+                  >
+                    <FileText size={22} />
+                    <span>글 수정하기</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      if (window.confirm("정말 삭제하시겠어요?\n삭제하면 되돌릴 수 없어요.")) {
+                        onDelete(product.id);
+                      }
+                    }}
+                  >
+                    <Trash2 size={22} />
+                    <span>삭제하기</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <button
