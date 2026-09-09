@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import styles from "./GajiMarketApp.module.css";
 
 // Components (Barrel Export from ./components)
@@ -225,6 +226,11 @@ export default function GajiMarketApp() {
       getMe()
         .then((fetchedMe) => {
           if (cancelled) return;
+          if (fetchedMe.role === "admin") {
+            // 관리자 계정은 모바일 당근 소비자 세션으로 진입하지 않고 온보딩으로 분리
+            handleLogout();
+            return;
+          }
           if (!fetchedMe.nicknameSet) {
             router.replace("/onboarding/profile");
             return;
@@ -759,6 +765,7 @@ export default function GajiMarketApp() {
   }, [togetherPosts, togetherCategoryFilter]);
 
   function navigateTab(tab: TabId) {
+    const isSameTab = activeTab === tab && !subPage;
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
@@ -766,7 +773,10 @@ export default function GajiMarketApp() {
       setMapSheetState("half");
     }
     window.requestAnimationFrame(() => {
-      document.querySelector("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+      document.querySelector("[data-app-scroll]")?.scrollTo({
+        top: 0,
+        behavior: isSameTab ? "smooth" : "instant",
+      });
     });
   }
 
@@ -1596,111 +1606,121 @@ export default function GajiMarketApp() {
               }}
               onPick={addNeighborhood}
             />
-          ) : activeTab === "home" ? (
-            <HomeScreen
-              isLoading={isBooting}
-              activeNeighborhood={activeNeighborhood}
-              secondaryNeighborhood={secondaryNeighborhood}
-              productFilter={productFilter}
-              products={filteredProducts}
-              onRefresh={refreshProducts}
-              onLoadMore={loadMoreProducts}
-              hasMore={products.length < productsTotal}
-              isLoadingMore={isLoadingMoreProducts}
-              onOpenRegion={() => setSheet("region")}
-              onOpenSearch={() => setSubPage({ type: "search" })}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenMenu={() => {
-                setActiveTab("my");
-                setSubPage({ type: "my-menu" });
-              }}
-              onFilterChange={(value) => {
-                if (value === "부동산") {
-                  openRealEstate();
-                  return;
-                }
-                setProductFilter(value);
-              }}
-              onProductClick={(id) => setSubPage({ type: "product-detail", id })}
-              categories={categories}
-              filters={productFilters}
-              onApplyFilters={setProductFilters}
-            />
-          ) : activeTab === "community" ? (
-            <CommunityScreen
-              activeTab={communityTab}
-              activeFilter={communityFilter}
-              posts={filteredPosts}
-              togetherPosts={filteredTogetherPosts}
-              togetherCategoryFilter={togetherCategoryFilter}
-              onTogetherCategoryChange={setTogetherCategoryFilter}
-              onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
-              onTogetherPostClick={(id) => setSubPage({ type: "together-detail", id })}
-              isLoading={isBooting}
-              onTabChange={setCommunityTab}
-              onFilterChange={setCommunityFilter}
-              onOpenSearch={() => setSubPage({ type: "search" })}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenMenu={() => {
-                setActiveTab("my");
-                setSubPage({ type: "settings" });
-              }}
-              onPostClick={(id) => setSubPage({ type: "community-detail", id })}
-            />
-          ) : activeTab === "map" ? (
-            <MapScreen
-              activeNeighborhood={activeNeighborhood}
-              secondaryNeighborhood={secondaryNeighborhood}
-              categories={LOCAL_CATEGORIES}
-              selectedCategory={mapCategory}
-              sheetState={mapSheetState}
-              query={mapQuery}
-              businesses={businesses}
-              allDangerSignals={dangerSignals}
-              hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
-              searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
-              onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
-              locationAllowed={locationAllowed}
-              theme={theme}
-              onCategoryChange={setMapCategory}
-              onSheetStateChange={setMapSheetState}
-              onQueryChange={setMapQuery}
-              onRequestLocation={() => setLocationAllowed(true)}
-              onOpenProfile={() => {
-                setActiveTab("my");
-                setSubPage(null);
-              }}
-            />
-          ) : activeTab === "chats" ? (
-            <ChatsScreen
-              rooms={filteredChats}
-              activeFilter={chatFilter}
-              isLoading={isBooting}
-              unreadCount={totalUnread}
-              onFilterChange={setChatFilter}
-              onOpenNotifications={() => setSheet("notifications")}
-              onOpenSettings={() => setSubPage({ type: "settings" })}
-              onOpenChat={openChat}
-              onRefresh={refreshChats}
-            />
           ) : (
-            <MyScreen
-              nickname={me?.nickname}
-              activeNeighborhood={activeNeighborhood}
-              unreadCount={totalUnread}
-              favoriteCount={favoriteProducts.length}
-              myProducts={myProducts}
-              walletBalance={walletBalance}
-              onOpenSettings={() => setSubPage({ type: "settings" })}
-              onOpenMenu={() => setSubPage({ type: "my-menu" })}
-              onOpenAllServices={() => setSubPage({ type: "all-services" })}
-              onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
-              onOpenAlba={() => setSubPage({ type: "alba" })}
-              onOpenSales={() => setSubPage({ type: "sales" })}
-              onOpenFavorites={() => setSubPage({ type: "favorites" })}
-              onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
-              onOpenApartment={openApartmentFlow}
-            />
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className={styles.tabContentTransition}
+            >
+              {activeTab === "home" ? (
+                <HomeScreen
+                  isLoading={isBooting}
+                  activeNeighborhood={activeNeighborhood}
+                  secondaryNeighborhood={secondaryNeighborhood}
+                  productFilter={productFilter}
+                  products={filteredProducts}
+                  onRefresh={refreshProducts}
+                  onLoadMore={loadMoreProducts}
+                  hasMore={products.length < productsTotal}
+                  isLoadingMore={isLoadingMoreProducts}
+                  onOpenRegion={() => setSheet("region")}
+                  onOpenSearch={() => setSubPage({ type: "search" })}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenMenu={() => {
+                    setActiveTab("my");
+                    setSubPage({ type: "my-menu" });
+                  }}
+                  onFilterChange={(value) => {
+                    if (value === "부동산") {
+                      openRealEstate();
+                      return;
+                    }
+                    setProductFilter(value);
+                  }}
+                  onProductClick={(id) => setSubPage({ type: "product-detail", id })}
+                  categories={categories}
+                  filters={productFilters}
+                  onApplyFilters={setProductFilters}
+                />
+              ) : activeTab === "community" ? (
+                <CommunityScreen
+                  activeTab={communityTab}
+                  activeFilter={communityFilter}
+                  posts={filteredPosts}
+                  togetherPosts={filteredTogetherPosts}
+                  togetherCategoryFilter={togetherCategoryFilter}
+                  onTogetherCategoryChange={setTogetherCategoryFilter}
+                  onOpenTogetherIntro={() => setSubPage({ type: "together-intro" })}
+                  onTogetherPostClick={(id) => setSubPage({ type: "together-detail", id })}
+                  isLoading={isBooting}
+                  onTabChange={setCommunityTab}
+                  onFilterChange={setCommunityFilter}
+                  onOpenSearch={() => setSubPage({ type: "search" })}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenMenu={() => {
+                    setActiveTab("my");
+                    setSubPage({ type: "settings" });
+                  }}
+                  onPostClick={(id) => setSubPage({ type: "community-detail", id })}
+                />
+              ) : activeTab === "map" ? (
+                <MapScreen
+                  activeNeighborhood={activeNeighborhood}
+                  secondaryNeighborhood={secondaryNeighborhood}
+                  categories={LOCAL_CATEGORIES}
+                  selectedCategory={mapCategory}
+                  sheetState={mapSheetState}
+                  query={mapQuery}
+                  businesses={businesses}
+                  allDangerSignals={dangerSignals}
+                  hasSearchedArea={mapSearchArea?.neighborhood === activeNeighborhood}
+                  searchBounds={mapSearchArea && mapSearchArea.neighborhood === activeNeighborhood ? mapSearchArea.bounds : null}
+                  onSearchBounds={(bounds) => setMapSearchArea({ neighborhood: activeNeighborhood, bounds })}
+                  locationAllowed={locationAllowed}
+                  theme={theme}
+                  onCategoryChange={setMapCategory}
+                  onSheetStateChange={setMapSheetState}
+                  onQueryChange={setMapQuery}
+                  onRequestLocation={() => setLocationAllowed(true)}
+                  onOpenProfile={() => {
+                    setActiveTab("my");
+                    setSubPage(null);
+                  }}
+                />
+              ) : activeTab === "chats" ? (
+                <ChatsScreen
+                  rooms={filteredChats}
+                  activeFilter={chatFilter}
+                  isLoading={isBooting}
+                  unreadCount={totalUnread}
+                  onFilterChange={setChatFilter}
+                  onOpenNotifications={() => setSheet("notifications")}
+                  onOpenSettings={() => setSubPage({ type: "settings" })}
+                  onOpenChat={openChat}
+                  onRefresh={refreshChats}
+                />
+              ) : (
+                <MyScreen
+                  nickname={me?.nickname}
+                  activeNeighborhood={activeNeighborhood}
+                  unreadCount={totalUnread}
+                  favoriteCount={favoriteProducts.length}
+                  myProducts={myProducts}
+                  walletBalance={walletBalance}
+                  onOpenSettings={() => setSubPage({ type: "settings" })}
+                  onOpenMenu={() => setSubPage({ type: "my-menu" })}
+                  onOpenAllServices={() => setSubPage({ type: "all-services" })}
+                  onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
+                  onOpenAlba={() => setSubPage({ type: "alba" })}
+                  onOpenSales={() => setSubPage({ type: "sales" })}
+                  onOpenFavorites={() => setSubPage({ type: "favorites" })}
+                  onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}
+                  onOpenApartment={openApartmentFlow}
+                />
+              )}
+            </motion.div>
           )}
         </main>
 

@@ -3,6 +3,7 @@
 import React from "react";
 import { Home, MapPin, MessageCircle, UserRound, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { motion } from "motion/react";
 import styles from "../../GajiMarketApp.module.css";
 import type { TabId } from "../../types";
 import { formatBadge } from "../../utils";
@@ -41,14 +42,37 @@ export function BottomNav({
         const TabIcon = tab.icon;
         const isActive = activeTab === tab.id;
         return (
-          <button
+          <motion.button
             type="button"
             key={tab.id}
-            className={isActive ? styles.navActive : ""}
+            className={`${styles.navButton} ${isActive ? styles.navActive : ""}`}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onNavigate(tab.id)}
+            whileTap={{ scale: 0.90 }}
+            transition={{ type: "spring", stiffness: 450, damping: 25 }}
           >
-            <span>
+            {isActive && (
+              <motion.div
+                layoutId="bottomNavActivePill"
+                className={styles.navActivePill}
+                transition={{
+                  type: "spring",
+                  stiffness: 420,
+                  damping: 32,
+                  mass: 0.85,
+                }}
+              />
+            )}
+            <motion.span
+              className={styles.navIcon}
+              animate={{
+                scale: isActive ? [0.92, 1.1, 1] : 1,
+              }}
+              transition={{
+                duration: 0.25,
+                ease: "easeOut",
+              }}
+            >
               {tab.id === "map" ? (
                 <EggplantPinIcon size={28} active={isActive} />
               ) : (
@@ -60,9 +84,21 @@ export function BottomNav({
                 />
               )}
               {tab.id === "chats" && unreadCount > 0 && <em>{formatBadge(unreadCount)}</em>}
-            </span>
-            {tab.label}
-          </button>
+            </motion.span>
+            <motion.span
+              className={styles.navLabel}
+              animate={{
+                y: isActive ? -1 : 0,
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 400,
+                damping: 25,
+              }}
+            >
+              {tab.label}
+            </motion.span>
+          </motion.button>
         );
       })}
     </nav>

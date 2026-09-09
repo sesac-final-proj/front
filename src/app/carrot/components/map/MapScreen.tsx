@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { Search, UserRound, House, Crosshair, X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type {
@@ -112,8 +112,12 @@ export function MapScreen({
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const locationRequestRef = useRef(0);
+  const initialHeightRef = useRef(198);
+  const mapCanvasRef = useRef<HTMLDivElement | null>(null);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const dragSourceRef = useRef<"sheet" | "map" | null>(null);
+  const dragStartXRef = useRef(0);
   const dragStartYRef = useRef(0);
   const lastYRef = useRef(0);
   const lastTimeRef = useRef(0);
@@ -124,8 +128,11 @@ export function MapScreen({
   const wheelTimeoutRef = useRef<number | null>(null);
   const animationTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     originStateRef.current = sheetState;
+    if (sheetState === "collapsed" && sheetRef.current) {
+      sheetRef.current.scrollTop = 0;
+    }
   }, [sheetState]);
 
   const transitionToState = useCallback((targetState: "collapsed" | "half" | "expanded") => {
@@ -140,15 +147,34 @@ export function MapScreen({
       animationTimeoutRef.current = null;
     }
 
-    onSheetStateChange(targetState);
+    // 아래로 접힐 때는 스크롤을 무조건 맨 위(0)로 리셋하여 5개 카테고리 아이콘이 완벽하게 보이도록 보장
+    if (targetState === "collapsed") {
+      sheetEl.scrollTop = 0;
+      sheetEl.scrollTo({ top: 0, behavior: "instant" });
+    }
 
-    sheetEl.style.transition = "transform 320ms cubic-bezier(0.25, 1, 0.5, 1)";
-    sheetEl.style.transform = "translate3d(0, 0, 0)";
+    // transform 대신 바닥(bottom: 0)에 고정된 height를 부드럽게 전환하여 하단이 잘리는 현상 원천 차단
+    sheetEl.style.transition = "height 320ms cubic-bezier(0.25, 1, 0.5, 1)";
+    sheetEl.style.transform = "";
+
+    if (targetState === "collapsed") {
+      sheetEl.style.height = "calc(198px + env(safe-area-inset-bottom))";
+    } else if (targetState === "half") {
+      sheetEl.style.height = "min(52%, 420px)";
+    } else {
+      sheetEl.style.height = "calc(100% - 60px)";
+    }
+
+    onSheetStateChange(targetState);
 
     animationTimeoutRef.current = window.setTimeout(() => {
       if (sheetEl) {
         sheetEl.style.transition = "";
+        sheetEl.style.height = "";
         sheetEl.style.transform = "";
+        if (targetState === "collapsed") {
+          sheetEl.scrollTop = 0;
+        }
       }
       animationTimeoutRef.current = null;
     }, 320);
@@ -163,14 +189,32 @@ export function MapScreen({
 
   const onGlobalPointerMove = useCallback((e: PointerEvent) => {
     const deltaY = e.clientY - dragStartYRef.current;
+    const deltaX = e.clientX - dragStartXRef.current;
 
     if (!isDraggingRef.current) {
-      if (Math.abs(deltaY) > 5) {
-        isDraggingRef.current = true;
-        hasMovedSignificantRef.current = true;
+      if (dragSourceRef.current === "map") {
+        if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX) * 0.85) {
+          if (deltaY < 0 || originStateRef.current !== "collapsed") {
+            isDraggingRef.current = true;
+            hasMovedSignificantRef.current = true;
+          } else {
+            return;
+          }
+        } else {
+          return;
+        }
       } else {
-        return;
+        if (Math.abs(deltaY) > 5) {
+          isDraggingRef.current = true;
+          hasMovedSignificantRef.current = true;
+        } else {
+          return;
+        }
       }
+    }
+
+    if (e.cancelable) {
+      e.preventDefault();
     }
 
     const now = performance.now();
@@ -183,14 +227,28 @@ export function MapScreen({
 
     const sheetEl = sheetRef.current;
     if (sheetEl) {
-      sheetEl.style.transition = "none";
-      let visualDy = deltaY;
-      if (originStateRef.current === "collapsed" && deltaY > 0) {
-        visualDy = deltaY * 0.2;
-      } else if (originStateRef.current === "expanded" && deltaY < 0) {
-        visualDy = deltaY * 0.2;
+      const containerHeight = sheetEl.parentElement?.getBoundingClientRect().height || window.innerHeight;
+      const minHeight = 198;
+      const maxHeight = containerHeight - 60;
+
+      // 위로 끌어올리면(deltaY < 0) height가 커지고, 아래로 내리면(deltaY > 0) height가 줄어듭니다.
+      // bottom: 0에 고정되어 있으므로 시트 아래가 허공에 뜨거나 잘리지 않습니다.
+      const targetHeight = initialHeightRef.current - deltaY;
+      let visualHeight = targetHeight;
+      if (targetHeight < minHeight) {
+        visualHeight = minHeight - (minHeight - targetHeight) * 0.2;
+      } else if (targetHeight > maxHeight) {
+        visualHeight = maxHeight + (targetHeight - maxHeight) * 0.2;
       }
-      sheetEl.style.transform = `translate3d(0, ${visualDy}px, 0)`;
+
+      // 시트가 아래로 내려갈 때는 내부 스크롤을 0으로 강제 유지하여 카테고리 아이콘이 항상 온전히 보이게 함 (사진 2번 상태 보장)
+      if (visualHeight < 360 || deltaY > 0) {
+        sheetEl.scrollTop = 0;
+      }
+
+      sheetEl.style.transition = "none";
+      sheetEl.style.transform = "none";
+      sheetEl.style.height = `${visualHeight}px`;
     }
   }, []);
 
@@ -201,9 +259,9 @@ export function MapScreen({
   }, []);
 
   const cleanupDragListeners = useCallback(() => {
-    window.removeEventListener("pointermove", onGlobalPointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-    window.removeEventListener("pointercancel", handlePointerUp);
+    window.removeEventListener("pointermove", onGlobalPointerMove, { capture: true } as any);
+    window.removeEventListener("pointerup", handlePointerUp, { capture: true } as any);
+    window.removeEventListener("pointercancel", handlePointerUp, { capture: true } as any);
   }, [onGlobalPointerMove, handlePointerUp]);
 
   const endDrag = useCallback(() => {
@@ -214,39 +272,60 @@ export function MapScreen({
 
     if (!isDraggingRef.current) {
       currentDeltaYRef.current = 0;
-      hasMovedSignificantRef.current = false;
+      dragSourceRef.current = null;
+      window.setTimeout(() => {
+        hasMovedSignificantRef.current = false;
+      }, 50);
       return;
     }
 
     isDraggingRef.current = false;
-    const deltaY = currentDeltaYRef.current;
+    const currentHeight = sheetEl.getBoundingClientRect().height;
     const velocity = dragVelocityRef.current;
     const origin = originStateRef.current;
 
+    const containerHeight = sheetEl.parentElement?.getBoundingClientRect().height || window.innerHeight;
+    const minHeight = 198;
+    const halfHeight = Math.min(containerHeight * 0.52, 420);
+    const maxHeight = containerHeight - 60;
+
     let targetState: "collapsed" | "half" | "expanded" = origin;
 
-    // 위로 올리기: deltaY < -35 또는 플릭 velocity < -0.25
-    if (velocity < -0.25 || deltaY < -35) {
+    // 빠른 스와이프(플릭) 판정
+    if (velocity < -0.28) {
+      // 위로 빠르게 튕김
       if (origin === "collapsed") {
-        targetState = (velocity < -0.65 || deltaY < -120) ? "expanded" : "half";
-      } else if (origin === "half") {
+        targetState = (velocity < -0.7 || currentHeight > (halfHeight + maxHeight) / 2) ? "expanded" : "half";
+      } else {
         targetState = "expanded";
       }
-    }
-    // 아래로 내리기: deltaY > 35 또는 플릭 velocity > 0.25
-    else if (velocity > 0.25 || deltaY > 35) {
+    } else if (velocity > 0.28) {
+      // 아래로 빠르게 튕김 -> 지도를 더 많이 보도록 아래로 접힘
       if (origin === "expanded") {
-        targetState = (velocity > 0.65 || deltaY > 120) ? "collapsed" : "half";
-      } else if (origin === "half") {
+        targetState = (velocity > 0.7 || currentHeight < (minHeight + halfHeight) / 2) ? "collapsed" : "half";
+      } else {
         targetState = "collapsed";
+      }
+    } else {
+      // 드래그 후 놓은 높이 기준 스냅
+      const mid1 = (minHeight + halfHeight) / 2;
+      const mid2 = (halfHeight + maxHeight) / 2;
+
+      if (currentHeight < mid1) {
+        targetState = "collapsed";
+      } else if (currentHeight < mid2) {
+        targetState = "half";
+      } else {
+        targetState = "expanded";
       }
     }
 
     transitionToState(targetState);
     currentDeltaYRef.current = 0;
+    dragSourceRef.current = null;
     window.setTimeout(() => {
       hasMovedSignificantRef.current = false;
-    }, 80);
+    }, 100);
   }, [cleanupDragListeners, transitionToState]);
 
   useEffect(() => {
@@ -255,6 +334,8 @@ export function MapScreen({
 
   const handleHandlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
+    initialHeightRef.current = sheetRef.current?.getBoundingClientRect().height ?? 198;
+    dragStartXRef.current = e.clientX;
     dragStartYRef.current = e.clientY;
     lastYRef.current = e.clientY;
     lastTimeRef.current = performance.now();
@@ -262,36 +343,40 @@ export function MapScreen({
     originStateRef.current = sheetState;
     currentDeltaYRef.current = 0;
     hasMovedSignificantRef.current = false;
+    dragSourceRef.current = "sheet";
 
-    window.addEventListener("pointermove", onGlobalPointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("pointermove", onGlobalPointerMove, { capture: true, passive: false });
+    window.addEventListener("pointerup", handlePointerUp, { capture: true });
+    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
   };
 
   const handleHandleClick = () => {
     if (hasMovedSignificantRef.current) return;
-    const target = sheetState === "expanded" ? "half" : sheetState === "half" ? "expanded" : "half";
+    // 언더바 클릭 시: 펼쳐져 있을 땐 아래로 접어 지도를 보여주고, 접혀있을 땐 절반으로 펼침
+    const target = sheetState === "expanded" ? "half" : sheetState === "half" ? "collapsed" : "half";
+    if (sheetRef.current) {
+      sheetRef.current.scrollTop = 0;
+      sheetRef.current.scrollTo({ top: 0, behavior: "instant" });
+    }
     transitionToState(target);
-    window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
-  const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const isHandle = target.closest(`.${styles.sheetHandle}`) !== null;
-    const isTopHeaderArea = e.clientY - (sheetRef.current?.getBoundingClientRect().top ?? 0) < 56;
-    const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
-    const isCollapsed = sheetState === "collapsed";
-
-    // collapsed 상태에서는 대화형 요소가 아니면 시트 전체 드래그 가능
-    // half / expanded 상태에서는 핸들이거나 최상단 헤더 영역일 때만 시트 드래그 허용 (내부 스크롤과 공존)
-    if (!isHandle && !isCollapsed && (!isTopHeaderArea || !isAtTop)) {
-      return;
-    }
-    if (target.closest("button, a, input, textarea, select, [role='button']")) {
-      return;
-    }
+  const handleMapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
 
+    if (
+      target.closest(`.${styles.mapSearch}`) ||
+      target.closest(`.${styles.mapControls}`) ||
+      target.closest(`.${styles.mapCategoryFab}`) ||
+      target.closest(`.${styles.tradeSafetyCard}`) ||
+      target.closest(`.${styles.dangerSignalCallout}`)
+    ) {
+      return;
+    }
+
+    initialHeightRef.current = sheetRef.current?.getBoundingClientRect().height ?? 198;
+    dragStartXRef.current = e.clientX;
     dragStartYRef.current = e.clientY;
     lastYRef.current = e.clientY;
     lastTimeRef.current = performance.now();
@@ -299,10 +384,50 @@ export function MapScreen({
     originStateRef.current = sheetState;
     currentDeltaYRef.current = 0;
     hasMovedSignificantRef.current = false;
+    dragSourceRef.current = "map";
 
-    window.addEventListener("pointermove", onGlobalPointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("pointermove", onGlobalPointerMove, { capture: true, passive: false });
+    window.addEventListener("pointerup", handlePointerUp, { capture: true });
+    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
+  };
+
+  const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+
+    if (target.closest("input, textarea, select")) {
+      return;
+    }
+
+    const isHandle = target.closest(`.${styles.sheetHandle}`) !== null;
+    const isAtTop = (sheetRef.current?.scrollTop ?? 0) <= 2;
+    const isCollapsed = sheetState === "collapsed";
+
+    if (!isHandle && !isCollapsed && !isAtTop) {
+      return;
+    }
+
+    initialHeightRef.current = sheetRef.current?.getBoundingClientRect().height ?? 198;
+    dragStartXRef.current = e.clientX;
+    dragStartYRef.current = e.clientY;
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = performance.now();
+    dragVelocityRef.current = 0;
+    originStateRef.current = sheetState;
+    currentDeltaYRef.current = 0;
+    hasMovedSignificantRef.current = false;
+    dragSourceRef.current = "sheet";
+
+    window.addEventListener("pointermove", onGlobalPointerMove, { capture: true, passive: false });
+    window.addEventListener("pointerup", handlePointerUp, { capture: true });
+    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
+  };
+
+  const handleSheetClickCapture = (e: React.MouseEvent) => {
+    if (hasMovedSignificantRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
   };
 
   useEffect(() => {
@@ -321,20 +446,27 @@ export function MapScreen({
     if (!sheetEl) return;
 
     const isOverHandle = (e.target as HTMLElement).closest(`.${styles.sheetHandle}`) !== null;
+    const isOverMap = (e.target as HTMLElement).closest(`.${styles.mapCanvas}`) !== null;
     const isAtTop = sheetEl.scrollTop <= 2;
 
-    // 위로 스크롤 (deltaY < -15): 시트 올리기 (확장)
-    if (e.deltaY < -15 && (isOverHandle || sheetState === "collapsed" || (sheetState === "half" && isAtTop))) {
-      if (sheetState !== "expanded") {
-        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
-        transitionToState(sheetState === "collapsed" ? "half" : "expanded");
+    // 아래로 스크롤 (deltaY > 8): 언더바 위이거나 지도 위이거나 시트 최상단일 때 시트를 아래로 내려 지도를 보여줌!
+    if (e.deltaY > 8 && (isOverHandle || isOverMap || (isAtTop && sheetState !== "collapsed"))) {
+      if (sheetState !== "collapsed") {
+        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 260);
+        const target = sheetState === "expanded" ? "half" : "collapsed";
+        if (sheetEl) {
+          sheetEl.scrollTop = 0;
+          sheetEl.scrollTo({ top: 0, behavior: "instant" });
+        }
+        transitionToState(target);
       }
     }
-    // 아래로 스크롤 (deltaY > 15): 최상단이거나 핸들 위일 때 시트 내리기 (축소)
-    else if (e.deltaY > 15 && (isOverHandle || (isAtTop && sheetState !== "collapsed"))) {
-      if (sheetState !== "collapsed") {
-        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 320);
-        transitionToState(sheetState === "expanded" ? "half" : "collapsed");
+    // 위로 스크롤 (deltaY < -8): 언더바 위이거나 지도 위이거나 시트 접힘 상태일 때 시트를 위로 올림!
+    else if (e.deltaY < -8 && (isOverHandle || isOverMap || sheetState === "collapsed" || (sheetState === "half" && isAtTop))) {
+      if (sheetState !== "expanded") {
+        wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 260);
+        const target = sheetState === "collapsed" ? "half" : "expanded";
+        transitionToState(target);
       }
     }
   };
@@ -520,7 +652,13 @@ export function MapScreen({
 
   return (
     <section className={styles.mapScreen}>
-      <div className={`${styles.mapCanvas} ${isTransitMode ? styles.transitCanvas : ""}`} data-sheet={sheetState}>
+      <div
+        ref={mapCanvasRef}
+        className={`${styles.mapCanvas} ${isTransitMode ? styles.transitCanvas : ""}`}
+        data-sheet={sheetState}
+        onPointerDownCapture={handleMapPointerDown}
+        onWheel={handleWheel}
+      >
         <KakaoMapLayer
           activeNeighborhood={activeNeighborhood}
           currentLocation={currentLocation}
@@ -614,6 +752,7 @@ export function MapScreen({
         ref={sheetRef}
         onWheel={handleWheel}
         onPointerDown={handleSheetPointerDown}
+        onClickCapture={handleSheetClickCapture}
       >
         <button
           type="button"

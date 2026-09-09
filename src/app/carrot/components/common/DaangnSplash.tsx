@@ -41,9 +41,14 @@ export function DaangnSplash({
 
   return (
     <aside className={styles.splashContainer} data-theme={themeMode} aria-busy="true" aria-live="polite">
+      <div className={styles.glassAmbientBlob1} />
+      <div className={styles.glassAmbientBlob2} />
+
       <div className={styles.logoWrapper}>
-        <div className={styles.logoSvgWrap}>
-          <img className={styles.logoSvg} src="/brand/gaji-mark.svg" alt="당근 로고" />
+        <div className={styles.logoBadgeWrap}>
+          <div className={styles.logoBadge}>
+            <img className={styles.logoSvg} src="/brand/daangn-mark.svg?v=3" alt="당근 로고" />
+          </div>
         </div>
 
         <div className={styles.infoArea}>
