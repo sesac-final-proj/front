@@ -9,11 +9,12 @@ import TradesSection from "./sections/TradesSection";
 import QualitySection from "./sections/QualitySection";
 import SourcesSection from "./sections/SourcesSection";
 import PriceModelSection from "./sections/PriceModelSection";
+import { PriceComparisonSection } from "./PriceComparisonSection";
 import NoticesSection from "./sections/NoticesSection";
 import SystemSection from "./sections/SystemSection";
 import type { ModelValidation } from "./sections/types";
 import styles from "@/app/admin/admin.module.css";
-export const sectionTitles: Record<string, string> = { trades: "거래 데이터 탐색", quality: "수집 품질", insights: "외부 지표 인사이트", sources: "수집원 관리", "price-model": "가격 모델", donations: "꿈가지 분석", notices: "공지·기부", system: "구현 현황" };
+export const sectionTitles: Record<string, string> = { trades: "거래 데이터 탐색", quality: "수집 품질", insights: "외부 지표 인사이트", sources: "수집원 관리", "price-model": "가격 모델", "price-comparison": "가격 지역별 비교", donations: "꿈가지 분석", notices: "공지·기부", system: "구현 현황" };
 async function getModel(): Promise<ModelValidation> {
   const response = await fetch("/model-validation.json", { cache: "no-store" });
   if (!response.ok) throw new Error("가격 모델 검증 산출물을 불러오지 못했습니다.");
@@ -30,13 +31,18 @@ export default function AdminSectionPage({ section }: { section: string }) {
   return { status, insights, dream, validation };
  }, [section]);
  const { data, loading, error, retry } = useAdminResource(loader);
- return <><AdminPageHeader title={sectionTitles[section]} description={["insights","sources","price-model"].includes(section) ? "외부 지표(타 플랫폼 시세, 기상청 날씨, 거시 물가, 소셜 트렌드) 수집 표본과 분석 결과를 확인하세요." : "운영 데이터를 확인하고 필요한 항목을 점검하세요."} action={<button onClick={retry} disabled={loading}>새로고침</button>} />
+ // price-comparison은 위 loader가 아무것도 안 가져온다(PriceComparisonSection이 자체
+ // fetch) — 그 상태로 이 버튼을 두면 눌러도 아무 것도 안 새로고침되면서, 섹션 내부에
+ // 진짜로 동작하는 새로고침 버튼과 나란히 떠서 헷갈린다. 이 섹션만 헤더 버튼을 뺀다.
+ const showHeaderRefresh = section !== "price-comparison";
+ return <><AdminPageHeader title={sectionTitles[section]} description={["insights","sources","price-model"].includes(section) ? "외부 지표(타 플랫폼 시세, 기상청 날씨, 거시 물가, 소셜 트렌드) 수집 표본과 분석 결과를 확인하세요." : "운영 데이터를 확인하고 필요한 항목을 점검하세요."} action={showHeaderRefresh ? <button onClick={retry} disabled={loading}>새로고침</button> : undefined} />
  {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : <div className={styles.legacy}>
  {section === "trades" && data.status && <TradesSection status={data.status} />}
  {section === "quality" && data.status && <QualitySection status={data.status} />}
  {section === "insights" && <InsightsSection insights={data.insights} />}
  {section === "sources" && <SourcesSection insights={data.insights} validation={data.validation} />}
  {section === "price-model" && <PriceModelSection validation={data.validation} />}
+ {section === "price-comparison" && <PriceComparisonSection />}
  {section === "donations" && <DreamSection dream={data.dream} />}
  {section === "notices" && <NoticesSection />}
  {section === "system" && <SystemSection insights={null} />}

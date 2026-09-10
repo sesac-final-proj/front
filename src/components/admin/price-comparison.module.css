@@ -1,0 +1,17 @@
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.headerBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border:1px solid #E7E8E5;border-radius:10px;background:#fff;color:#42483b;white-space:nowrap}
+.headerBtn:hover{background:#FFF1E8}
+.headerBtn:disabled{cursor:wait;opacity:.6}
+.lift{transition:box-shadow .18s ease,transform .18s ease;animation:fadeUp .35s ease backwards}
+.lift:hover{transform:translateY(-2px);box-shadow:0 10px 24px -14px rgba(255,111,15,.35)}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid #E7E8E5;background:#fff;color:#656b60;transition:background .15s ease,color .15s ease,border-color .15s ease}
+.tab:hover{border-color:#FF6F0F}
+.tabActive,.tabActive:hover{background:#FF6F0F;border-color:#FF6F0F;color:#fff}
+.gradeChip{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;color:#fff}
+.trendGood{color:#2F8F46}
+.trendBad{color:#D14343}
+.trendFlat{color:#8b9184}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+.legendItem{display:flex;align-items:center;gap:6px;font-size:11px;color:#656b60}
+.legendSwatch{width:9px;height:9px;border-radius:2px;display:inline-block}
