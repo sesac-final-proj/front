@@ -54,10 +54,6 @@ const DOT_SIZE = 5;
 const BINS = 120;
 const ROW_GAP = 10;
 const MAX_STACK = 22;
-// 구 1개당 최대 600건(seed 단계 상한)까지 나올 수 있는데, 3개 구를 다 겹쳐 그리면
-// 최대 1800개 점 — 호버할 때마다 recharts가 전체 재렌더해서 마우스 움직임이 버벅거림.
-// 분포 모양은 훨씬 적은 표본으로도 충분히 드러나서 렌더 개수 자체를 줄인다.
-const SWARM_SAMPLE_CAP = 450;
 
 function swarmDotShape(props: any) {
   return <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2.4} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.8} />;
@@ -142,7 +138,7 @@ export function PriceComparisonSection() {
   );
 
   const samplesLoader = useCallback(
-    () => (selectedCategory ? getPriceComparisonSamples(selectedCategory, undefined, SWARM_SAMPLE_CAP) : Promise.resolve({ category: "", samples: [] })),
+    () => (selectedCategory ? getPriceComparisonSamples(selectedCategory) : Promise.resolve({ category: "", samples: [] })),
     [selectedCategory],
   );
   const { retry: retrySamples, ...samplesState } = useAdminResource(samplesLoader);
@@ -202,7 +198,7 @@ export function PriceComparisonSection() {
         </div>
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
-          <div className={pStyles.cardHead}><div><h2>구별 가격 분포</h2><p>점 하나 = 매물 하나 · 행 = 구(이상치 상위 3% 제외 · 최대 {SWARM_SAMPLE_CAP}건 표시)</p></div></div>
+          <div className={pStyles.cardHead}><div><h2>구별 가격 분포</h2><p>점 하나 = 매물 하나 · 행 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
           {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <SampleSwarm samples={samplesState.data.samples} />}
         </article>
 
