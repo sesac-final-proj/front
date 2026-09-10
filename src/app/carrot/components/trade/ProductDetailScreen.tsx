@@ -16,7 +16,7 @@ import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem, TradeStatus } from "../../types";
 import { KAKAO_MAP_JS_KEY } from "../../constants";
 import { formatPrice } from "../../utils";
-import { loadKakaoMapScript } from "../map";
+import { createEggplantMarkerImage, loadKakaoMapScript } from "../map";
 import { IconButton } from "../common/IconButton";
 import { MannerTemperatureModal, getMannerColor } from "../common/MannerTemperatureModal";
 
@@ -77,7 +77,7 @@ export function TradePlaceMap({
           center,
           level: geo.matched === "fallback" ? 6 : 3,
         });
-        new kakaoMaps.Marker({ position: center, map });
+        new kakaoMaps.Marker({ position: center, map, image: createEggplantMarkerImage(kakaoMaps) });
         setUsedFallback(geo.matched === "fallback");
         setStatus("ready");
       })

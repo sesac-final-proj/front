@@ -90,3 +90,34 @@ export async function getDreamPointsBalance(signal?: AbortSignal): Promise<numbe
   const payload: { balance: number } = await response.json();
   return payload.balance;
 }
+
+export interface DreamPointTransaction {
+  id: number;
+  amount: number;
+  source: "general_payment" | "trade";
+  createdAt: string;
+}
+
+// 꿈가지 화면 상단 "최근 적립" 카드용 — 잔액만 쓰던 getDreamPointsBalance와 별개로
+// 개별 적립 내역(source/금액/일시)까지 필요해서 추가. size로 최근 몇 건만 받는다.
+export async function getDreamPointsHistory(size = 5, signal?: AbortSignal): Promise<{ balance: number; transactions: DreamPointTransaction[] }> {
+  const response = await authorizedFetch(`/api/v1/dream/points?size=${size}`, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("포인트 내역을 불러오지 못했습니다.");
+
+  const payload: {
+    balance: number;
+    transactions: { items: { id: number; amount: number; source: "general_payment" | "trade"; created_at: string }[] };
+  } = await response.json();
+  return {
+    balance: payload.balance,
+    transactions: payload.transactions.items.map((item) => ({
+      id: item.id,
+      amount: item.amount,
+      source: item.source,
+      createdAt: item.created_at,
+    })),
+  };
+}
