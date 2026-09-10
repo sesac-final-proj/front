@@ -231,6 +231,48 @@ export interface PriceModelCharts {
   feature_importance: PriceFeatureImportanceItem[];
 }
 
+// 가격 지역별 비교 대시보드(crawling_Data 세션 산출물) — /api/v1/admin/price-comparison/*.
+// price_model(팀원 ML 모델)과는 별개 기능 — "상품 x 구" 전체를 어드민이 지역별로 비교.
+export interface PriceComparisonCategoryItem {
+  category: string;
+  sample_count: number;
+  median_price: number;
+  std_price: number;
+  cv_price: number;
+  price_trend_pct: number | null;
+  frequency_grade: string;
+  listings_per_month: number;
+}
+
+export interface PriceComparisonRegionItem {
+  category: string;
+  gu: string;
+  sample_count: number;
+  median_price: number;
+  completion_rate: number;
+  avg_manner_temp: number;
+}
+
+export interface PriceComparisonDetailTypeItem {
+  category: string;
+  detail_type: string;
+  gu: string;
+  sample_count: number;
+  median_price: number;
+  cv_price: number;
+}
+
+export interface PriceComparisonOverview {
+  categories: PriceComparisonCategoryItem[];
+  regions: PriceComparisonRegionItem[];
+  detail_types: PriceComparisonDetailTypeItem[];
+}
+
+export interface PriceComparisonSample {
+  gu: string;
+  price: number;
+}
+
 async function errorMessage(response: Response, fallback: string) {
   try {
     const payload = await response.json();
@@ -397,6 +439,24 @@ export async function getDetailTypeCounts(): Promise<{ items: DetailTypeCountIte
 export async function getPriceModelCharts(): Promise<PriceModelCharts> {
   const response = await adminAuthorizedFetch("/api/v1/admin/price-model/charts", { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(await errorMessage(response, "가격예측 차트 데이터를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceComparisonOverview(): Promise<PriceComparisonOverview> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-comparison/overview", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "지역별 가격비교 데이터를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceComparisonSamples(category: string, gu?: string): Promise<{ category: string; samples: PriceComparisonSample[] }> {
+  const params = new URLSearchParams({ category });
+  if (gu) params.set("gu", gu);
+  const response = await adminAuthorizedFetch(`/api/v1/admin/price-comparison/samples?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "매물 표본을 불러오지 못했습니다."));
   return response.json();
 }
 

@@ -9,11 +9,12 @@ import TradesSection from "./sections/TradesSection";
 import QualitySection from "./sections/QualitySection";
 import SourcesSection from "./sections/SourcesSection";
 import PriceModelSection from "./sections/PriceModelSection";
+import { PriceComparisonSection } from "./PriceComparisonSection";
 import NoticesSection from "./sections/NoticesSection";
 import SystemSection from "./sections/SystemSection";
 import type { ModelValidation } from "./sections/types";
 import styles from "@/app/admin/admin.module.css";
-export const sectionTitles: Record<string, string> = { trades: "거래 데이터 탐색", quality: "수집 품질", insights: "외부 지표 인사이트", sources: "수집원 관리", "price-model": "가격 모델", donations: "꿈가지 분석", notices: "공지·기부", system: "구현 현황" };
+export const sectionTitles: Record<string, string> = { trades: "거래 데이터 탐색", quality: "수집 품질", insights: "외부 지표 인사이트", sources: "수집원 관리", "price-model": "가격 모델", "price-comparison": "가격 지역별 비교", donations: "꿈가지 분석", notices: "공지·기부", system: "구현 현황" };
 async function getModel(): Promise<ModelValidation> {
   const response = await fetch("/model-validation.json", { cache: "no-store" });
   if (!response.ok) throw new Error("가격 모델 검증 산출물을 불러오지 못했습니다.");
@@ -37,6 +38,7 @@ export default function AdminSectionPage({ section }: { section: string }) {
  {section === "insights" && <InsightsSection insights={data.insights} />}
  {section === "sources" && <SourcesSection insights={data.insights} validation={data.validation} />}
  {section === "price-model" && <PriceModelSection validation={data.validation} />}
+ {section === "price-comparison" && <PriceComparisonSection />}
  {section === "donations" && <DreamSection dream={data.dream} />}
  {section === "notices" && <NoticesSection />}
  {section === "system" && <SystemSection insights={null} />}
