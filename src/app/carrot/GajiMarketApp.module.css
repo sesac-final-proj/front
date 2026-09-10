@@ -1012,18 +1012,9 @@ img.thumbnail {
   inset: 0;
 }
 
-.tradePlacePickerPin {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -100%);
-  pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
-}
-
 .tradePlacePickerTooltip {
   position: absolute;
-  top: calc(50% - 92px);
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--color-surface);

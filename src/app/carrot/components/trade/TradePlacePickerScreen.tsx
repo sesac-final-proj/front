@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import { KAKAO_MAP_JS_KEY } from "../../constants";
 import { loadKakaoMapScript } from "../map";
@@ -16,8 +16,9 @@ export interface PickedTradePlace {
   lng: number;
 }
 
-// 지도를 움직여서 중앙 핀 위치를 거래 희망 장소로 고르는 화면 — 실제 당근마켓과
-// 동일하게 핀은 화면 중앙에 고정하고 지도(밑판)만 움직인다. ProductFormScreen 안에서
+// 지도를 탭하거나(클릭 지점에 마커 이동) 마커를 직접 드래그해서 거래 희망 장소를 고르는
+// 화면 — 화면 중앙에 핀을 고정하고 지도만 움직이던 이전 방식은 "정확히 그 자리"를
+// 찍는다는 느낌이 안 들어서, 실제 마커를 찍는 방식으로 바꿨다. ProductFormScreen 안에서
 // 오버레이로 띄운다(별도 subPage 이동이면 아직 안 낸 제목/설명 등 폼 입력값이 날아감).
 export function TradePlacePickerScreen({
   initialLat,
@@ -31,19 +32,16 @@ export function TradePlacePickerScreen({
   onConfirm: (place: PickedTradePlace) => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   const [placeName, setPlaceName] = useState<string | null>(null);
-  const [hasMoved, setHasMoved] = useState(false);
+  const [hasPicked, setHasPicked] = useState(false);
   const [mapError, setMapError] = useState(!KAKAO_MAP_JS_KEY);
 
   useEffect(() => {
     if (!KAKAO_MAP_JS_KEY) return;
     let cancelled = false;
 
-    function resolvePlaceName(map: any) {
-      const center = map.getCenter();
-      const lat = center.getLat();
-      const lng = center.getLng();
+    function resolvePlaceName(lat: number, lng: number) {
       fetch(`/api/geocode?lat=${lat}&lng=${lng}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { name?: string } | null) => {
@@ -61,15 +59,26 @@ export function TradePlacePickerScreen({
           if (!cancelled) setMapError(true);
           return;
         }
-        const center = new kakaoMaps.LatLng(
-          initialLat ?? DEFAULT_CENTER.lat,
-          initialLng ?? DEFAULT_CENTER.lng,
-        );
+        const startLat = initialLat ?? DEFAULT_CENTER.lat;
+        const startLng = initialLng ?? DEFAULT_CENTER.lng;
+        const center = new kakaoMaps.LatLng(startLat, startLng);
         const map = new kakaoMaps.Map(mapElementRef.current, { center, level: 4 });
-        mapInstanceRef.current = map;
-        kakaoMaps.event.addListener(map, "dragstart", () => setHasMoved(true));
-        kakaoMaps.event.addListener(map, "idle", () => resolvePlaceName(map));
-        resolvePlaceName(map);
+        const marker = new kakaoMaps.Marker({ position: center, map, draggable: true });
+        markerRef.current = marker;
+
+        function moveMarkerTo(latLng: any) {
+          marker.setPosition(latLng);
+          setHasPicked(true);
+          resolvePlaceName(latLng.getLat(), latLng.getLng());
+        }
+
+        // 지도 아무 곳이나 탭 -> 그 지점으로 마커 이동. 마커 자체를 손가락/마우스로
+        // 끌어서 미세조정도 가능(draggable: true) — 둘 다 같은 moveMarkerTo로 수렴.
+        kakaoMaps.event.addListener(map, "click", (e: any) => moveMarkerTo(e.latLng));
+        kakaoMaps.event.addListener(marker, "dragend", () => moveMarkerTo(marker.getPosition()));
+
+        if (initialLat !== undefined && initialLng !== undefined) setHasPicked(true);
+        resolvePlaceName(startLat, startLng);
       })
       .catch(() => {
         if (!cancelled) setMapError(true);
@@ -81,10 +90,10 @@ export function TradePlacePickerScreen({
   }, [initialLat, initialLng]);
 
   function handleConfirm() {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    const center = map.getCenter();
-    onConfirm({ name: placeName ?? "직접 선택한 위치", lat: center.getLat(), lng: center.getLng() });
+    const marker = markerRef.current;
+    if (!marker) return;
+    const position = marker.getPosition();
+    onConfirm({ name: placeName ?? "직접 선택한 위치", lat: position.getLat(), lng: position.getLng() });
   }
 
   return (
@@ -106,17 +115,14 @@ export function TradePlacePickerScreen({
         ) : (
           <>
             <div ref={mapElementRef} className={styles.tradePlacePickerMap} />
-            <div className={styles.tradePlacePickerPin} aria-hidden>
-              <MapPin size={40} fill="var(--color-primary)" color="#fff" strokeWidth={1.5} />
-            </div>
-            {!hasMoved && (
-              <div className={styles.tradePlacePickerTooltip}>지도를 움직여서 선택해보세요.</div>
+            {!hasPicked && (
+              <div className={styles.tradePlacePickerTooltip}>지도를 탭해서 위치를 선택해보세요.</div>
             )}
           </>
         )}
       </div>
       <div className={styles.tradePlacePickerFooter}>
-        <button type="button" className={styles.primaryButton} onClick={handleConfirm}>
+        <button type="button" className={styles.primaryButton} onClick={handleConfirm} disabled={!hasPicked}>
           선택 완료
         </button>
       </div>
