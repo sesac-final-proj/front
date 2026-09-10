@@ -123,6 +123,114 @@ export interface AdminDreamStatus {
   limitations: string[];
 }
 
+// analyzer 파이프라인(LightGBM) 기반 가격예측 모델 — /api/v1/admin/price-model/*.
+// 백엔드 응답이 snake_case라 위 인터페이스들과 다르게 필드명을 그대로 옮긴다.
+export interface PriceModelMetricItem {
+  feature_set: string;
+  model_key: string;
+  label: string;
+  rmse: number;
+  mae: number;
+  mape: number;
+  r2: number;
+  hit10: number;
+  hit20: number;
+  // LightGBM 행에만 있음(CQR 보정) — range_coverage_10_90은 "10~90% 예측구간 안에 실제가가
+  // 들어올 확률"로 목표치가 80%인 별개 지표. Hit@20%(오차 ±20% 이내 적중률, ~44~49%)와 다르다.
+  extra?: { range_coverage_25_75?: number; range_coverage_10_90?: number } | null;
+}
+
+export interface PriceModelListingItem {
+  id: number;
+  category: string;
+  detail_type: string;
+  gu: string;
+  condition: string;
+  status: string;
+  chat_count: number;
+  interest_count: number;
+  view_count: number;
+  manner_temp: number;
+  title_length: number;
+  days_since_listed: number;
+  category_detail_median_price: number;
+  price: number;
+  price_log: number;
+  title: string;
+}
+
+export interface PriceDistributionCategory {
+  category: string;
+  sample_count: number;
+  types: { type: string; count: number; median_price: number }[];
+  points: { type: string; price: number }[];
+}
+
+// price-distribution의 types는 상위 5개+"기타"로 잘리는데, 이건 세부유형(예: 청소기 V8/V10/V6…)을
+// 자르지 않고 전부 세는 값 — "다이슨 V6 몇 개, V10 몇 개" 같은 분류 개수 그 자체.
+export interface DetailTypeCountItem {
+  category: string;
+  detail_type: string;
+  count: number;
+}
+
+export interface PricePredictionItem {
+  feature_set: string;
+  category: string;
+  detail_type: string;
+  title: string;
+  actual_price: number;
+  predicted_price: number;
+  error_rate: number;
+}
+
+export interface PricePlatformComparisonItem {
+  category: string;
+  platform: string;
+  sample_count: number;
+  mean_price: number;
+  median_price: number;
+  std_price: number;
+  p25_price: number;
+  p75_price: number;
+}
+
+export interface PricePlatformTestItem {
+  category: string;
+  platform_a: string;
+  platform_b: string;
+  median_a: number;
+  median_b: number;
+  diff_pct: number;
+  p_value: number;
+  significant: boolean;
+}
+
+export interface PriceClusterItem {
+  category: string;
+  price_band: string;
+  share: number;
+  median_price: number;
+  range_low: number;
+  range_high: number;
+  sample_count: number;
+}
+
+export interface PriceFeatureImportanceItem {
+  feature_set: string;
+  feature: string;
+  gain: number;
+  split: number;
+}
+
+export interface PriceModelCharts {
+  predictions: PricePredictionItem[];
+  platform_comparisons: PricePlatformComparisonItem[];
+  platform_tests: PricePlatformTestItem[];
+  clusters: PriceClusterItem[];
+  feature_importance: PriceFeatureImportanceItem[];
+}
+
 async function errorMessage(response: Response, fallback: string) {
   try {
     const payload = await response.json();
@@ -254,6 +362,52 @@ export async function getAdminDreamStatus(): Promise<AdminDreamStatus> {
   const response = await adminAuthorizedFetch("/api/v1/admin/dream-status", { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(await errorMessage(response, "꿈가지 운영 데이터를 불러오지 못했습니다."));
   return response.json();
+}
+
+export async function getPriceModelMetrics(): Promise<{ metrics: PriceModelMetricItem[] }> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-model/metrics", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "가격예측 모델 지표를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceModelListings(page = 1, size = 20): Promise<{ items: PriceModelListingItem[]; total: number }> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/price-model/listings?page=${page}&size=${size}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "가격예측 매물 목록을 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceDistribution(): Promise<{ categories: PriceDistributionCategory[] }> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-model/price-distribution", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "가격분포를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getDetailTypeCounts(): Promise<{ items: DetailTypeCountItem[] }> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-model/detail-type-counts", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "세부유형 분류 개수를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceModelCharts(): Promise<PriceModelCharts> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-model/charts", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "가격예측 차트 데이터를 불러오지 못했습니다."));
+  return response.json();
+}
+
+// SHAP summary plot은 DB 값이 아니라 analyzer가 matplotlib으로 그린 PNG라 그대로 받아온다.
+// <img src>는 Authorization 헤더를 못 보내서 blob으로 받아 컴포넌트에서 object URL로 바꿔 쓴다.
+export async function getPriceModelShapSummary(featureSet: "full" | "no_leak_prone"): Promise<Blob> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/price-model/shap-summary?feature_set=${featureSet}`, {
+    headers: { Accept: "image/png" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "SHAP 요약 이미지를 불러오지 못했습니다."));
+  return response.blob();
 }
 
 export async function logoutAdmin() {

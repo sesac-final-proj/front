@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { DashboardOverview } from "@/lib/admin/dashboard-api";
 import { EmptyState } from "./AdminUI";
@@ -7,8 +8,18 @@ export function CollectionTrendChart({ data }: { data: DashboardOverview["collec
   if (!data.some(row => row.transaction_count)) return <EmptyState message="최근 14일 동안 수집된 거래가 없습니다." />;
   return <div className={styles.chart} role="img" aria-label={data.map(row => `${row.date}: ${row.transaction_count}건`).join(", ")}><ResponsiveContainer width="100%" height="100%"><BarChart data={data} margin={{ top: 10, right: 4, left: -22, bottom: 0 }} accessibilityLayer><CartesianGrid vertical={false} stroke="#F0F1ED" /><XAxis dataKey="date" tickFormatter={value => String(value).slice(5).replace("-", ".")} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8b9184" }} minTickGap={12} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8b9184" }} /><Tooltip labelFormatter={label => String(label)} cursor={{ fill: "#F7F7F5" }} /><Bar name="수집 거래" dataKey="transaction_count" fill="#FF9D5B" radius={[4,4,0,0]} maxBarSize={24} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
 }
-export function TradeStatusCard({ data }: { data: DashboardOverview["trade_status"] }) {
- return <article className={styles.card}><div className={styles.cardHead}><div><h2>거래 상태</h2><p>누적 수집 거래의 현재 상태</p></div></div><HorizontalBars data={data.map(row => ({ name: row.status, count: row.transaction_count }))} /></article>;
+// 지금 수집 지역이 이 3개 구뿐이라 탭도 이 3개만 — 구가 늘면 이 목록만 늘리면 됨(SeoulGuMap과 동일 패턴).
+const GU_TABS = ["전체", "영등포구", "노원구", "송파구"] as const;
+export function TradeStatusCard({ data, dataByGu }: { data: DashboardOverview["trade_status"]; dataByGu: DashboardOverview["trade_status_by_gu"] }) {
+ const [tab, setTab] = useState<(typeof GU_TABS)[number]>("전체");
+ const rows = tab === "전체" ? data : dataByGu.filter(row => row.gu_name === tab);
+ return <article className={styles.card}>
+   <div className={styles.cardHead}><div><h2>거래 상태</h2><p>{tab === "전체" ? "누적 수집 거래의 현재 상태" : `${tab} 거래의 현재 상태`}</p></div></div>
+   <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+     {GU_TABS.map(t => <button key={t} type="button" onClick={() => setTab(t)} style={{ padding: "5px 11px", borderRadius: 999, fontSize: 11, fontWeight: 550, border: "1px solid #E7E8E5", background: tab === t ? "#FF6F0F" : "#fff", color: tab === t ? "#fff" : "#656b60" }}>{t}</button>)}
+   </div>
+   <HorizontalBars data={rows.map(row => ({ name: row.status, count: row.transaction_count }))} />
+ </article>;
 }
 export function PriceDistributionChart({ data }: { data: DashboardOverview["price_distribution"] }) {
  if (!data.some(row => row.transaction_count)) return <EmptyState message="가격이 있는 거래가 없습니다." />;
