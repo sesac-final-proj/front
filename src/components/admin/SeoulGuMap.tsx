@@ -88,6 +88,7 @@ function GuDongMap({
               }}
               style={{
                 cursor: "pointer",
+                outline: "none", // 클릭 시 브라우저 기본 포커스 링(파란 테두리)이 떠서 — 선택 표시는 path의 굵은 stroke로 이미 충분
                 transformBox: "fill-box",
                 transformOrigin: "center",
                 transform: isHovered || isSelected ? "scale(1.06)" : "scale(1)",
