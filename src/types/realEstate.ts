@@ -55,7 +55,7 @@ export interface RealEstateBounds {
 export interface RentTransactionResponse {
   items: RentTransaction[];
   total: number;
-  source: "seoul_open_data" | "seoul_sample";
+  source: "seoul_open_data" | "seoul_sample" | "seoul_apartment_db";
   geocodedCount: number;
   notice?: string;
 }

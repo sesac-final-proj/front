@@ -1,7 +1,6 @@
 // 목업 데이터 + 화면 전역 상수. 실 API로 대체된 데이터(예: 예전 DREAM_FACILITIES)는
 // 여기서 지워지는 게 정상 — 이 파일이 자꾸 비어가는 게 이 리팩터링의 목표다.
 import {
-  BadgePercent,
   Bike,
   BookOpen,
   CakeSlice,
@@ -225,8 +224,6 @@ export const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "subway", name: "지하철", icon: TrainFront, tone: "blue" },
   { id: "bike", name: "따릉이", icon: Bike, tone: "green" },
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
-  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
-  { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
   { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
   { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
   { id: "class", name: "클래스", icon: CakeSlice, tone: "amber" },

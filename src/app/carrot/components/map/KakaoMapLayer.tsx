@@ -457,55 +457,39 @@ export function createWorkoutMarkerElement(
 ): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.setAttribute("role", "button");
   button.setAttribute("aria-label", `${facility.name} (${facility.category})`);
   button.title = `${facility.name} - ${facility.category}`;
-  button.style.display = "inline-flex";
-  button.style.alignItems = "center";
-  button.style.gap = "5px";
-  button.style.height = "32px";
-  button.style.padding = "0 10px";
-  button.style.borderRadius = "999px";
-  button.style.fontSize = "12px";
-  button.style.fontWeight = "750";
-  button.style.cursor = "pointer";
-  button.style.whiteSpace = "nowrap";
-  button.style.userSelect = "none";
-  button.style.boxShadow = isSelected
-    ? "0 3px 12px rgba(255, 111, 15, 0.45)"
-    : "0 2px 8px rgba(0, 0, 0, 0.18)";
-  button.style.border = isSelected ? "2px solid #ff6f0f" : "1.5px solid #212529";
-  button.style.background = isSelected ? "#ff6f0f" : "#212529";
-  button.style.color = "#ffffff";
-  button.style.transition = "transform 0.15s ease, background 0.15s ease";
-
-  const iconSpan = document.createElement("span");
-  iconSpan.style.fontSize = "13px";
-  iconSpan.textContent =
-    facility.subCategory === "swimming"
-      ? "🏊"
-      : facility.subCategory === "climbing"
-      ? "🧗"
-      : facility.subCategory === "pilates"
-      ? "🧘"
-      : facility.subCategory === "golf"
-      ? "⛳"
-      : "🏋️";
-
-  const labelSpan = document.createElement("span");
-  labelSpan.textContent = facility.name;
-  labelSpan.style.maxWidth = "110px";
-  labelSpan.style.overflow = "hidden";
-  labelSpan.style.textOverflow = "ellipsis";
-
-  button.appendChild(iconSpan);
-  button.appendChild(labelSpan);
+  button.className = `${styles.workoutMapDot} ${isSelected ? styles.workoutMapDotSelected : ""}`;
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();
     onSelect();
   });
 
+  return button;
+}
+
+export function createWorkoutClusterMarkerElement(
+  count: number,
+  onSelect: () => void,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = styles.workoutMapCluster;
+  button.setAttribute("aria-label", `이 위치의 운동 시설 ${count}곳 보기`);
+
+  const image = document.createElement("img");
+  image.src = "/images/carrot/workout-carrot-dumbbells.png";
+  image.alt = "";
+  image.draggable = false;
+
+  const badge = document.createElement("span");
+  badge.textContent = String(count);
+  button.append(image, badge);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onSelect();
+  });
   return button;
 }
 
@@ -525,6 +509,7 @@ export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   workoutFacilities?: WorkoutFacility[];
   selectedWorkoutId?: string | null;
   onSelectWorkoutFacility?: (facility: WorkoutFacility) => void;
+  onSelectWorkoutCluster?: (facilities: WorkoutFacility[]) => void;
   onWorkoutBoundsChange?: (bounds: { south: number; north: number; west: number; east: number }) => void;
   businesses: T[];
   renderBusinessMarker: (business: T) => HTMLElement;
@@ -553,6 +538,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   workoutFacilities = [],
   selectedWorkoutId,
   onSelectWorkoutFacility,
+  onSelectWorkoutCluster,
   onWorkoutBoundsChange,
   businesses,
   renderBusinessMarker,
@@ -1090,24 +1076,59 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     workoutOverlaysRef.current.forEach((o) => o.setMap(null));
     workoutOverlaysRef.current = [];
 
-    const newOverlays = workoutFacilities.map((facility) => {
-      const isSelected = facility.id === selectedWorkoutId;
-      const markerEl = createWorkoutMarkerElement(facility, isSelected, () => {
-        const position = new kakao.maps.LatLng(facility.lat, facility.lng);
-        map.panTo(position);
-        onSelectWorkoutFacility?.(facility);
-      });
+    const projection = map.getProjection?.();
+    const clusters: WorkoutFacility[][] = [];
+    workoutFacilities.forEach((facility) => {
+      const position = new kakao.maps.LatLng(facility.lat, facility.lng);
+      const point = projection?.containerPointFromCoords?.(position) ?? projection?.pointFromCoords?.(position);
+      const nearby = point ? clusters.find((cluster) => {
+        const first = cluster[0];
+        const firstPosition = new kakao.maps.LatLng(first.lat, first.lng);
+        const firstPoint = projection?.containerPointFromCoords?.(firstPosition) ?? projection?.pointFromCoords?.(firstPosition);
+        return firstPoint && Math.hypot(point.x - firstPoint.x, point.y - firstPoint.y) <= 28;
+      }) : undefined;
+      if (nearby) nearby.push(facility);
+      else clusters.push([facility]);
+    });
 
+    const newOverlays = clusters.flatMap((cluster) => {
+      const containsSelected = cluster.some((facility) => facility.id === selectedWorkoutId);
+      if (cluster.length === 1 || containsSelected) {
+        return cluster.map((facility) => {
+          const isSelected = facility.id === selectedWorkoutId;
+          const position = new kakao.maps.LatLng(facility.lat, facility.lng);
+          const markerEl = createWorkoutMarkerElement(facility, isSelected, () => {
+            map.panTo(position);
+            onSelectWorkoutFacility?.(facility);
+          });
+          const overlay = new kakao.maps.CustomOverlay({
+            position,
+            content: markerEl,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+            zIndex: isSelected ? 210 : 90,
+          });
+          overlay.setMap(map);
+          return overlay;
+        });
+      }
+
+      const lat = cluster.reduce((sum, facility) => sum + facility.lat, 0) / cluster.length;
+      const lng = cluster.reduce((sum, facility) => sum + facility.lng, 0) / cluster.length;
+      const position = new kakao.maps.LatLng(lat, lng);
+      const markerEl = createWorkoutClusterMarkerElement(cluster.length, () => {
+        map.panTo(position);
+        onSelectWorkoutCluster?.(cluster);
+      });
       const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(facility.lat, facility.lng),
+        position,
         content: markerEl,
         yAnchor: 0.5,
         xAnchor: 0.5,
-        zIndex: isSelected ? 210 : 90,
+        zIndex: 180,
       });
-
       overlay.setMap(map);
-      return overlay;
+      return [overlay];
     });
 
     workoutOverlaysRef.current = newOverlays;
@@ -1116,7 +1137,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
       workoutOverlaysRef.current.forEach((o) => o.setMap(null));
       workoutOverlaysRef.current = [];
     };
-  }, [canUseKakaoMap, isWorkoutMode, workoutFacilities, selectedWorkoutId, onSelectWorkoutFacility]);
+  }, [canUseKakaoMap, isWorkoutMode, workoutFacilities, selectedWorkoutId, onSelectWorkoutCluster, onSelectWorkoutFacility]);
 
   // Workout viewport synchronization
   useEffect(() => {

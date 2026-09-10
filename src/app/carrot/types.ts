@@ -59,7 +59,7 @@ export type SubPage =
   | { type: "wallet-pay"; storeId?: number }
   | { type: "my-menu" }
   | { type: "all-services" }
-  | { type: "merge-game" }
+  | { type: "merge-game"; returnTo?: "my" | "services" }
   | { type: "real-estate" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
@@ -78,7 +78,7 @@ export type SubPage =
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" }
-  | { type: "region-search"; returnTo?: "dream-dashboard" };
+  | { type: "region-search"; returnTo?: "dream-dashboard" | "settings" };
 
 export type ProductListItem = {
   id: string;

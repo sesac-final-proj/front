@@ -73,7 +73,7 @@ export function MyScreen({
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
-    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
+    { label: "당근알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
     { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];
 

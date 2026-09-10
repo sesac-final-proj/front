@@ -60,7 +60,7 @@ export function BottomSheet({
                 <Users size={28} /> 같이해요
               </button>
               <button type="button">
-                <BriefcaseBusiness size={28} /> 가지알바
+                <BriefcaseBusiness size={28} /> 당근알바
               </button>
             </div>
           </>

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
+import { motion } from "motion/react";
 import {
   X,
   Search,
@@ -20,6 +21,11 @@ import styles from "../../GajiMarketApp.module.css";
 import type { AlbaItem } from "@/types";
 import { IconButton, ScreenHeader, StateBlock } from "../common";
 import { AlbaCardComponent } from "./AlbaCardComponent";
+import { useSlidingNav } from "../../hooks/useSlidingNav";
+
+type AlbaTab = "home" | "search" | "applications" | "manage";
+
+const ALBA_TABS: readonly AlbaTab[] = ["home", "search", "applications", "manage"];
 
 export interface AlbaMainScreenProps {
   activeNeighborhood: string;
@@ -42,9 +48,11 @@ export function AlbaMainScreen({
   onWrite,
   onToggleFavorite,
 }: AlbaMainScreenProps) {
-  const [currentTab, setCurrentTab] = useState<"home" | "search" | "applications" | "manage">(initialTab);
+  const [currentTab, setCurrentTab] = useState<AlbaTab>(initialTab);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory ?? null);
   const [searchQuery, setSearchQuery] = useState("");
+  const selectTab = useCallback((tab: AlbaTab) => setCurrentTab(tab), []);
+  const { navRef, navGestureProps } = useSlidingNav(ALBA_TABS, selectTab);
 
   const categories = [
     { label: "이웃알바", icon: Heart },
@@ -268,7 +276,13 @@ export function AlbaMainScreen({
         <Plus size={22} strokeWidth={2.5} />
       </button>
 
-      <nav className={styles.albaBottomNav} aria-label="알바 메뉴">
+      <nav ref={navRef} className={styles.albaBottomNav} aria-label="알바 메뉴" {...navGestureProps}>
+        <motion.span
+          aria-hidden="true"
+          className={styles.albaNavActivePill}
+          animate={{ x: `${ALBA_TABS.indexOf(currentTab) * 100}%` }}
+          transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.82 }}
+        />
         <button
           type="button"
           className={`${styles.albaNavBtn} ${currentTab === "home" ? styles.albaNavBtnActive : ""}`}

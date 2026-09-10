@@ -92,12 +92,15 @@ export function useWorkoutFacilities({
 
   // 활성화 상태나 동네/서브카테고리 변경 시 데이터 로드
   useEffect(() => {
-    if (enabled) {
-      loadFacilities();
-    } else {
-      setSelectedId(null);
-    }
-  }, [enabled, subCategory, refreshTrigger, activeNeighborhood]);
+    const frame = window.requestAnimationFrame(() => {
+      if (enabled) {
+        void loadFacilities();
+      } else {
+        setSelectedId(null);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeNeighborhood, enabled, loadFacilities, refreshTrigger]);
 
   const handleRetry = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);

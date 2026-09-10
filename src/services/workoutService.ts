@@ -30,7 +30,7 @@ export interface WorkoutBoundsParams {
 
 export const WORKOUT_SUB_CATEGORIES = [
   { id: "all", label: "전체", icon: "🏋️", query: "헬스장 필라테스 수영장" },
-  { id: "gym", label: "헬스·PT", icon: "💪", query: "헬스장 피트니스 PT" },
+  { id: "gym", label: "헬스·체육관", icon: "💪", query: "헬스장 PT 체육관" },
   { id: "pilates", label: "필라테스·요가", icon: "🧘", query: "필라테스 요가" },
   { id: "swimming", label: "수영장", icon: "🏊", query: "수영장 실내수영장" },
   { id: "climbing", label: "클라이밍", icon: "🧗", query: "클라이밍 볼더링" },
