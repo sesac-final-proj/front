@@ -63,6 +63,7 @@ export type SubPage =
   | { type: "real-estate" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
+  | { type: "dream-points-history" }
   | { type: "carrot-notice" }
   | { type: "alba"; tab?: "home" | "search" | "applications" | "manage"; category?: string }
   | { type: "alba-detail"; id: string }
