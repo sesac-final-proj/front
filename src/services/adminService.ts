@@ -450,9 +450,10 @@ export async function getPriceComparisonOverview(): Promise<PriceComparisonOverv
   return response.json();
 }
 
-export async function getPriceComparisonSamples(category: string, gu?: string): Promise<{ category: string; samples: PriceComparisonSample[] }> {
+export async function getPriceComparisonSamples(category: string, gu?: string, sample?: number): Promise<{ category: string; samples: PriceComparisonSample[] }> {
   const params = new URLSearchParams({ category });
   if (gu) params.set("gu", gu);
+  if (sample) params.set("sample", String(sample));
   const response = await adminAuthorizedFetch(`/api/v1/admin/price-comparison/samples?${params.toString()}`, {
     headers: { Accept: "application/json" },
   });

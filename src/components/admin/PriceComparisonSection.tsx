@@ -34,7 +34,7 @@ function RegionBarChart({ rows }: { rows: PriceComparisonRegionItem[] }) {
           <CartesianGrid vertical={false} stroke="#F0F1ED" />
           <XAxis dataKey="gu" tick={{ fontSize: 11, fill: "#656b60" }} axisLine={false} tickLine={false} />
           <YAxis tickFormatter={v => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
-          <Tooltip cursor={{ fill: "#F7F7F5" }} content={({ payload }) => {
+          <Tooltip cursor={{ fill: "#F7F7F5" }} isAnimationActive={false} content={({ payload }) => {
             const row = payload?.[0]?.payload?.row as PriceComparisonRegionItem | undefined;
             if (!row) return null;
             return <div style={tooltipBox}>
@@ -54,6 +54,14 @@ const DOT_SIZE = 5;
 const BINS = 120;
 const ROW_GAP = 10;
 const MAX_STACK = 22;
+// 구 1개당 최대 600건(seed 단계 상한)까지 나올 수 있는데, 3개 구를 다 겹쳐 그리면
+// 최대 1800개 점 — 호버할 때마다 recharts가 전체 재렌더해서 마우스 움직임이 버벅거림.
+// 분포 모양은 훨씬 적은 표본으로도 충분히 드러나서 렌더 개수 자체를 줄인다.
+const SWARM_SAMPLE_CAP = 450;
+
+function swarmDotShape(props: any) {
+  return <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2.4} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.8} />;
+}
 
 // PricePredictionSection의 detail_type별 스웜 레이아웃과 같은 방식(d3-force 없이 구간별
 // 도트 히스토그램)을 세부유형 대신 구 3개로 적용 — 구별로 가격이 어디에 몰려있는지 한눈에.
@@ -101,12 +109,12 @@ function SampleSwarm({ samples }: { samples: PriceComparisonSample[] }) {
             <CartesianGrid stroke="#F0F1ED" horizontal={false} />
             <XAxis type="number" dataKey="price" tickFormatter={v => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
             <YAxis type="number" dataKey="y" hide domain={[0, totalHeight]} />
-            <Tooltip cursor={false} content={({ payload }) => {
+            <Tooltip cursor={false} isAnimationActive={false} content={({ payload }) => {
               const row = payload?.[0]?.payload as { gu: string; price: number } | undefined;
               if (!row) return null;
               return <div style={tooltipBox}>{row.gu} · {money(row.price)}</div>;
             }} />
-            <Scatter data={points} isAnimationActive={false} shape={(props: any) => <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2.4} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.8} />} />
+            <Scatter data={points} isAnimationActive={false} shape={swarmDotShape} />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -134,10 +142,15 @@ export function PriceComparisonSection() {
   );
 
   const samplesLoader = useCallback(
-    () => (selectedCategory ? getPriceComparisonSamples(selectedCategory) : Promise.resolve({ category: "", samples: [] })),
+    () => (selectedCategory ? getPriceComparisonSamples(selectedCategory, undefined, SWARM_SAMPLE_CAP) : Promise.resolve({ category: "", samples: [] })),
     [selectedCategory],
   );
-  const samplesState = useAdminResource(samplesLoader);
+  const { retry: retrySamples, ...samplesState } = useAdminResource(samplesLoader);
+
+  const refreshAll = useCallback(() => {
+    retry();
+    retrySamples();
+  }, [retry, retrySamples]);
 
   const trend = summary?.price_trend_pct ?? null;
   const trendClass = trend === null ? styles.trendFlat : trend < 0 ? styles.trendGood : trend > 0 ? styles.trendBad : styles.trendFlat;
@@ -147,7 +160,7 @@ export function PriceComparisonSection() {
     <section style={{ marginTop: 40 }}>
       <div className={pStyles.cardHead}>
         <div><h2 style={{ fontSize: 20 }}>가격 지역별 비교</h2><p>크롤링 분석 세션 산출물 · 송파구/영등포구/노원구 비교 · 관리자 전용</p></div>
-        <button onClick={retry} disabled={loading}><RefreshCw size={14} />새로고침</button>
+        <button onClick={refreshAll} disabled={loading || samplesState.loading}><RefreshCw size={14} />새로고침</button>
       </div>
 
       {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : !data.categories.length ? <EmptyState message="적재된 가격비교 데이터가 없습니다." /> : <>
@@ -189,8 +202,8 @@ export function PriceComparisonSection() {
         </div>
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
-          <div className={pStyles.cardHead}><div><h2>구별 가격 분포</h2><p>점 하나 = 매물 하나 · 행 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
-          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={samplesState.retry} /> : <SampleSwarm samples={samplesState.data.samples} />}
+          <div className={pStyles.cardHead}><div><h2>구별 가격 분포</h2><p>점 하나 = 매물 하나 · 행 = 구(이상치 상위 3% 제외 · 최대 {SWARM_SAMPLE_CAP}건 표시)</p></div></div>
+          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <SampleSwarm samples={samplesState.data.samples} />}
         </article>
 
         <div style={{ marginTop: 20 }}>
