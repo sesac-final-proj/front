@@ -18,6 +18,14 @@ import { KAKAO_MAP_JS_KEY } from "../../constants";
 import { formatPrice } from "../../utils";
 import { loadKakaoMapScript } from "../map";
 import { IconButton } from "../common/IconButton";
+import { MannerTemperatureModal, getMannerColor } from "../common/MannerTemperatureModal";
+
+function getMannerEmoji(temp: number): string {
+  if (temp < 36.0) return "😠";
+  if (temp < 40.0) return "🙂";
+  if (temp < 70.0) return "🥰";
+  return "🔥";
+}
 
 export function TradePlaceMap({ query, neighborhoodName }: { query: string; neighborhoodName: string }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -107,6 +115,8 @@ export function ProductDetailScreen({
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState("전문 판매업자 같아요");
+  const [showMannerModal, setShowMannerModal] = useState(false);
+  const sellerTemp = product.sellerMannerTemp ?? 36.5;
 
   const reportReasons = [
     "전문 판매업자 같아요",
@@ -138,11 +148,27 @@ export function ProductDetailScreen({
         <div className={styles.sellerCard}>
           <div className={styles.avatar}>가</div>
           <div>
-            <strong>{product.sellerNickname || "주황가지님"}</strong>
+            <strong>{product.sellerNickname || "당근이웃님"}</strong>
             <span>{product.neighborhoodName}</span>
           </div>
-          <button type="button" className={styles.trustPill}>
-            매너온도 {(product.sellerMannerTemp ?? 36.5).toFixed(1)}°C
+          <button
+            type="button"
+            className={styles.mannerTempTrigger}
+            onClick={() => setShowMannerModal(true)}
+            aria-label="매너온도 설명 보기"
+          >
+            <div className={styles.mannerTempHead}>
+              <span
+                className={styles.mannerTempDegree}
+                style={{ color: getMannerColor(sellerTemp) }}
+              >
+                {sellerTemp.toFixed(1)}°C
+              </span>
+              <span className={styles.mannerTempFace}>
+                {getMannerEmoji(sellerTemp)}
+              </span>
+            </div>
+            <span className={styles.mannerTempLabel}>매너온도</span>
           </button>
         </div>
         <div className={styles.priceLine}>
@@ -330,6 +356,11 @@ export function ProductDetailScreen({
           </div>
         </>
       )}
+      <MannerTemperatureModal
+        isOpen={showMannerModal}
+        onClose={() => setShowMannerModal(false)}
+        targetTemp={sellerTemp}
+      />
     </section>
   );
 }

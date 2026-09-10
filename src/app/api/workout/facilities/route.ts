@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       searchKeywords = matchedCategory.query.split(" ");
     } else {
       // 'all'일 때는 대표적인 운동 키워드 복수 검색
-      searchKeywords = ["헬스장", "필라테스", "수영장", "클라이밍"];
+      searchKeywords = ["헬스장", "필라테스", "체육관"];
     }
   }
 
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
     }
 
     // 문서 -> WorkoutFacility 변환
-    const facilities: WorkoutFacility[] = Array.from(uniqueDocsMap.values()).map((doc, idx) => {
+    const facilities: WorkoutFacility[] = Array.from(uniqueDocsMap.values()).map((doc) => {
       const lat = parseFloat(doc.y);
       const lng = parseFloat(doc.x);
       const { category, subCategory: derivedSub } = categorizeFacility(

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { TOGETHER_CATEGORIES, TogetherPost } from "@/types/together";
 import styles from "../../GajiMarketApp.module.css";
+import { MannerTemperatureModal } from "../common/MannerTemperatureModal";
 
 interface TogetherDetailViewProps {
   post: TogetherPost;
@@ -83,7 +84,7 @@ export function TogetherDetailView({
             <strong>{post.userName}</strong>
             <span>{post.userNeighborhood}</span>
           </div>
-          <button type="button" className={styles.trustPill}>
+          <button type="button" className={styles.trustPill} onClick={() => setShowMannerModal(true)}>
             신뢰온도 {post.userMannerTemp ?? 36.5}°C
           </button>
         </div>

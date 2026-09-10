@@ -139,6 +139,10 @@ export function DreamDashboardScreen({
                     )}
                   </strong>
                   <span>{facility.facilityType} - 현재 모금액 {facility.currentAmount.toLocaleString()}원</span>
+                  <span className={styles.dreamFacilityContact}><b>주소</b> {facility.address || "주소 정보 미제공"}</span>
+                  <span className={styles.dreamFacilityContact}>
+                    <b>전화</b> {facility.phone || "전화번호 미제공"}
+                  </span>
                 </div>
                 <em>{facility.totalScore !== null ? `${facility.totalScore}점` : `${progress}%`}</em>
                 <div className={styles.dreamProgressTrack} role="progressbar" aria-label={`${facility.name} 모금 진행률`} aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100}>
@@ -155,8 +159,6 @@ export function DreamDashboardScreen({
                     </div>
                   )}
                   <div className={styles.dreamFacilityDetailMeta}>
-                    {facility.address && <p><strong>주소:</strong> {facility.address}</p>}
-                    {facility.phone && <p><strong>전화:</strong> {facility.phone}</p>}
                     {facility.operationStatus && <p><strong>운영 상태:</strong> {facility.operationStatus}</p>}
                     {facility.establishedDate && <p><strong>인허가일:</strong> {facility.establishedDate}</p>}
                   </div>

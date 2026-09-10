@@ -46,14 +46,14 @@ export default function SourcesSection({
       </div>
 
       {/* Business Strategy Intro */}
-      <div className={styles.sourceIntro} style={{ background: "#20231f", color: "#fff", padding: "24px", borderRadius: "8px", marginBottom: "18px" }}>
+      <div className={styles.sourceIntro}>
         <div>
-          <span style={{ color: "#ff9a57", fontSize: "11px", fontWeight: 800 }}>사업 운영 목적</span>
-          <h3 style={{ fontSize: "20px", margin: "6px 0 10px" }}>
+          <span>사업 운영 목적</span>
+          <h3>
             타 플랫폼 시세를 분석해<br />당근의 가격 경쟁력과 거래 회전율을 높입니다.
           </h3>
         </div>
-        <p style={{ color: "#c4c9c1", fontSize: "12px", lineHeight: 1.7, margin: 0 }}>
+        <p>
           번개장터와 중고나라의 실거래 데이터를 지속 수집·정제하여, 당근 판매자에게는 <b>타 플랫폼 대비 빠른 체결 추천가</b>를 제시하고, 구매자에게는 <b>배송비/수수료 없는 로컬 직거래의 가격적 이점</b>을 명확히 전달하여 플랫폼 락인(Lock-in)을 강화합니다.
         </p>
       </div>

@@ -25,6 +25,8 @@ export interface SettingsScreenProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
   onBack: () => void;
+  activeNeighborhood: string;
+  onOpenNeighborhood: () => void;
   locationAllowed: boolean;
   onLocationToggle: () => void;
   onLogout: () => void;
@@ -36,6 +38,8 @@ export function SettingsScreen({
   theme,
   onThemeChange,
   onBack,
+  activeNeighborhood,
+  onOpenNeighborhood,
   locationAllowed,
   onLocationToggle,
   onLogout,
@@ -68,7 +72,7 @@ export function SettingsScreen({
       <MenuCard
         title="설정"
         items={[
-          { label: "내 동네 설정", icon: MapPinned },
+          { label: "내 동네 설정", icon: MapPinned, trailing: activeNeighborhood, onClick: onOpenNeighborhood },
           { label: locationAllowed ? "동네 인증됨" : "동네 인증하기", icon: Crosshair, trailing: locationAllowed ? "ON" : "OFF" },
           { label: "QR 코드 스캔", icon: QrCode },
           { label: "앱 설정", icon: Settings },

@@ -10,7 +10,7 @@ export function PromoCard() {
         <CakeSlice size={28} />
       </div>
       <div>
-        <strong>가지X동네 베이커리 콜라보 출시</strong>
+        <strong>당근X동네 베이커리 콜라보 출시</strong>
         <span>포장주문하면 4천원 할인까지</span>
       </div>
       <button type="button" aria-label="닫기">

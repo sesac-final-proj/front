@@ -1,8 +1,8 @@
 import React from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { PropertyBuilding } from "@/types";
-import { displayBuildingName, formatRentPrice, formatArea } from "./constants";
+import { displayBuildingName, formatRentPrice, formatArea, makeNaverRealEstateUrl } from "./constants";
 
 export interface RealEstateBuildingSheetProps {
   building: PropertyBuilding;
@@ -31,6 +31,15 @@ export function RealEstateBuildingSheet({
           <span key={transaction.id}>{formatRentPrice(transaction)} · {transaction.contractDate.slice(0, 7).replace("-", ".")}</span>
         ))}
       </div>
+      <a
+        className={styles.realEstateNaverPriceLink}
+        href={makeNaverRealEstateUrl(building)}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        정확한 시세보기
+        <ExternalLink size={17} />
+      </a>
     </article>
   );
 }

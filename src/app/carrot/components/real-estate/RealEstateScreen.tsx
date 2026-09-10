@@ -198,7 +198,7 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
     <section className={styles.realEstateHome}>
       <header className={styles.realEstateHeader}>
         <IconButton label="닫기" onClick={onBack}><X size={28} /></IconButton>
-        <h1>가지부동산</h1>
+        <h1>당근부동산</h1>
         <button type="button" className={styles.realEstateMapButton} onClick={() => setView("map")}>
           <MapPinned size={19} /> 지도
         </button>

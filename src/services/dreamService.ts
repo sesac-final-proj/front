@@ -72,7 +72,10 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
       isSelected: item.is_selected,
       checklist: item.checklist,
     };
-  });
+  })
+    .filter((facility) => facility.isSelected)
+    .sort((a, b) => (a.districtRank ?? Number.MAX_SAFE_INTEGER) - (b.districtRank ?? Number.MAX_SAFE_INTEGER))
+    .slice(0, 2);
 }
 
 // 꿈방울(기부 가능 포인트) 잔액 — 결제할 때마다 자동 적립되는 값(일반결제 1%, 중고거래

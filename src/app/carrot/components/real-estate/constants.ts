@@ -5,7 +5,7 @@ import {
   Menu,
   LucideIcon,
 } from "lucide-react";
-import type { HouseTypeFilter, RentTransaction } from "@/types";
+import type { HouseTypeFilter, PropertyBuilding, RentTransaction } from "@/types";
 
 export const SEOUL_DISTRICTS = [
   "종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구", "강북구",
@@ -134,4 +134,15 @@ export function displayBuildingName(transaction: RentTransaction) {
   const name = transaction.buildingName?.trim();
   if (name && !/^\([\d-]+\)$/.test(name)) return name;
   return `${transaction.dong} ${transaction.houseTypeLabel}`;
+}
+
+export function makeNaverRealEstateUrl(building: PropertyBuilding) {
+  const query = [
+    "서울",
+    building.district,
+    building.dong,
+    displayBuildingName(building.latestTransaction),
+  ].join(" ");
+
+  return `https://m.land.naver.com/search/result/${encodeURIComponent(query)}`;
 }

@@ -13,6 +13,13 @@ function AuthCallbackInner() {
   const params = useSearchParams();
 
   useEffect(() => {
+    const errorMsg = params?.get("error");
+    if (errorMsg) {
+      alert(errorMsg);
+      router.replace("/onboarding");
+      return;
+    }
+
     const accessToken = params?.get("access_token");
     const refreshToken = params?.get("refresh_token");
 

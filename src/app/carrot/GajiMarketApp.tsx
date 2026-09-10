@@ -12,6 +12,7 @@ import {
   BottomNav,
   BottomSheet,
   FloatingWriteButton,
+  HomeFloatingActionMenu,
   AllServicesScreen,
   RegionSearchScreen,
   SearchScreen,
@@ -200,6 +201,7 @@ export default function GajiMarketApp() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
+  const [isHomeActionMenuOpen, setIsHomeActionMenuOpen] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
   // 로그인 필수 게이트: getMe() 응답이 오기 전엔 화면을 그리지 않고, 비로그인/토큰
   // 만료면 온보딩으로 보낸다 — 게스트 열람 허용하던 이전 동작을 없앤 것.
@@ -812,6 +814,7 @@ export default function GajiMarketApp() {
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
+    setIsHomeActionMenuOpen(false);
     if (tab === "map") {
       setMapSheetState("half");
     }
@@ -1864,21 +1867,73 @@ export default function GajiMarketApp() {
         </main>
 
         {!subPage && (activeTab === "home" || activeTab === "community" || (activeTab === "map" && mapSheetState === "expanded")) && (
-          <FloatingWriteButton
-            showTogetherTooltip={activeTab === "community"}
-            onTooltipClick={() => setSubPage({ type: "together-intro" })}
-            onClick={() => {
-              if (activeTab === "community") {
-                if (communityTab === "같이해요") {
-                  setSubPage({ type: "together-intro" });
+          activeTab === "home" ? (
+            <HomeFloatingActionMenu
+              isOpen={isHomeActionMenuOpen}
+              onToggle={() => setIsHomeActionMenuOpen((prev) => !prev)}
+              onClose={() => setIsHomeActionMenuOpen(false)}
+              onSellMyProduct={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "product-form" });
+              }}
+              onSellMultipleProducts={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "product-form" });
+                setToastMessage("'여러 물건 팔기' 모드로 글을 작성할 수 있어요.");
+              }}
+              onOpenAlba={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "alba" });
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenRealEstate={() => {
+                setIsHomeActionMenuOpen(false);
+                openRealEstate();
+              }}
+              onOpenCommunity={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("전체");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenTogether={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("같이해요");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenStory={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("자유 주제");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+            />
+          ) : (
+            <FloatingWriteButton
+              showTogetherTooltip={activeTab === "community"}
+              onTooltipClick={() => setSubPage({ type: "together-intro" })}
+              onClick={() => {
+                if (activeTab === "community") {
+                  if (communityTab === "같이해요") {
+                    setSubPage({ type: "together-intro" });
+                  } else {
+                    setSubPage({ type: "community-form" });
+                  }
                 } else {
-                  setSubPage({ type: "community-form" });
+                  setSheet("write");
                 }
-              } else {
-                setSheet("write");
-              }
-            }}
-          />
+              }}
+            />
+          )
         )}
 
         {showBottomNav && (

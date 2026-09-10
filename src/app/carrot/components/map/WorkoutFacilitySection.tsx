@@ -2,10 +2,7 @@
 
 import React from "react";
 import {
-  ChevronRight,
-  Dumbbell,
   ExternalLink,
-  MapPin,
   Navigation,
   Phone,
   RefreshCw,
@@ -65,7 +62,7 @@ export function WorkoutFacilitySection({
         </button>
       </div>
       <p className={styles.hint}>
-        현재 지도 영역의 헬스장, 필라테스, 수영장 등 운동 시설을 모아봤어요.
+        현재 지도 영역의 헬스장, 필라테스, 체육관을 모아봤어요.
       </p>
 
       {/* 2. 서브 카테고리 칩 필터 */}

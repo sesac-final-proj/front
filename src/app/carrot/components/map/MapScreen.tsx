@@ -31,6 +31,7 @@ import { RealtimeDangerTicker } from "./RealtimeDangerTicker";
 import { CongestionAnalysisSection } from "./CongestionAnalysisSection";
 import { DangerSignalCallout } from "./DangerSignalCallout";
 import { WorkoutFacilitySection } from "./WorkoutFacilitySection";
+import { WorkoutClusterListSheet, WorkoutDetailSheet } from "./WorkoutMapSheets";
 import { useWorkoutFacilities } from "./useWorkoutFacilities";
 import type { WorkoutFacility } from "@/services/workoutService";
 
@@ -117,6 +118,10 @@ export function MapScreen({
     currentLocation,
     coordsMap: NEIGHBORHOOD_COORDS,
   });
+  const [workoutClusterFacilities, setWorkoutClusterFacilities] = useState<WorkoutFacility[] | null>(null);
+  const selectedWorkoutFacility = workout.selectedId
+    ? workout.facilities.find((facility) => facility.id === workout.selectedId) ?? null
+    : null;
   const [centerRequest, setCenterRequest] = useState(0);
   const [selectedDanger, setSelectedDanger] = useState<LocalBusiness | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -198,10 +203,17 @@ export function MapScreen({
   }, [transitionToState]);
 
   const handleSelectWorkoutFacility = useCallback((facility: WorkoutFacility) => {
+    setWorkoutClusterFacilities(null);
     workout.handleSelectFacility(facility);
     transitionToState("half");
     window.requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 100, behavior: "smooth" }));
   }, [workout, transitionToState]);
+  const handleSelectWorkoutCluster = useCallback((facilities: WorkoutFacility[]) => {
+    setWorkoutClusterFacilities(facilities);
+    workout.setSelectedId(null);
+    sheetRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    onSheetStateChange("half");
+  }, [workout, onSheetStateChange]);
 
   const onGlobalPointerMove = useCallback((e: PointerEvent) => {
     const deltaY = e.clientY - dragStartYRef.current;
@@ -377,36 +389,6 @@ export function MapScreen({
     transitionToState(target);
   };
 
-  const handleMapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-
-    if (
-      target.closest(`.${styles.mapSearch}`) ||
-      target.closest(`.${styles.mapControls}`) ||
-      target.closest(`.${styles.mapCategoryFab}`) ||
-      target.closest(`.${styles.tradeSafetyCard}`) ||
-      target.closest(`.${styles.dangerSignalCallout}`)
-    ) {
-      return;
-    }
-
-    initialHeightRef.current = sheetRef.current?.getBoundingClientRect().height ?? 198;
-    dragStartXRef.current = e.clientX;
-    dragStartYRef.current = e.clientY;
-    lastYRef.current = e.clientY;
-    lastTimeRef.current = performance.now();
-    dragVelocityRef.current = 0;
-    originStateRef.current = sheetState;
-    currentDeltaYRef.current = 0;
-    hasMovedSignificantRef.current = false;
-    dragSourceRef.current = "map";
-
-    window.addEventListener("pointermove", onGlobalPointerMove, { capture: true, passive: false });
-    window.addEventListener("pointerup", handlePointerUp, { capture: true });
-    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
-  };
-
   const handleSheetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -462,11 +444,10 @@ export function MapScreen({
     if (!sheetEl) return;
 
     const isOverHandle = (e.target as HTMLElement).closest(`.${styles.sheetHandle}`) !== null;
-    const isOverMap = (e.target as HTMLElement).closest(`.${styles.mapCanvas}`) !== null;
     const isAtTop = sheetEl.scrollTop <= 2;
 
-    // 아래로 스크롤 (deltaY > 8): 언더바 위이거나 지도 위이거나 시트 최상단일 때 시트를 아래로 내려 지도를 보여줌!
-    if (e.deltaY > 8 && (isOverHandle || isOverMap || (isAtTop && sheetState !== "collapsed"))) {
+    // 시트 또는 손잡이 위의 휠 입력만 시트 높이에 반영한다.
+    if (e.deltaY > 8 && (isOverHandle || (isAtTop && sheetState !== "collapsed"))) {
       if (sheetState !== "collapsed") {
         wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 260);
         const target = sheetState === "expanded" ? "half" : "collapsed";
@@ -477,8 +458,7 @@ export function MapScreen({
         transitionToState(target);
       }
     }
-    // 위로 스크롤 (deltaY < -8): 언더바 위이거나 지도 위이거나 시트 접힘 상태일 때 시트를 위로 올림!
-    else if (e.deltaY < -8 && (isOverHandle || isOverMap || sheetState === "collapsed" || (sheetState === "half" && isAtTop))) {
+    else if (e.deltaY < -8 && (isOverHandle || sheetState === "collapsed" || (sheetState === "half" && isAtTop))) {
       if (sheetState !== "expanded") {
         wheelTimeoutRef.current = window.setTimeout(() => { wheelTimeoutRef.current = null; }, 260);
         const target = sheetState === "collapsed" ? "half" : "expanded";
@@ -672,8 +652,6 @@ export function MapScreen({
         ref={mapCanvasRef}
         className={`${styles.mapCanvas} ${isTransitMode ? styles.transitCanvas : ""}`}
         data-sheet={sheetState}
-        onPointerDownCapture={handleMapPointerDown}
-        onWheel={handleWheel}
       >
         <KakaoMapLayer
           activeNeighborhood={activeNeighborhood}
@@ -691,6 +669,11 @@ export function MapScreen({
           transitFocus={transitFocus}
           onTransitBoundsChange={handleTransitBounds}
           onSelectTransit={handleSelectTransit}
+          workoutFacilities={isWorkoutMode ? workout.facilities : []}
+          selectedWorkoutId={workout.selectedId}
+          onSelectWorkoutFacility={handleSelectWorkoutFacility}
+          onSelectWorkoutCluster={handleSelectWorkoutCluster}
+          onWorkoutBoundsChange={workout.setMapBounds}
           theme={theme}
           onSelectRestaurants={handleSelectRestaurants}
           onRestaurantsLoaded={setRestaurantResults}
@@ -712,7 +695,7 @@ export function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode && !isWorkoutMode ? (
           <RealtimeDangerTicker
             dangerSignals={liveDangerSignals}
             onSelectDanger={selectDanger}
@@ -793,6 +776,17 @@ export function MapScreen({
             actionLabel="권한 허용"
             onAction={requestCurrentLocation}
           />
+        ) : isWorkoutMode && workoutClusterFacilities && !selectedWorkoutFacility ? (
+          <WorkoutClusterListSheet
+            facilities={workoutClusterFacilities}
+            onSelect={handleSelectWorkoutFacility}
+            onClose={() => setWorkoutClusterFacilities(null)}
+          />
+        ) : isWorkoutMode && selectedWorkoutFacility ? (
+          <WorkoutDetailSheet
+            facility={selectedWorkoutFacility}
+            onClose={() => workout.setSelectedId(null)}
+          />
         ) : selectedCategory === "food" && selectedRestaurants.length > 1 && !selectedRestaurantId ? (
           <RestaurantClusterListSheet
             restaurants={selectedRestaurants}
@@ -839,7 +833,24 @@ export function MapScreen({
               <span />
               <span />
             </div>
-            {transitKind ? (
+            {isWorkoutMode ? (
+              <WorkoutFacilitySection
+                facilities={workoutClusterFacilities ?? workout.facilities}
+                selectedId={workout.selectedId}
+                loading={workout.loading}
+                error={workout.error}
+                subCategory={workout.subCategory}
+                onSubCategoryChange={(subCategory) => {
+                  setWorkoutClusterFacilities(null);
+                  workout.setSubCategory(subCategory);
+                }}
+                onSelectFacility={handleSelectWorkoutFacility}
+                onRetry={() => {
+                  setWorkoutClusterFacilities(null);
+                  workout.retry();
+                }}
+              />
+            ) : transitKind ? (
               <TransitSection
                 kind={transitKind}
                 stops={transit.stops}

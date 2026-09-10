@@ -25,7 +25,8 @@ import {
   ListFilter,
   Tag,
   ShoppingBag,
-  Info
+  Info,
+  AlertTriangle
 } from "lucide-react";
 import type { AdminAudienceInsights, AdminProductCluster } from "@/services/adminService";
 import styles from "@/app/admin/admin.module.css";
@@ -166,6 +167,7 @@ const GOOGLE_TREND_INDICATORS: GoogleTrendItem[] = [
 
 export default function InsightsSection({ insights }: { insights: AdminAudienceInsights | null }) {
   // Main Filter State
+  const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFamily, setSelectedFamily] = useState("all");
   const [selectedQuality, setSelectedQuality] = useState("all");
@@ -208,10 +210,8 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTab, setReportTab] = useState<"governance" | "semantic" | "guide">("governance");
 
-  if (!insights) return null;
-
-  const rawClusters = insights.productClusters ?? [];
-  const rawExamples = insights.examples ?? [];
+  const rawClusters = insights?.productClusters ?? [];
+  const rawExamples = insights?.examples ?? [];
 
   // Extract unique families for Tab Bar
   const uniqueFamilies = useMemo(() => {
@@ -362,10 +362,111 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     };
   }, [filteredClusters]);
 
+  const distributionMetrics = useMemo(() => {
+    const sortedPrices = filteredClusters
+      .map((cluster) => cluster.median || cluster.medianPrice || 0)
+      .filter((price) => price > 0)
+      .sort((a, b) => a - b);
+    const percentile = (ratio: number) => {
+      if (sortedPrices.length === 0) return 0;
+      return sortedPrices[Math.min(sortedPrices.length - 1, Math.floor((sortedPrices.length - 1) * ratio))];
+    };
+    const totalSamples = filteredClusters.reduce((sum, cluster) => sum + (cluster.count || cluster.sampleCount || 0), 0);
+    const completedSamples = filteredClusters.reduce(
+      (sum, cluster) => sum + (cluster.count || cluster.sampleCount || 0) * (cluster.completedRate || 0),
+      0,
+    );
+    const reliableSamples = filteredClusters.reduce((sum, cluster) => {
+      const status = showTuningPanel ? cluster.tunedStatus : cluster.qualityStatus;
+      return status === "reliable" || status === "limited"
+        ? sum + (cluster.count || cluster.sampleCount || 0)
+        : sum;
+    }, 0);
+    const buckets = [
+      { label: "5만원 미만", min: 0, max: 50000 },
+      { label: "5–10만원", min: 50000, max: 100000 },
+      { label: "10–20만원", min: 100000, max: 200000 },
+      { label: "20–30만원", min: 200000, max: 300000 },
+      { label: "30만원 이상", min: 300000, max: Number.POSITIVE_INFINITY },
+    ].map((bucket) => ({
+      ...bucket,
+      count: filteredClusters.reduce((sum, cluster) => {
+        const price = cluster.median || cluster.medianPrice || 0;
+        return price >= bucket.min && price < bucket.max
+          ? sum + (cluster.count || cluster.sampleCount || 0)
+          : sum;
+      }, 0),
+    }));
+
+    return {
+      q1: percentile(0.25),
+      median: percentile(0.5),
+      q3: percentile(0.75),
+      iqr: percentile(0.75) - percentile(0.25),
+      completionRate: totalSamples > 0 ? (completedSamples / totalSamples) * 100 : 0,
+      reliableRate: totalSamples > 0 ? (reliableSamples / totalSamples) * 100 : 0,
+      buckets,
+      maxBucketCount: Math.max(1, ...buckets.map((bucket) => bucket.count)),
+    };
+  }, [filteredClusters, showTuningPanel]);
+
   // Active Google Trends Info
   const activeTrendData = useMemo(() => {
     return GOOGLE_TREND_INDICATORS.find((t) => t.item === selectedTrendItem) || GOOGLE_TREND_INDICATORS[0];
   }, [selectedTrendItem]);
+
+  const operationalSignals = useMemo(() => {
+    const trendRows = GOOGLE_TREND_INDICATORS.map((trend) => {
+      const change = Number.parseFloat(trend.trendChange.replace(/[^\d.-]/g, "")) || 0;
+      const relatedClusters = processedClusters.filter((cluster) => cluster.item === trend.item);
+      const noisyClusters = relatedClusters.filter((cluster) => cluster.tunedStatus === "noisy").length;
+      const reliableClusters = relatedClusters.filter(
+        (cluster) => cluster.tunedStatus === "reliable" || cluster.tunedStatus === "limited",
+      ).length;
+      return { ...trend, change, noisyClusters, reliableClusters, clusterCount: relatedClusters.length };
+    });
+    const rising = [...trendRows].sort((a, b) => b.change - a.change)[0];
+    const supplyWatch = [...trendRows]
+      .filter((row) => row.change > 0)
+      .sort((a, b) => (b.trendScore / Math.max(b.marketSamples, 1)) - (a.trendScore / Math.max(a.marketSamples, 1)))[0];
+    const hold = [...trendRows].sort((a, b) => a.marketSamples - b.marketSamples)[0];
+
+    return {
+      summary: [
+        {
+          label: "관심도 급상승",
+          item: rising.item,
+          value: rising.trendChange,
+          note: `관심도 ${rising.trendScore}/100 · 외부 표본 ${number.format(rising.marketSamples)}건`,
+          color: "#d95f18",
+          background: "#fff4eb",
+        },
+        {
+          label: "공급 압력 점검",
+          item: supplyWatch.item,
+          value: `점수 ${supplyWatch.trendScore}`,
+          note: `상승 신호 대비 외부 표본 ${number.format(supplyWatch.marketSamples)}건`,
+          color: "#8a5a00",
+          background: "#fff8dc",
+        },
+        {
+          label: "판단 보류",
+          item: hold.item,
+          value: `${number.format(hold.marketSamples)}건`,
+          note: "표본이 적어 가격·수요 판단에 주의가 필요합니다.",
+          color: "#a13a46",
+          background: "#fff0f2",
+        },
+      ],
+      priorities: trendRows
+        .map((row) => ({
+          ...row,
+          priorityScore: row.change * 2 + row.trendScore - Math.min(30, Math.log10(Math.max(row.marketSamples, 1)) * 10),
+        }))
+        .sort((a, b) => b.priorityScore - a.priorityScore)
+        .slice(0, 4),
+    };
+  }, [processedClusters]);
 
   // Linked Raw Listings for the Selected Cluster (Drilldown)
   const linkedRawListings = useMemo(() => {
@@ -404,7 +505,64 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     };
   }, [processedClusters]);
 
+  const longTermScorecard = useMemo(() => {
+    const totalRows = processedClusters.reduce((sum, cluster) => sum + (cluster.count || cluster.sampleCount || 0), 0);
+    const multiSourceRows = processedClusters.reduce(
+      (sum, cluster) => (cluster.platformCount || 0) >= 2 ? sum + (cluster.count || cluster.sampleCount || 0) : sum,
+      0,
+    );
+    const coveredItems = new Set(processedClusters.map((cluster) => cluster.item).filter(Boolean));
+    const targetItems = new Set(GOOGLE_TREND_INDICATORS.map((item) => item.item));
+    const marketCoverage = targetItems.size > 0
+      ? ([...targetItems].filter((item) => coveredItems.has(item)).length / targetItems.size) * 100
+      : 0;
+    const sources = insights?.sourceValidation?.sources ?? [];
+    const sourceRows = sources.reduce((sum, source) => sum + source.rows, 0);
+    const weightedRate = (key: "modelKnownRate" | "datedRate") => sourceRows > 0
+      ? sources.reduce((sum, source) => sum + source.rows * source[key], 0) / sourceRows
+      : 0;
+
+    return [
+      {
+        label: "핵심 품목 커버리지",
+        value: marketCoverage,
+        target: 90,
+        suffix: "%",
+        definition: "관찰 대상 품목 중 분석 가능한 클러스터가 존재하는 비율",
+      },
+      {
+        label: "신뢰 표본 커버리지",
+        value: Number(tuningStats.coverageRate),
+        target: 85,
+        suffix: "%",
+        definition: "전체 표본 중 Reliable·Limited 등급으로 활용 가능한 비율",
+      },
+      {
+        label: "다중 출처 검증률",
+        value: totalRows > 0 ? (multiSourceRows / totalRows) * 100 : 0,
+        target: 70,
+        suffix: "%",
+        definition: "2개 이상 외부 플랫폼에서 교차 확인된 표본 비율",
+      },
+      {
+        label: "모델 식별률",
+        value: weightedRate("modelKnownRate"),
+        target: 90,
+        suffix: "%",
+        definition: "수집 데이터 중 정규화된 제품 모델을 식별한 비율",
+      },
+      {
+        label: "수집일 식별률",
+        value: weightedRate("datedRate"),
+        target: 95,
+        suffix: "%",
+        definition: "수집 시점을 확인해 시계열 비교에 사용할 수 있는 데이터 비율",
+      },
+    ];
+  }, [insights, processedClusters, tuningStats.coverageRate]);
+
   const resetAllFilters = () => {
+    setSearchDraft("");
     setSearchQuery("");
     setSelectedFamily("all");
     setSelectedQuality("all");
@@ -414,6 +572,18 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
     setMaxPriceFilter(1000000);
     setCurrentPage(1);
     setSelectedCluster(null);
+  };
+
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(searchDraft.trim());
+    setCurrentPage(1);
+  };
+
+  const clearSearch = () => {
+    setSearchDraft("");
+    setSearchQuery("");
+    setCurrentPage(1);
   };
 
   const toggleSort = (key: typeof sortKey) => {
@@ -428,6 +598,8 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  if (!insights) return null;
 
   return (
     <section id="external-insights" className={styles.section}>
@@ -464,8 +636,120 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
         </div>
       </div>
 
+      {/* Operations-first external signal briefing */}
+      <div className={styles.externalBrief}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+          <div>
+            <h3 style={{ margin: 0, color: "var(--ink)", fontSize: "20px", letterSpacing: "-.035em" }}>오늘 확인할 외부 시장 변화</h3>
+            <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: "11px" }}>거래 성과가 아닌 외부 관심도·공급 표본·데이터 품질 기반 운영 신호입니다.</p>
+          </div>
+          <span style={{ color: "var(--muted)", fontSize: "10px" }}>데이터 기준 {insights.asOf || "최근 수집 시점"}</span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "10px", marginBottom: "18px" }}>
+          {operationalSignals.summary.map((signal) => (
+            <button
+              type="button"
+              key={signal.label}
+              onClick={() => {
+                setSelectedTrendItem(signal.item);
+                setSelectedFamily(signal.item);
+                setCurrentPage(1);
+              }}
+              style={{ minHeight: "126px", padding: "16px", textAlign: "left", border: `1px solid ${signal.color}24`, borderRadius: "12px", color: "var(--ink)", background: signal.background, cursor: "pointer" }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: signal.color, fontSize: "10px", fontWeight: 800 }}>
+                {signal.label === "판단 보류" ? <AlertTriangle size={14} /> : <TrendingUp size={14} />}
+                {signal.label}
+              </span>
+              <strong style={{ display: "block", margin: "13px 0 4px", fontSize: "15px" }}>{signal.item}</strong>
+              <b style={{ color: signal.color, fontSize: "13px" }}>{signal.value}</b>
+              <small style={{ display: "block", marginTop: "7px", color: "var(--muted)", fontSize: "9px", lineHeight: 1.45 }}>{signal.note}</small>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, .45fr) minmax(0, 1.55fr)", gap: "16px", paddingTop: "17px", borderTop: "1px solid var(--line)" }}>
+          <div>
+            <span style={{ display: "flex", alignItems: "center", gap: "7px", color: "var(--ink)", fontSize: "12px", fontWeight: 800 }}><ShieldCheck size={15} color="var(--carrot)" /> 우선 대응 품목</span>
+            <p style={{ margin: "7px 0 0", color: "var(--muted)", fontSize: "9px", lineHeight: 1.55 }}>변화율과 관심도가 높고 외부 표본이 상대적으로 적은 순서입니다. 품목을 누르면 아래 근거 지표가 함께 바뀝니다.</p>
+          </div>
+          <div style={{ display: "grid", gap: "6px" }}>
+            {operationalSignals.priorities.map((item, index) => (
+              <button
+                type="button"
+                key={item.item}
+                onClick={() => {
+                  setSelectedTrendItem(item.item);
+                  setSelectedFamily(item.item);
+                  setCurrentPage(1);
+                }}
+                style={{ display: "grid", gridTemplateColumns: "28px minmax(120px, 1fr) auto auto 18px", gap: "10px", alignItems: "center", width: "100%", padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "9px", color: "var(--ink)", background: "#fff", textAlign: "left", cursor: "pointer" }}
+              >
+                <b style={{ color: index === 0 ? "var(--carrot)" : "var(--muted)", font: "800 10px ui-monospace, monospace" }}>{String(index + 1).padStart(2, "0")}</b>
+                <strong style={{ fontSize: "11px" }}>{item.item}</strong>
+                <span style={{ color: item.change > 0 ? "#b45309" : "var(--muted)", fontSize: "10px", fontWeight: 700 }}>{item.trendChange}</span>
+                <span style={{ color: "var(--muted)", fontSize: "9px" }}>{number.format(item.marketSamples)}건</span>
+                <ChevronRight size={15} color="var(--muted)" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Long-term performance baseline */}
+      <div className={styles.externalScorecard}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap", marginBottom: "18px" }}>
+          <div>
+            <h3 style={{ margin: "7px 0 5px", fontSize: "18px", letterSpacing: "-.025em" }}>외부 데이터 장기 성과 기준선</h3>
+            <p style={{ maxWidth: "650px", margin: 0, color: "#b9beb6", fontSize: "10px", lineHeight: 1.6 }}>일회성 시세가 아니라 시장 관찰 범위와 데이터 신뢰도가 장기간 개선되는지 확인합니다. 현재 값은 실수집 데이터에서 계산됩니다.</p>
+          </div>
+          <span style={{ padding: "6px 9px", border: "1px solid #50564d", borderRadius: "7px", color: "#cdd2ca", fontSize: "9px" }}>기준 {insights.asOf || "최근 수집 시점"}</span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", border: "1px solid #454a42", borderRadius: "12px", overflow: "hidden" }}>
+          {longTermScorecard.map((metric) => {
+            const progress = Math.min(100, (metric.value / metric.target) * 100);
+            const reached = metric.value >= metric.target;
+            return (
+              <article key={metric.label} style={{ minHeight: "164px", padding: "15px", borderRight: "1px solid #454a42", background: reached ? "#29352d" : "#2b2e28" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: "#c5cac2", fontSize: "9px", fontWeight: 700 }}>{metric.label}</span>
+                  <span style={{ color: reached ? "#7ee2a8" : "#ffb17e", fontSize: "8px", fontWeight: 800 }}>{reached ? "목표 충족" : "개선 필요"}</span>
+                </div>
+                <strong style={{ display: "block", margin: "15px 0 3px", fontSize: "24px", fontVariantNumeric: "tabular-nums" }}>{metric.value.toFixed(1)}{metric.suffix}</strong>
+                <small style={{ color: "#949b91", fontSize: "8px" }}>장기 목표 {metric.target}{metric.suffix}</small>
+                <div role="progressbar" aria-label={metric.label} aria-valuemin={0} aria-valuemax={metric.target} aria-valuenow={Math.round(metric.value)} style={{ height: "5px", margin: "12px 0 9px", borderRadius: "999px", overflow: "hidden", background: "#4a4f47" }}>
+                  <span style={{ display: "block", width: `${progress}%`, height: "100%", borderRadius: "inherit", background: reached ? "#58c785" : "#ff8a48" }} />
+                </div>
+                <p style={{ margin: 0, color: "#aeb4ac", fontSize: "8px", lineHeight: 1.45 }}>{metric.definition}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(170px, .45fr) minmax(0, 1.55fr)", gap: "18px", marginTop: "14px", padding: "15px", borderRadius: "11px", background: "#1d201c" }}>
+          <div>
+            <span style={{ display: "flex", alignItems: "center", gap: "7px", color: "#fff", fontSize: "11px", fontWeight: 800 }}><Layers size={14} color="#ff9a57" /> 다음 측정 단계</span>
+            <p style={{ margin: "6px 0 0", color: "#8f968c", fontSize: "8px", lineHeight: 1.5 }}>운영 이력이 쌓여야 계산 가능한 성과척도입니다.</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
+            {[
+              ["24시간 내 검토율", "신호 탐지·최초 검토 시각 필요"],
+              ["운영 과제 전환율", "담당자·대응 상태 이력 필요"],
+              ["신호 유효 판정률", "유효·관찰·무시 판정값 필요"],
+            ].map(([label, requirement]) => (
+              <div key={label} style={{ padding: "10px", border: "1px dashed #444a41", borderRadius: "8px" }}>
+                <strong style={{ display: "block", color: "#d9ddd6", fontSize: "9px" }}>{label}</strong>
+                <span style={{ display: "block", marginTop: "4px", color: "#858c82", fontSize: "8px", lineHeight: 1.4 }}>{requirement}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* 2. Visual Market Indicators & Price Distribution Strip */}
-      <div style={{
+      <div className={styles.externalMarketEvidence} style={{
         background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
         border: "1px solid #334155",
         borderRadius: "8px",
@@ -489,7 +773,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
               gap: "4px"
             }}>
               <Globe size={13} />
-              GOOGLE TRENDS × EXTERNAL MARKET VISUALIZER
+              외부 시장 근거
             </span>
             <h3 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#fff" }}>
               품목별 구글 관심도 & 외부 시장 시세 밴드 (Boxplot 시각화)
@@ -507,6 +791,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
             return (
               <button
                 key={t.item}
+                className={`${styles.externalTrendChip} ${isSelected ? styles.externalTrendChipActive : ""}`}
                 onClick={() => {
                   setSelectedTrendItem(t.item);
                   setSelectedFamily(t.item);
@@ -609,48 +894,46 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
       </div>
 
       {/* 3. Advanced Multi-Dimensional Search & Filtering Console */}
-      <div style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "8px",
-        padding: "18px 20px",
-        marginBottom: "18px"
-      }}>
+      <div className={styles.externalSearchPanel}>
+        <div className={styles.externalSearchHead}>
+          <div>
+            <span>DATA EXPLORER</span>
+            <strong>외부 시세 데이터 검색</strong>
+            <p>품목·모델·시그니처를 검색하고 수집 품질 조건을 조합하세요.</p>
+          </div>
+          <div className={styles.externalResultMeta} aria-live="polite">
+            <strong>{number.format(totalFilteredCount)}</strong>
+            <span>/ 전체 {number.format(rawClusters.length)}개 클러스터</span>
+          </div>
+        </div>
         {/* Top Search Toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        <div className={styles.externalSearchToolbar}>
           {/* Main Keyword Search Bar */}
-          <div style={{ position: "relative", flex: 1, minWidth: "280px", maxWidth: "420px" }}>
-            <Search size={16} color="var(--muted)" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }} />
+          <form className={styles.externalSearchForm} onSubmit={submitSearch} role="search">
+            <button type="submit" className={styles.externalSearchSubmit} aria-label="외부 데이터 검색">
+              <Search size={17} />
+            </button>
             <input
               type="text"
               placeholder="품목명, 정규화 모델명, 시그니처, 키워드 검색..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{
-                width: "100%",
-                padding: "9px 12px 9px 36px",
-                borderRadius: "6px",
-                border: "1px solid var(--line)",
-                background: "#fff",
-                fontSize: "13px",
-                color: "var(--ink)",
-              }}
+              aria-label="외부 데이터 검색어"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
             />
-            {searchQuery && (
+            {searchDraft && (
               <button
-                onClick={() => setSearchQuery("")}
-                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", border: "none", background: "none", cursor: "pointer", color: "var(--muted)" }}
+                type="button"
+                onClick={clearSearch}
+                className={styles.externalSearchClear}
+                aria-label="검색어 지우기"
               >
                 <X size={14} />
               </button>
             )}
-          </div>
+          </form>
 
           {/* Quick Filter Dropdowns */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <div className={styles.externalFilterRow}>
             {/* Family Select */}
             <select
               value={selectedFamily}
@@ -658,7 +941,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 setSelectedFamily(e.target.value);
                 setCurrentPage(1);
               }}
-              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+              className={styles.externalSelect}
             >
               <option value="all">전체 품목군 ({rawClusters.length}개)</option>
               {uniqueFamilies.map((fam) => (
@@ -673,7 +956,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 setPlatformFilter(e.target.value as any);
                 setCurrentPage(1);
               }}
-              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+              className={styles.externalSelect}
             >
               <option value="all">모든 플랫폼</option>
               <option value="multi">다중 수집 (번개+중고나라)</option>
@@ -688,7 +971,7 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
                 setSelectedQuality(e.target.value);
                 setCurrentPage(1);
               }}
-              style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px", color: "var(--ink)", cursor: "pointer" }}
+              className={styles.externalSelect}
             >
               <option value="all">모든 품질 상태</option>
               <option value="reliable">신뢰 (Reliable)</option>
@@ -885,6 +1168,54 @@ export default function InsightsSection({ insights }: { insights: AdminAudienceI
           </div>
         </div>
       )}
+
+      {/* Filter-linked distribution metrics */}
+      <div style={{ margin: "18px 0", padding: "20px", border: "1px solid var(--line)", borderRadius: "16px", background: "var(--surface)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ display: "grid", placeItems: "center", width: "36px", height: "36px", borderRadius: "10px", color: "var(--carrot-dark)", background: "#fff1e7" }}>
+              <BarChart3 size={18} />
+            </span>
+            <div>
+              <strong style={{ display: "block", color: "var(--ink)", fontSize: "14px" }}>검색 결과 분포도</strong>
+              <span style={{ color: "var(--muted)", fontSize: "10px" }}>현재 검색·품목·품질·가격 필터가 즉시 반영됩니다.</span>
+            </div>
+          </div>
+          <span style={{ color: "var(--muted)", fontSize: "10px" }}>
+            {number.format(currentSliceStats.clusterCount)}개 클러스터 · {number.format(currentSliceStats.totalCount)}건 표본
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", border: "1px solid var(--line)", borderRadius: "12px", overflow: "hidden", marginBottom: "18px" }}>
+          {[
+            ["하위 25%", money(distributionMetrics.q1)],
+            ["중앙값", money(distributionMetrics.median)],
+            ["상위 75%", money(distributionMetrics.q3)],
+            ["가격 편차 IQR", money(distributionMetrics.iqr)],
+            ["거래 완료율", `${distributionMetrics.completionRate.toFixed(1)}%`],
+            ["신뢰 표본 비중", `${distributionMetrics.reliableRate.toFixed(1)}%`],
+          ].map(([label, value], index) => (
+            <div key={label} style={{ padding: "14px", borderRight: index < 5 ? "1px solid var(--line)" : "none", background: index === 1 ? "#fff7f1" : "#fff" }}>
+              <span style={{ display: "block", color: "var(--muted)", fontSize: "9px", marginBottom: "6px" }}>{label}</span>
+              <strong style={{ color: index === 1 ? "var(--carrot-dark)" : "var(--ink)", fontSize: "13px", fontVariantNumeric: "tabular-nums" }}>{value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div aria-label="가격 구간별 표본 분포" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(80px, 1fr))", gap: "10px", alignItems: "end", minHeight: "142px", padding: "14px 14px 10px", borderRadius: "12px", background: "#f6f5f1" }}>
+          {distributionMetrics.buckets.map((bucket) => {
+            const height = bucket.count === 0 ? 3 : Math.max(12, (bucket.count / distributionMetrics.maxBucketCount) * 82);
+            const share = currentSliceStats.totalCount > 0 ? (bucket.count / currentSliceStats.totalCount) * 100 : 0;
+            return (
+              <div key={bucket.label} style={{ display: "grid", gridTemplateRows: "20px 82px auto", gap: "5px", alignItems: "end", minWidth: 0 }}>
+                <strong style={{ textAlign: "center", color: "var(--ink)", fontSize: "10px" }}>{share.toFixed(1)}%</strong>
+                <div title={`${bucket.label}: ${number.format(bucket.count)}건`} style={{ alignSelf: "end", width: "100%", height: `${height}px`, borderRadius: "7px 7px 3px 3px", background: bucket.count > 0 ? "var(--carrot)" : "#dedbd3" }} />
+                <span style={{ minHeight: "28px", textAlign: "center", color: "var(--muted)", fontSize: "9px", lineHeight: 1.35 }}>{bucket.label}<br />{number.format(bucket.count)}건</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 5. Main Clusters Data Table */}
       <div style={{ border: "1px solid var(--line)", background: "var(--surface)", borderRadius: "6px", overflowX: "auto" }}>

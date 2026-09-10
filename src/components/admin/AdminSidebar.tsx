@@ -14,7 +14,7 @@ const groups = [
 export function AdminSidebar({ open, close }: { open: boolean; close: () => void }) {
   const pathname = usePathname();
   return <>{open && <button className={styles.scrim} onClick={close} aria-label="메뉴 닫기" />}<aside id="admin-sidebar" className={styles.sidebar} data-open={open}>
-    <div className={styles.brand}><Link href="/admin" onClick={close}><span>가지</span> Admin Portal</Link><button className={styles.mobileButton} onClick={close} aria-label="메뉴 닫기"><X size={20} /></button></div>
+    <div className={styles.brand}><Link href="/admin" onClick={close}><span>당근</span> Admin Portal</Link><button className={styles.mobileButton} onClick={close} aria-label="메뉴 닫기"><X size={20} /></button></div>
     <nav aria-label="관리자 메뉴">{groups.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(([href, label, Icon]) => <Link key={href} href={href} onClick={close} aria-current={pathname === href ? "page" : undefined}><Icon size={18} />{label}</Link>)}</section>)}</nav>
     <Link className={styles.backToService} href="/carrot">사용자 서비스로 이동 ↗</Link>
   </aside></>;
