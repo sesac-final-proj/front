@@ -18,10 +18,21 @@ function colorFor(ratio: number) {
 }
 
 // 크롤링 데이터의 "양평제1동" 표기와 2013년 행정동 경계 데이터의 "양평1동" 표기가
-// "제" 유무로 갈려서, 매칭 전에 "제"를 지워 맞춘다.
-const normalizeDong = (name: string) => name.replace(/제/g, "");
+// "제" 유무로 갈려서, 매칭 전에 "제"를 지워 맞춘다. TradesSection이 category_counts_by_region을
+// (구 동) 원본 표기 그대로 받으니, 이 동 이름으로 거를 때도 같은 정규화를 거쳐야 한다.
+export const normalizeDong = (name: string) => name.replace(/제/g, "");
 
-function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount[] }) {
+function GuDongMap({
+  gu,
+  regionCounts,
+  selectedDong,
+  onSelectDong,
+}: {
+  gu: string;
+  regionCounts: RegionCount[];
+  selectedDong: string | null;
+  onSelectDong: (rawName: string | null) => void;
+}) {
   const features = useMemo(() => dongFeatures.filter(f => f.properties.gu === gu), [gu]);
   const { width, height, pathGenerator } = useMemo(() => {
     const w = 420;
@@ -62,21 +73,35 @@ function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount
           const count = countsByDong.get(normalizeDong(rawName)) ?? 0;
           const ratio = count / maxCount;
           const isHovered = hover === rawName;
+          const isSelected = selectedDong === rawName;
           return (
             <g
               key={rawName}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
               onMouseEnter={() => setHover(rawName)}
               onMouseLeave={() => setHover(null)}
+              onClick={() => onSelectDong(isSelected ? null : rawName)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onSelectDong(isSelected ? null : rawName);
+              }}
               style={{
+                cursor: "pointer",
                 transformBox: "fill-box",
                 transformOrigin: "center",
-                transform: isHovered ? "scale(1.06)" : "scale(1)",
+                transform: isHovered || isSelected ? "scale(1.06)" : "scale(1)",
                 transition: "transform 50ms ease-out",
-                filter: isHovered ? "drop-shadow(0 6px 10px rgba(26, 28, 32, 0.35))" : "none",
+                filter: isHovered || isSelected ? "drop-shadow(0 6px 10px rgba(26, 28, 32, 0.35))" : "none",
               }}
             >
-              <path d={pathGenerator(f) ?? undefined} fill={count ? colorFor(ratio) : "#F0F1ED"} stroke="#fff" strokeWidth={1}>
-                <title>{rawName} · {count.toLocaleString("ko-KR")}건</title>
+              <path
+                d={pathGenerator(f) ?? undefined}
+                fill={count ? colorFor(ratio) : "#F0F1ED"}
+                stroke={isSelected ? "#42483b" : "#fff"}
+                strokeWidth={isSelected ? 2.2 : 1}
+              >
+                <title>{rawName} · {count.toLocaleString("ko-KR")}건 · 클릭해서 선택</title>
               </path>
             </g>
           );
@@ -117,7 +142,16 @@ function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount
   );
 }
 
-export function SeoulGuMap({ regionCounts, onChangeGu }: { regionCounts: RegionCount[]; onChangeGu?: (gu: string) => void }) {
+export function SeoulGuMap({
+  regionCounts,
+  onChangeGu,
+  onChangeDong,
+}: {
+  regionCounts: RegionCount[];
+  onChangeGu?: (gu: string) => void;
+  // 동을 클릭해 선택/해제할 때마다 알려준다 — dongName은 normalizeDong을 거친 값(선택 해제면 null).
+  onChangeDong?: (gu: string, dongName: string | null) => void;
+}) {
   const totalsByGu = useMemo(() => {
     const map = new Map<string, number>();
     regionCounts.forEach(row => {
@@ -129,12 +163,17 @@ export function SeoulGuMap({ regionCounts, onChangeGu }: { regionCounts: RegionC
   }, [regionCounts]);
   const availableGu = GU_LIST.filter(gu => totalsByGu.has(gu));
   const [activeGu, setActiveGu] = useState<string>(availableGu[0] ?? GU_LIST[0]);
+  const [selectedDong, setSelectedDong] = useState<string | null>(null);
 
   // 부모(TradesSection)가 "카테고리 구성" 패널을 이 탭 선택에 맞춰 바꿔야 해서 알려준다 —
   // 최초 렌더(기본 선택된 구)도 놓치지 않게 마운트 시 한 번 포함.
   useEffect(() => {
     onChangeGu?.(activeGu);
   }, [activeGu, onChangeGu]);
+
+  useEffect(() => {
+    onChangeDong?.(activeGu, selectedDong ? normalizeDong(selectedDong) : null);
+  }, [activeGu, selectedDong, onChangeDong]);
 
   return (
     <div>
@@ -143,7 +182,10 @@ export function SeoulGuMap({ regionCounts, onChangeGu }: { regionCounts: RegionC
           <button
             key={gu}
             type="button"
-            onClick={() => setActiveGu(gu)}
+            onClick={() => {
+              setActiveGu(gu);
+              setSelectedDong(null); // 다른 구로 넘어가면 이전 구에서 고른 동은 의미 없어짐
+            }}
             style={{
               padding: "6px 12px",
               borderRadius: 999,
@@ -158,7 +200,12 @@ export function SeoulGuMap({ regionCounts, onChangeGu }: { regionCounts: RegionC
           </button>
         ))}
       </div>
-      <GuDongMap gu={activeGu} regionCounts={regionCounts} />
+      <GuDongMap gu={activeGu} regionCounts={regionCounts} selectedDong={selectedDong} onSelectDong={setSelectedDong} />
+      {selectedDong && (
+        <p style={{ fontSize: 11, color: "#656b60", marginTop: 8 }}>
+          <b style={{ color: "#303629" }}>{selectedDong}</b> 선택됨 · 다시 클릭하면 해제
+        </p>
+      )}
     </div>
   );
 }
