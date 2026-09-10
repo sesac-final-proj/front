@@ -66,6 +66,38 @@ export function loadKakaoMapScript(appKey: string = KAKAO_MAP_KEY): Promise<void
   return kakaoMapScriptPromise;
 }
 
+// BottomNav 지도 탭 아이콘(EggplantPinIcon)과 같은 핀 모양 — 카카오맵 기본 빨간 마커
+// 대신 가지 브랜드 핀을 쓰려고 MarkerImage로 만든다. CustomOverlay가 아니라
+// MarkerImage인 이유: 드래그 가능한 마커(draggable: true)가 CustomOverlay엔 없음.
+// 이미지는 별도 문서 컨텍스트라 CSS 변수(--eggplant-pin-top 등)를 못 읽어서
+// EggplantPinIcon 기본값과 같은 색을 하드코딩해서 쓴다.
+const EGGPLANT_PIN_PATH = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z";
+
+function eggplantPinSvg(size: number) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
+    <defs>
+      <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#078452" />
+        <stop offset="30%" stop-color="#078452" />
+        <stop offset="30%" stop-color="#ff6f0f" />
+        <stop offset="100%" stop-color="#ff6f0f" />
+      </linearGradient>
+      <filter id="eggplant-pin-shadow" x="-50%" y="-30%" width="200%" height="180%">
+        <feDropShadow dx="0" dy="2" stdDeviation="1.4" flood-color="#1a1c20" flood-opacity="0.35" />
+      </filter>
+    </defs>
+    <path d="${EGGPLANT_PIN_PATH}" fill="url(#eggplant-pin-gradient)" filter="url(#eggplant-pin-shadow)" />
+  </svg>`;
+}
+
+export function createEggplantMarkerImage(kakaoMaps: any, size = 40) {
+  const dataUri = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(eggplantPinSvg(size))}`;
+  // offset = 마커가 좌표를 가리키는 기준점 — 핀 뾰족한 끝(하단 중앙)이 실제 위치를 찍도록.
+  return new kakaoMaps.MarkerImage(dataUri, new kakaoMaps.Size(size, size), {
+    offset: new kakaoMaps.Point(size / 2, size),
+  });
+}
+
 // 사진 2번: 당근 실시간 현 위치 ("내 장소") 동심원 펄스 마커
 export function createCurrentLocationOverlayHtml(isDark: boolean): string {
   const textShadow = isDark

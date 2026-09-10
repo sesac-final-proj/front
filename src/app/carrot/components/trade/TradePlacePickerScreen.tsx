@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import { KAKAO_MAP_JS_KEY } from "../../constants";
-import { loadKakaoMapScript } from "../map";
+import { createEggplantMarkerImage, loadKakaoMapScript } from "../map";
 import { IconButton } from "../common/IconButton";
 
 // 서울시청 기본 좌표 — 동네 좌표를 못 구한 경우의 최종 폴백.
@@ -63,7 +63,12 @@ export function TradePlacePickerScreen({
         const startLng = initialLng ?? DEFAULT_CENTER.lng;
         const center = new kakaoMaps.LatLng(startLat, startLng);
         const map = new kakaoMaps.Map(mapElementRef.current, { center, level: 4 });
-        const marker = new kakaoMaps.Marker({ position: center, map, draggable: true });
+        const marker = new kakaoMaps.Marker({
+          position: center,
+          map,
+          draggable: true,
+          image: createEggplantMarkerImage(kakaoMaps),
+        });
         markerRef.current = marker;
 
         function moveMarkerTo(latLng: any) {
