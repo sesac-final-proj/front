@@ -286,16 +286,18 @@ function DetailTypeCountsCard({ items }: { items: DetailTypeCountItem[] }) {
   return (
     <div className={styles.chartGrid} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
       {Array.from(byCategory.entries()).map(([category, rows]) => (
-        // 세부유형이 10~20개까지 나오는 카테고리(마사지기 등)는 표가 화면을 다 잡아먹어서
-        // 접어두고 필요할 때만 펼쳐본다 — 상태 없이 native <details>로 충분.
-        <details key={category} className={styles.card} open={rows.length <= 4}>
-          <summary className={styles.cardHead} style={{ cursor: "pointer" }}>
-            <div><h2 style={{ display: "inline" }}>{category}</h2><p>세부유형 {rows.length}개 · 표본 {rows.reduce((sum, r) => sum + r.count, 0).toLocaleString("ko-KR")}건</p></div>
-          </summary>
-          <AdminTable headers={["세부유형", "건수"]}>
-            {rows.map(r => <tr key={r.detail_type}><td>{r.detail_type}</td><td>{r.count.toLocaleString("ko-KR")}건</td></tr>)}
-          </AdminTable>
-        </details>
+        <article key={category} className={styles.card}>
+          <div className={styles.cardHead}>
+            <div><h2>{category}</h2><p>세부유형 {rows.length}개 · 표본 {rows.reduce((sum, r) => sum + r.count, 0).toLocaleString("ko-KR")}건</p></div>
+          </div>
+          {/* 세부유형이 10~20개까지 나오는 카테고리(마사지기 등)는 표가 화면을 다 잡아먹어서
+              카드 자체는 항상 보이되 표 안쪽만 스크롤 처리 — 접어버리면 품목이 안 보임. */}
+          <div style={{ maxHeight: 260, overflowY: "auto" }}>
+            <AdminTable headers={["세부유형", "건수"]}>
+              {rows.map(r => <tr key={r.detail_type}><td>{r.detail_type}</td><td>{r.count.toLocaleString("ko-KR")}건</td></tr>)}
+            </AdminTable>
+          </div>
+        </article>
       ))}
     </div>
   );
