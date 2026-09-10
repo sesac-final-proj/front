@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sprout } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { DonationFacility } from "@/types";
 import { NEIGHBORHOOD_DISTRICTS } from "../../constants";
-import { getDreamFacilities } from "@/services";
+import { getDreamFacilities, getDreamPointsHistory, type DreamPointTransaction } from "@/services";
 import { ScreenHeader, IconButton } from "../common";
 import { DreamMapLayer } from "./DreamMapLayer";
+
+const POINT_SOURCE_LABEL: Record<DreamPointTransaction["source"], string> = {
+  general_payment: "일반결제 적립",
+  trade: "중고거래 적립",
+};
 
 export interface DreamDashboardScreenProps {
   activeNeighborhood: string;
@@ -23,6 +28,23 @@ export function DreamDashboardScreen({
 }: DreamDashboardScreenProps) {
   const facilityListRef = useRef<HTMLElement | null>(null);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
+  const [pointsBalance, setPointsBalance] = useState<number | null>(null);
+  const [pointsHistory, setPointsHistory] = useState<DreamPointTransaction[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getDreamPointsHistory(5, controller.signal)
+      .then(({ balance, transactions }) => {
+        setPointsBalance(balance);
+        setPointsHistory(transactions);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // 로그인 전이거나 잠깐 실패해도 배너 아래 카드 하나가 비는 정도라 화면을 막을 정도는 아님.
+        console.error("꿈방울 적립 내역을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, []);
   const district = NEIGHBORHOOD_DISTRICTS[activeNeighborhood] ?? activeNeighborhood;
   const [facilityResult, setFacilityResult] = useState<{
     district: string;
@@ -81,6 +103,29 @@ export function DreamDashboardScreen({
           priority
         />
       </button>
+      {pointsBalance !== null && (
+        <section className={styles.dreamPointsCard} aria-label="꿈방울 적립 현황">
+          <div className={styles.dreamPointsHeading}>
+            <h2><Sprout size={18} aria-hidden="true" /> 꿈방울 적립</h2>
+            <span className={styles.dreamPointsBalance}>{pointsBalance.toLocaleString("ko-KR")}방울</span>
+          </div>
+          {pointsHistory.length > 0 ? (
+            <div className={styles.dreamPointsList}>
+              {pointsHistory.map((item) => (
+                <div key={item.id} className={styles.dreamPointsRow}>
+                  <div>
+                    <span>{POINT_SOURCE_LABEL[item.source]}</span>
+                    <span>{new Date(item.createdAt).toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}</span>
+                  </div>
+                  <strong>+{item.amount.toLocaleString("ko-KR")}방울</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.dreamEmpty}>아직 적립된 꿈방울이 없어요. 결제할 때마다 자동으로 쌓여요.</p>
+          )}
+        </section>
+      )}
       <section className={styles.dreamMapPanel}>
         <DreamMapLayer
           activeNeighborhood={activeNeighborhood}
