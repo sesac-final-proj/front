@@ -8,6 +8,8 @@ export * from "./FavoriteScreen";
 export * from "./DreamFacilityCallout";
 export * from "./DreamMapLayer";
 export * from "./DreamNoticeScreen";
+export * from "./CarrotNoticeScreen";
 export * from "./DreamDashboardScreen";
+export * from "./DreamPointsHistoryScreen";
 export * from "./WalletChargeScreen";
 export * from "./WalletPayScreen";

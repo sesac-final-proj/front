@@ -320,9 +320,9 @@ export const LOCAL_BUSINESSES: LocalBusiness[] = [
 ];
 
 export const baseMessages: ChatMessageUi[] = [
-  { mine: false, text: "안녕하세요. 아직 거래 가능할까요?", time: "오후 5:11" },
-  { mine: true, text: "네 가능해요. 오늘 저녁에도 괜찮습니다.", time: "오후 5:14" },
-  { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18" },
+  { mine: false, text: "안녕하세요. 아직 거래 가능할까요?", time: "오후 5:11", createdAt: "2026-01-01T17:11:00+09:00" },
+  { mine: true, text: "네 가능해요. 오늘 저녁에도 괜찮습니다.", time: "오후 5:14", createdAt: "2026-01-01T17:14:00+09:00" },
+  { mine: false, text: "그럼 7시에 위례 주민센터 앞에서 뵐게요.", time: "오후 5:18", createdAt: "2026-01-01T17:18:00+09:00" },
 ];
 
 export const ALBA_MOCK_DATA: AlbaItem[] = [

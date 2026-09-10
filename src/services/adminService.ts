@@ -137,7 +137,25 @@ export interface PriceModelMetricItem {
   hit20: number;
   // LightGBM 행에만 있음(CQR 보정) — range_coverage_10_90은 "10~90% 예측구간 안에 실제가가
   // 들어올 확률"로 목표치가 80%인 별개 지표. Hit@20%(오차 ±20% 이내 적중률, ~44~49%)와 다르다.
-  extra?: { range_coverage_25_75?: number; range_coverage_10_90?: number } | null;
+  // best_params 이하는 analyzer가 Optuna(TPESampler)로 탐색한 LightGBM 하이퍼파라미터 —
+  // 이것도 LightGBM 행에만 있고 RandomForest 베이스라인엔 없다.
+  extra?: {
+    range_coverage_25_75?: number;
+    range_coverage_10_90?: number;
+    best_params?: {
+      learning_rate?: number;
+      num_leaves?: number;
+      max_depth?: number;
+      min_child_samples?: number;
+      subsample?: number;
+      colsample_bytree?: number;
+      reg_alpha?: number;
+      reg_lambda?: number;
+    };
+    best_iteration?: number;
+    optuna_n_trials?: number;
+    optuna_search_seconds?: number;
+  } | null;
 }
 
 export interface PriceModelListingItem {
@@ -249,6 +267,82 @@ export interface PriceModelCharts {
   platform_tests: PricePlatformTestItem[];
   clusters: PriceClusterItem[];
   feature_importance: PriceFeatureImportanceItem[];
+}
+
+// 가격 지역별 비교 대시보드(crawling_Data 세션 산출물) — /api/v1/admin/price-comparison/*.
+// price_model(팀원 ML 모델)과는 별개 기능 — "상품 x 구" 전체를 어드민이 지역별로 비교.
+export interface PriceComparisonCategoryItem {
+  category: string;
+  sample_count: number;
+  median_price: number;
+  std_price: number;
+  cv_price: number;
+  price_trend_pct: number | null;
+  frequency_grade: string;
+  listings_per_month: number;
+}
+
+export interface PriceComparisonRegionItem {
+  category: string;
+  gu: string;
+  sample_count: number;
+  median_price: number;
+  completion_rate: number;
+  avg_manner_temp: number;
+}
+
+export interface PriceComparisonDetailTypeItem {
+  category: string;
+  detail_type: string;
+  gu: string;
+  sample_count: number;
+  median_price: number;
+  cv_price: number;
+}
+
+export interface PriceComparisonOverview {
+  categories: PriceComparisonCategoryItem[];
+  regions: PriceComparisonRegionItem[];
+  detail_types: PriceComparisonDetailTypeItem[];
+}
+
+export interface PriceComparisonSample {
+  gu: string;
+  price: number;
+}
+
+export type AdminNoticeService = "dream" | "carrot";
+export type AdminNoticeStatus = "draft" | "scheduled" | "published" | "ended" | "hidden";
+
+export interface AdminNotice {
+  id: number;
+  service: AdminNoticeService;
+  title: string;
+  content: string;
+  status: AdminNoticeStatus;
+  manual_status: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  display_order: number;
+  alert_count: number;
+  warning_reasons: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface AdminNoticeList {
+  items: AdminNotice[];
+  total: number;
+}
+
+export interface AdminNoticePayload {
+  service: AdminNoticeService;
+  title: string;
+  content: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  manual_status?: "hidden" | null;
 }
 
 async function errorMessage(response: Response, fallback: string) {
@@ -420,6 +514,25 @@ export async function getPriceModelCharts(): Promise<PriceModelCharts> {
   return response.json();
 }
 
+export async function getPriceComparisonOverview(): Promise<PriceComparisonOverview> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/price-comparison/overview", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "지역별 가격비교 데이터를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceComparisonSamples(category: string, gu?: string, sample?: number): Promise<{ category: string; samples: PriceComparisonSample[] }> {
+  const params = new URLSearchParams({ category });
+  if (gu) params.set("gu", gu);
+  if (sample) params.set("sample", String(sample));
+  const response = await adminAuthorizedFetch(`/api/v1/admin/price-comparison/samples?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "매물 표본을 불러오지 못했습니다."));
+  return response.json();
+}
+
 // SHAP summary plot은 DB 값이 아니라 analyzer가 matplotlib으로 그린 PNG라 그대로 받아온다.
 // <img src>는 Authorization 헤더를 못 보내서 blob으로 받아 컴포넌트에서 object URL로 바꿔 쓴다.
 export async function getPriceModelShapSummary(featureSet: "full" | "no_leak_prone"): Promise<Blob> {
@@ -428,6 +541,67 @@ export async function getPriceModelShapSummary(featureSet: "full" | "no_leak_pro
   });
   if (!response.ok) throw new Error(await errorMessage(response, "SHAP 요약 이미지를 불러오지 못했습니다."));
   return response.blob();
+}
+
+
+export async function getAdminNotices(query: { q?: string; service?: string; status?: string; deleteStatus?: string; page?: number; size?: number } = {}): Promise<AdminNoticeList> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.service && query.service !== "all") params.set("service", query.service);
+  if (query.status && query.status !== "all") params.set("status", query.status);
+  if (query.deleteStatus && query.deleteStatus !== "normal") params.set("delete_status", query.deleteStatus);
+  params.set("page", String(query.page ?? 1));
+  params.set("size", String(query.size ?? 10));
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices?${params}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function createAdminNotice(payload: AdminNoticePayload): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/notices", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 저장하지 못했습니다."));
+  return response.json();
+}
+
+export async function updateAdminNotice(id: number, payload: Partial<AdminNoticePayload>): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 수정하지 못했습니다."));
+  return response.json();
+}
+
+export async function deleteAdminNotice(id: number): Promise<void> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 삭제하지 못했습니다."));
+}
+
+export async function duplicateAdminNotice(id: number): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}/duplicate`, { method: "POST", headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 복사하지 못했습니다."));
+  return response.json();
+}
+
+export async function createAdminNoticeAlerts(id: number): Promise<{ notice_id: number; created_count: number; alert_count: number; created_at: string }> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}/alerts`, { method: "POST", headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지 알림을 생성하지 못했습니다."));
+  return response.json();
+}
+
+export async function reorderAdminNotices(noticeIds: number[]): Promise<AdminNoticeList> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/notices/order", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ notice_ids: noticeIds }),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지 순서를 저장하지 못했습니다."));
+  return response.json();
 }
 
 export async function logoutAdmin() {

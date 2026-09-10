@@ -45,10 +45,15 @@ export interface PricePredictionSummary {
 // 한 번에 묶어서 useAdminResource 한 번으로 처리한다. 매물 목록은 페이지네이션이 있어 따로 호출.
 export async function getPricePredictionSummary(): Promise<PricePredictionSummary> {
   const [metrics, distribution, charts, detailTypeCounts] = await Promise.all([
-    getPriceModelMetrics(),
-    getPriceDistribution(),
-    getPriceModelCharts(),
-    getDetailTypeCounts(),
+    getPriceModelMetrics().catch(() => ({ metrics: [] as PriceModelMetricItem[] })),
+    getPriceDistribution().catch(() => ({ categories: [] as PriceDistributionCategory[] })),
+    getPriceModelCharts().catch(() => ({ predictions: [] as PricePredictionItem[], feature_importance: [] as PriceFeatureImportanceItem[] })),
+    getDetailTypeCounts().catch(() => ({ items: [] as DetailTypeCountItem[] })),
   ]);
-  return { metrics: metrics.metrics, distribution: distribution.categories, charts, detailTypeCounts: detailTypeCounts.items };
+  return {
+    metrics: Array.isArray(metrics?.metrics) ? metrics.metrics : [],
+    distribution: Array.isArray(distribution?.categories) ? distribution.categories : [],
+    charts: charts && Array.isArray(charts.predictions) && Array.isArray(charts.feature_importance) ? charts : { predictions: [], feature_importance: [] },
+    detailTypeCounts: Array.isArray(detailTypeCounts?.items) ? detailTypeCounts.items : [],
+  };
 }
