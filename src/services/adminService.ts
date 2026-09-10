@@ -137,7 +137,25 @@ export interface PriceModelMetricItem {
   hit20: number;
   // LightGBM 행에만 있음(CQR 보정) — range_coverage_10_90은 "10~90% 예측구간 안에 실제가가
   // 들어올 확률"로 목표치가 80%인 별개 지표. Hit@20%(오차 ±20% 이내 적중률, ~44~49%)와 다르다.
-  extra?: { range_coverage_25_75?: number; range_coverage_10_90?: number } | null;
+  // best_params 이하는 analyzer가 Optuna(TPESampler)로 탐색한 LightGBM 하이퍼파라미터 —
+  // 이것도 LightGBM 행에만 있고 RandomForest 베이스라인엔 없다.
+  extra?: {
+    range_coverage_25_75?: number;
+    range_coverage_10_90?: number;
+    best_params?: {
+      learning_rate?: number;
+      num_leaves?: number;
+      max_depth?: number;
+      min_child_samples?: number;
+      subsample?: number;
+      colsample_bytree?: number;
+      reg_alpha?: number;
+      reg_lambda?: number;
+    };
+    best_iteration?: number;
+    optuna_n_trials?: number;
+    optuna_search_seconds?: number;
+  } | null;
 }
 
 export interface PriceModelListingItem {
