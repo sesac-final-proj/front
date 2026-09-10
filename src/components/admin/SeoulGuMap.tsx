@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { geoMercator, geoPath } from "d3-geo";
 import seoulDong from "@/data/seoul-dong.json";
 
@@ -117,7 +117,7 @@ function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount
   );
 }
 
-export function SeoulGuMap({ regionCounts }: { regionCounts: RegionCount[] }) {
+export function SeoulGuMap({ regionCounts, onChangeGu }: { regionCounts: RegionCount[]; onChangeGu?: (gu: string) => void }) {
   const totalsByGu = useMemo(() => {
     const map = new Map<string, number>();
     regionCounts.forEach(row => {
@@ -129,6 +129,12 @@ export function SeoulGuMap({ regionCounts }: { regionCounts: RegionCount[] }) {
   }, [regionCounts]);
   const availableGu = GU_LIST.filter(gu => totalsByGu.has(gu));
   const [activeGu, setActiveGu] = useState<string>(availableGu[0] ?? GU_LIST[0]);
+
+  // 부모(TradesSection)가 "카테고리 구성" 패널을 이 탭 선택에 맞춰 바꿔야 해서 알려준다 —
+  // 최초 렌더(기본 선택된 구)도 놓치지 않게 마운트 시 한 번 포함.
+  useEffect(() => {
+    onChangeGu?.(activeGu);
+  }, [activeGu, onChangeGu]);
 
   return (
     <div>
