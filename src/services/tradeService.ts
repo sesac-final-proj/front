@@ -275,10 +275,14 @@ export async function recordProductView(id: number): Promise<void> {
 }
 
 // 목록 API는 description을 안 내려줘서(상세 API만 채워짐) 상세 화면 진입 시 따로 조회.
+// 비로그인도 볼 수 있는 공개 API(get_current_user_optional)라 authorizedFetch(토큰 없으면
+// AuthRequiredError)는 못 쓰지만, 로그인 상태면 토큰을 실어 보내야 is_mine이 제대로 나온다 —
+// 안 보내면 백엔드가 항상 user=None으로 보고 본인 글도 "삭제하기"가 안 뜸(버그 리포트).
 export async function getProduct(id: number, signal?: AbortSignal): Promise<TradeProduct> {
+  const token = getAuthToken();
   const response = await fetch(apiUrl(`/api/v1/trades/products/${id}`), {
     signal,
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
   if (!response.ok) {
     throw new Error("상품 상세를 불러오지 못했습니다.");
