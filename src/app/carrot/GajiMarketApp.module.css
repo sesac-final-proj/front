@@ -4827,6 +4827,45 @@ img.thumbnail {
   font-variant-numeric: tabular-nums;
 }
 
+.dreamPointsHistoryList {
+  padding: 4px 16px 24px;
+  background: var(--dream-surface);
+}
+
+.dreamPointsHistoryRow {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--dream-border);
+  color: var(--dream-text-primary);
+}
+
+.dreamPointsHistoryRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.dreamPointsHistoryRow strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.dreamPointsHistoryRow time {
+  color: var(--dream-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.dreamPointsHistoryRow > span {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--dream-orange);
+  font-variant-numeric: tabular-nums;
+}
+
 .dreamFacilityItem {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 48px;

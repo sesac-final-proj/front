@@ -44,6 +44,7 @@ import {
   FavoriteScreen,
   DreamDashboardScreen,
   DreamNoticeScreen,
+  DreamPointsHistoryScreen,
   WalletChargeScreen,
   WalletPayScreen,
   // real-estate
@@ -936,6 +937,10 @@ export default function GajiMarketApp() {
       setSubPage(null);
       return;
     }
+    if (subPage?.type === "dream-points-history") {
+      setSubPage({ type: "dream-dashboard" });
+      return;
+    }
     if (subPage?.type === "alba-detail") {
       setSubPage({ type: "alba" });
       return;
@@ -1684,10 +1689,11 @@ export default function GajiMarketApp() {
       ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
       : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "dream-points-history", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
     subPage?.type === "dream-dashboard" ||
     subPage?.type === "dream-notice" ||
+    subPage?.type === "dream-points-history" ||
     (subPage?.type === "region-search" && subPage.returnTo === "dream-dashboard");
 
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
@@ -1923,9 +1929,12 @@ export default function GajiMarketApp() {
               onBack={goBack}
               onChangeNeighborhood={() => setSheet("region")}
               onOpenNotice={() => setSubPage({ type: "dream-notice" })}
+              onOpenPointsHistory={() => setSubPage({ type: "dream-points-history" })}
             />
           ) : subPage?.type === "dream-notice" ? (
             <DreamNoticeScreen onBack={goBack} />
+          ) : subPage?.type === "dream-points-history" ? (
+            <DreamPointsHistoryScreen onBack={goBack} />
           ) : subPage?.type === "alba" ? (
             <AlbaMainScreen
               activeNeighborhood={activeNeighborhood}
