@@ -192,6 +192,57 @@ function MetricsR2Bar({ metrics }: { metrics: PriceModelMetricItem[] }) {
   return <HorizontalBars data={data} />;
 }
 
+const OPTUNA_PARAM_LABELS: Record<string, string> = {
+  learning_rate: "learning_rate",
+  num_leaves: "num_leaves",
+  max_depth: "max_depth",
+  min_child_samples: "min_child_samples",
+  subsample: "subsample",
+  colsample_bytree: "colsample_bytree",
+  reg_alpha: "reg_alpha",
+  reg_lambda: "reg_lambda",
+};
+
+// Optuna(TPESampler)로 탐색한 최종 LightGBM 하이퍼파라미터 — RandomForest 베이스라인엔
+// 없는 값이라(extra.best_params) R²가 가장 높은 feature set의 LightGBM 행만 찾아서 쓴다.
+function OptunaParamsCard({ metrics }: { metrics: PriceModelMetricItem[] }) {
+  const row = metrics.find(m => m.model_key === "lightgbm" && m.extra?.best_params);
+  if (!row?.extra?.best_params) return <EmptyState message="탐색된 하이퍼파라미터가 없습니다." />;
+  const params = row.extra.best_params;
+  const entries = Object.entries(OPTUNA_PARAM_LABELS).map(([key, label]) => ({
+    label,
+    value: params[key as keyof typeof params],
+  }));
+
+  return (
+    <article className={styles.card}>
+      <div className={styles.cardHead}>
+        <div>
+          <h2>Optuna 하이퍼파라미터 탐색</h2>
+          <p>
+            {row.feature_set} · {row.label} 최종 선택값
+            {row.extra.optuna_n_trials != null && ` · ${row.extra.optuna_n_trials} trial`}
+            {row.extra.optuna_search_seconds != null && ` · 약 ${Math.round(row.extra.optuna_search_seconds)}초`}
+          </p>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#F0F1ED", border: "1px solid #F0F1ED", borderRadius: 10, overflow: "hidden" }}>
+        {entries.map(({ label, value }) => (
+          <div key={label} style={{ background: "#fff", padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, color: "#8b9184" }}>{label}</div>
+            <div style={{ fontSize: 15, fontWeight: 650, color: "#303629", marginTop: 4 }}>
+              {value == null ? "—" : typeof value === "number" && !Number.isInteger(value) ? value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : value}
+            </div>
+          </div>
+        ))}
+      </div>
+      {row.extra.best_iteration != null && (
+        <p style={{ fontSize: 11, color: "#91968c", marginTop: 10 }}>best_iteration {row.extra.best_iteration.toLocaleString("ko-KR")}회</p>
+      )}
+    </article>
+  );
+}
+
 function PlatformComparisonChart({ rows }: { rows: PricePlatformComparisonItem[] }) {
   // 플랫폼별로 그룹 막대(중위가) + 오차막대(p25~p75)를 카테고리마다 나란히 — 표보다 플랫폼 간 격차가 한눈에 들어온다.
   const platforms = Array.from(new Set(rows.map(r => r.platform)));
@@ -358,6 +409,10 @@ export function PricePredictionSection() {
             <div className={styles.cardHead}><div><h2>R² 비교</h2><p>값이 높을수록(100에 가까울수록) 설명력이 좋음</p></div></div>
             <MetricsR2Bar metrics={data.metrics} />
           </article>
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <OptunaParamsCard metrics={data.metrics} />
         </div>
 
         <div className={styles.chartGrid} style={{ marginTop: 20 }}>
