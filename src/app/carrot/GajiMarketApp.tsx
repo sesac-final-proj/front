@@ -514,6 +514,7 @@ export default function GajiMarketApp() {
             [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)),
           }));
           recordOtherUserId(chatId, page.items);
+          applyCounterpartLastReadAt(chatId, page.counterpartLastReadAt);
         })
         .catch(() => {});
     }, 3000);
@@ -833,15 +834,23 @@ export default function GajiMarketApp() {
   }, [activeNeighborhood, communityFilter, posts, secondaryNeighborhood]);
 
   const filteredChats = useMemo(() => {
-    return chats.filter((chat) => {
-      if (chatFilter === "전체") return true;
-      if (chatFilter === "판매") return chat.tradeRole === "SELLER";
-      if (chatFilter === "구매") return chat.tradeRole === "BUYER";
-      if (chatFilter === "안읽음") return chat.unreadCount > 0;
-      if (chatFilter === "모임") return chat.type === "GROUP";
-      if (chatFilter === "알바") return chat.title.includes("알바");
-      return true;
-    });
+    return chats
+      .filter((chat) => {
+        if (chatFilter === "전체") return true;
+        if (chatFilter === "판매") return chat.tradeRole === "SELLER";
+        if (chatFilter === "구매") return chat.tradeRole === "BUYER";
+        if (chatFilter === "안읽음") return chat.unreadCount > 0;
+        if (chatFilter === "모임") return chat.type === "GROUP";
+        if (chatFilter === "알바") return chat.title.includes("알바");
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (a.lastMessageAtRaw ? new Date(a.lastMessageAtRaw).getTime() : 0) <
+          (b.lastMessageAtRaw ? new Date(b.lastMessageAtRaw).getTime() : 0)
+            ? 1
+            : -1,
+      );
   }, [chatFilter, chats]);
 
   const localBusinesses = useMemo(() => {
@@ -1042,6 +1051,13 @@ export default function GajiMarketApp() {
     );
   }
 
+  // 카톡식 "1" 표시용 — 메시지 목록을 받아올 때마다 상대방이 마지막으로 읽은 시각을 갱신.
+  function applyCounterpartLastReadAt(chatId: string, counterpartLastReadAt: string | null) {
+    setChats((current) =>
+      current.map((chat) => (chat.id === chatId ? { ...chat, counterpartLastReadAt } : chat)),
+    );
+  }
+
   function openChat(chatId: string) {
     markChatRead(chatId);
     setSubPage({ type: "chat-room", id: chatId });
@@ -1051,6 +1067,7 @@ export default function GajiMarketApp() {
       .then((page) => {
         setRoomMessages((current) => ({ ...current, [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)) }));
         recordOtherUserId(chatId, page.items);
+        applyCounterpartLastReadAt(chatId, page.counterpartLastReadAt);
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
@@ -1077,7 +1094,9 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: text, lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? { ...chat, lastMessage: text, lastMessageAt: "방금 전", lastMessageAtRaw: new Date().toISOString() }
+              : chat,
           ),
         );
       })
@@ -1101,7 +1120,14 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: "사진을 보냈습니다", lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: "사진을 보냈습니다",
+                  lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
+                }
+              : chat,
           ),
         );
       })
@@ -1143,7 +1169,14 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: message.content ?? "", lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: message.content ?? "",
+                  lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
+                }
+              : chat,
           ),
         );
         // 채팅방에 걸린 상품 상태도 같이 반영 — 목록/판매내역/상세 화면 전부 동일 값을 보게.
@@ -1198,6 +1231,7 @@ export default function GajiMarketApp() {
                   ...chat,
                   lastMessage: `${amount.toLocaleString("ko-KR")}원을 보냈어요`,
                   lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
                   // 백엔드가 송금 시점에 거래완료로 바꿔주므로(계획 문서 3-2절) 프론트도
                   // 곧장 반영 — 안 그러면 새로고침 전까진 여전히 "판매중"으로 보인다.
                   productTradeStatus: "SOLD",

@@ -113,6 +113,7 @@ export type ChatMessageUi = {
   mine: boolean;
   text: string;
   time: string;
+  createdAt: string;
   imageUrl?: string;
   // 당근페이 송금 메시지에만 실린다 — 채팅방 버블/상세내역 화면 둘 다 이 값 하나로 그린다.
   payment?: { transactionId: string; amount: number; balanceAfter: number; createdAt: string };
@@ -145,6 +146,7 @@ export type ChatRoom = {
   avatarTone: string;
   lastMessage: string;
   lastMessageAt: string;
+  lastMessageAtRaw: string;
   unreadCount: number;
   verified: boolean;
   muted: boolean;
@@ -157,6 +159,9 @@ export type ChatRoom = {
   productThumbnailUrl?: string;
   productPrice?: number | null;
   productTradeStatus?: TradeStatus;
+  // 카톡식 "1" 표시용 — 상대가 메시지함을 마지막으로 연 시각. 메시지 목록을 불러올 때만
+  // 같이 온다(채팅방 목록 API엔 없음), 그래서 채팅방에 들어가기 전엔 undefined.
+  counterpartLastReadAt?: string | null;
 };
 
 export type DangerTone = "fire" | "accident" | "construction" | "failure" | "control" | "flood" | "default";
