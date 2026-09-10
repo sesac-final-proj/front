@@ -249,6 +249,40 @@ export interface PriceModelCharts {
   feature_importance: PriceFeatureImportanceItem[];
 }
 
+export type AdminNoticeService = "dream" | "carrot";
+export type AdminNoticeStatus = "draft" | "scheduled" | "published" | "ended" | "hidden";
+
+export interface AdminNotice {
+  id: number;
+  service: AdminNoticeService;
+  title: string;
+  content: string;
+  status: AdminNoticeStatus;
+  manual_status: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  display_order: number;
+  alert_count: number;
+  warning_reasons: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface AdminNoticeList {
+  items: AdminNotice[];
+  total: number;
+}
+
+export interface AdminNoticePayload {
+  service: AdminNoticeService;
+  title: string;
+  content: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  manual_status?: "hidden" | null;
+}
+
 async function errorMessage(response: Response, fallback: string) {
   try {
     const payload = await response.json();
@@ -426,6 +460,67 @@ export async function getPriceModelShapSummary(featureSet: "full" | "no_leak_pro
   });
   if (!response.ok) throw new Error(await errorMessage(response, "SHAP 요약 이미지를 불러오지 못했습니다."));
   return response.blob();
+}
+
+
+export async function getAdminNotices(query: { q?: string; service?: string; status?: string; deleteStatus?: string; page?: number; size?: number } = {}): Promise<AdminNoticeList> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.service && query.service !== "all") params.set("service", query.service);
+  if (query.status && query.status !== "all") params.set("status", query.status);
+  if (query.deleteStatus && query.deleteStatus !== "normal") params.set("delete_status", query.deleteStatus);
+  params.set("page", String(query.page ?? 1));
+  params.set("size", String(query.size ?? 10));
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices?${params}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function createAdminNotice(payload: AdminNoticePayload): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/notices", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 저장하지 못했습니다."));
+  return response.json();
+}
+
+export async function updateAdminNotice(id: number, payload: Partial<AdminNoticePayload>): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 수정하지 못했습니다."));
+  return response.json();
+}
+
+export async function deleteAdminNotice(id: number): Promise<void> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 삭제하지 못했습니다."));
+}
+
+export async function duplicateAdminNotice(id: number): Promise<AdminNotice> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}/duplicate`, { method: "POST", headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지를 복사하지 못했습니다."));
+  return response.json();
+}
+
+export async function createAdminNoticeAlerts(id: number): Promise<{ notice_id: number; created_count: number; alert_count: number; created_at: string }> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/notices/${id}/alerts`, { method: "POST", headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지 알림을 생성하지 못했습니다."));
+  return response.json();
+}
+
+export async function reorderAdminNotices(noticeIds: number[]): Promise<AdminNoticeList> {
+  const response = await adminAuthorizedFetch("/api/v1/admin/notices/order", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ notice_ids: noticeIds }),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "공지 순서를 저장하지 못했습니다."));
+  return response.json();
 }
 
 export async function logoutAdmin() {
