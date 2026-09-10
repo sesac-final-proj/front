@@ -53,22 +53,15 @@ function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`${gu} 동별 거래 분포 지도`}>
+        {/* 도형과 라벨을 두 패스로 나눠 그린다 — 한 <g>에 같이 넣으면 인접 동 도형이
+            나중에 그려질 때 이전 동의 라벨을 덮어버려서(작은 동일수록 라벨이 이웃
+            도형 경계 쪽으로 삐져나옴) 이름이 잘려 보였다. 라벨을 전부 맨 위 패스로
+            분리하면 어떤 도형 순서든 항상 라벨이 위에 그려진다. */}
         {orderedFeatures.map(f => {
           const rawName = f.properties.name as string;
           const count = countsByDong.get(normalizeDong(rawName)) ?? 0;
-          const [cx, cy] = pathGenerator.centroid(f);
           const ratio = count / maxCount;
           const isHovered = hover === rawName;
-
-          // 작은 동은 이름+건수 두 줄이 옆 동까지 넘쳐서 안 보이는 게 아니라 오히려 더 헷갈렸다 —
-          // 도형이 충분히 클 때만 라벨을 그리고, 작은 동은 hover 시 title 툴팁으로만 보여준다.
-          const [[x0, y0], [x1, y1]] = pathGenerator.bounds(f);
-          const showLabel = (x1 - x0) >= 46 && (y1 - y0) >= 30;
-          const textFill = ratio > 0.55 ? "#fff" : "#1A1C20";
-          // 흰 배경엔 검정 halo, 진한 주황 배경엔 흰 halo — 배경이 뭐든 글자 테두리가 반대색이라 묻히지 않음.
-          // 3px는 9px 글자에 너무 두꺼워서 뭉개졌던 것 — 1.4px로 줄임.
-          const haloProps = { paintOrder: "stroke" as const, stroke: textFill === "#fff" ? "#c9500a" : "#fff", strokeWidth: 1.4, strokeLinejoin: "round" as const };
-
           return (
             <g
               key={rawName}
@@ -85,12 +78,32 @@ function GuDongMap({ gu, regionCounts }: { gu: string; regionCounts: RegionCount
               <path d={pathGenerator(f) ?? undefined} fill={count ? colorFor(ratio) : "#F0F1ED"} stroke="#fff" strokeWidth={1}>
                 <title>{rawName} · {count.toLocaleString("ko-KR")}건</title>
               </path>
-              {showLabel && <text x={cx} y={cy - 4} textAnchor="middle" fontSize={9} fill={textFill} {...haloProps} style={{ pointerEvents: "none" }}>
+            </g>
+          );
+        })}
+        {features.map(f => {
+          const rawName = f.properties.name as string;
+          const count = countsByDong.get(normalizeDong(rawName)) ?? 0;
+          const [cx, cy] = pathGenerator.centroid(f);
+          const ratio = count / maxCount;
+
+          // 작은 동은 이름+건수 두 줄이 옆 동까지 넘쳐서 안 보이는 게 아니라 오히려 더 헷갈렸다 —
+          // 도형이 충분히 클 때만 라벨을 그리고, 작은 동은 hover 시 title 툴팁으로만 보여준다.
+          const [[x0, y0], [x1, y1]] = pathGenerator.bounds(f);
+          const showLabel = (x1 - x0) >= 46 && (y1 - y0) >= 30;
+          const textFill = ratio > 0.55 ? "#fff" : "#1A1C20";
+          // 흰 배경엔 검정 halo, 진한 주황 배경엔 흰 halo — 배경이 뭐든 글자 테두리가 반대색이라 묻히지 않음.
+          // 3px는 9px 글자에 너무 두꺼워서 뭉개졌던 것 — 1.4px로 줄임.
+          const haloProps = { paintOrder: "stroke" as const, stroke: textFill === "#fff" ? "#c9500a" : "#fff", strokeWidth: 1.4, strokeLinejoin: "round" as const };
+          if (!showLabel) return null;
+          return (
+            <g key={`label-${rawName}`} style={{ pointerEvents: "none" }}>
+              <text x={cx} y={cy - 4} textAnchor="middle" fontSize={9} fill={textFill} {...haloProps}>
                 {rawName}
-              </text>}
-              {showLabel && <text x={cx} y={cy + 8} textAnchor="middle" fontSize={9} fontWeight={700} fill={textFill} {...haloProps} style={{ pointerEvents: "none" }}>
+              </text>
+              <text x={cx} y={cy + 8} textAnchor="middle" fontSize={9} fontWeight={700} fill={textFill} {...haloProps}>
                 {count.toLocaleString("ko-KR")}
-              </text>}
+              </text>
             </g>
           );
         })}
