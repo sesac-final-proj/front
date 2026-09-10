@@ -26,7 +26,7 @@ export function TogetherFormView({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [maxParticipants, setMaxParticipants] = useState<number>(4);
-  const [deadline, setDeadline] = useState("2026-09-09");
+  const [deadline, setDeadline] = useState("2026-09-15");
   const [regionName, setRegionName] = useState(userNeighborhood);
   const [allowChat, setAllowChat] = useState(true);
 
@@ -81,7 +81,7 @@ export function TogetherFormView({
           >
             {Object.values(TOGETHER_CATEGORIES).map((cat) => (
               <option key={cat.key} value={cat.key}>
-                {cat.label} ({cat.description})
+                {cat.icon} {cat.label} ({cat.description})
               </option>
             ))}
           </select>
@@ -103,7 +103,12 @@ export function TogetherFormView({
         {/* Conditional Group Buy Fields */}
         {category === "group_buy" && (
           <div className={styles.togetherBox} style={{ margin: 0 }}>
-            <strong>🛒 공동구매 추가 정보</strong>
+            <div className={styles.togetherBoxHeader}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className={styles.togetherBoxIcon}>🛒</span>
+                <span>공동구매 추가 정보</span>
+              </div>
+            </div>
             <label style={{ fontSize: 13, fontWeight: 600 }}>
               상품/구매명
               <input
@@ -183,16 +188,19 @@ export function TogetherFormView({
             type="checkbox"
             checked={allowChat}
             onChange={(e) => setAllowChat(e.target.checked)}
-            style={{ width: 20, height: 20, accentColor: "var(--color-primary)" }}
+            style={{ width: 20, height: 20, accentColor: "var(--color-primary)", cursor: "pointer" }}
           />
         </div>
 
         {/* Submit */}
-        <button type="submit" className={styles.primaryButton} style={{ marginTop: 12 }}>
+        <button
+          type="submit"
+          className={`${styles.togetherDetailJoinBtn} ${styles.togetherDetailJoinBtnActive}`}
+          style={{ width: "100%", marginTop: 12, height: 50 }}
+        >
           작성 완료
         </button>
       </form>
     </section>
   );
 }
-

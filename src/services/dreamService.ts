@@ -51,12 +51,16 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
   return payload.items.map((item, idx) => {
     const lat = item.lat ?? (37.5665 + (idx % 5) * 0.0015);
     const lng = item.lng ?? (126.9780 + (Math.floor(idx / 5) % 5) * 0.0015);
+    const homepageUrl =
+      item.homepage_url && !["http://", "https://"].includes(item.homepage_url.trim())
+        ? item.homepage_url.trim()
+        : null;
     return {
       id: item.id,
       name: item.name,
       facilityType: item.facility_type,
       neighborhoodName: item.district,
-      homepageUrl: item.homepage_url,
+      homepageUrl,
       address: item.address,
       phone: item.phone,
       establishedDate: item.established_date,
@@ -77,7 +81,6 @@ export async function getDreamFacilities(district: string, signal?: AbortSignal)
     .sort((a, b) => (a.districtRank ?? Number.MAX_SAFE_INTEGER) - (b.districtRank ?? Number.MAX_SAFE_INTEGER))
     .slice(0, 2);
 }
-
 // 꿈방울(기부 가능 포인트) 잔액 — 결제할 때마다 자동 적립되는 값(일반결제 1%, 중고거래
 // 0.1%·5,000원 이상만)이라 여기선 조회만 한다. 나의 당근 화면의 "포인트" 배지에 씀.
 export async function getDreamPointsBalance(signal?: AbortSignal): Promise<number> {

@@ -1890,7 +1890,15 @@ export default function GajiMarketApp() {
               onOpenGame={() => setSubPage({ type: "merge-game" })}
             />
           ) : subPage?.type === "merge-game" ? (
-            <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
+            <GajiMergeGameScreen
+              onBack={() => {
+                if (subPage.returnTo === "my") {
+                  setSubPage(null);
+                } else {
+                  goBack();
+                }
+              }}
+            />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
               activeNeighborhood={activeNeighborhood}
@@ -2133,6 +2141,7 @@ export default function GajiMarketApp() {
                   onOpenAllServices={() => setSubPage({ type: "all-services" })}
                   onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
                   onOpenAlba={() => setSubPage({ type: "alba" })}
+                  onOpenGame={() => setSubPage({ type: "merge-game", returnTo: "my" })}
                   onOpenSales={() => setSubPage({ type: "sales" })}
                   onOpenFavorites={() => setSubPage({ type: "favorites" })}
                   onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}

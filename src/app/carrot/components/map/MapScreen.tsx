@@ -876,7 +876,9 @@ export function MapScreen({
             ) : (
               <section className={styles.localResults}>
                 <h2 aria-live="polite">
-                  {hasSearchedArea || selectedCategory === "food"
+                  {selectedCategory === "danger"
+                    ? "여기 조심하세요!"
+                    : hasSearchedArea || selectedCategory === "food"
                     ? `현 지도 검색 결과 ${displayedBusinesses.length}곳`
                     : "이런 동네 가게 알고 있었나요?"}
                 </h2>

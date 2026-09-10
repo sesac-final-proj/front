@@ -195,6 +195,26 @@ export interface PricePlatformComparisonItem {
   p75_price: number;
 }
 
+export interface ListingSentimentSummary {
+  platform: string;
+  category: string | null;
+  total: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  score: number;
+  top_positive_terms: string[];
+  top_negative_terms: string[];
+}
+
+export interface ListingSentimentAnalysis {
+  method: string;
+  unit: string;
+  analyzed_count: number;
+  platforms: ListingSentimentSummary[];
+  categories: ListingSentimentSummary[];
+}
+
 export interface PricePlatformTestItem {
   category: string;
   platform_a: string;

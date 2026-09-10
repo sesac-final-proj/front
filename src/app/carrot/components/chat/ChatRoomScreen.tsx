@@ -1,4 +1,4 @@
-import React, { useState, FormEvent } from "react";
+import React, { useEffect, useRef, useState, FormEvent } from "react";
 import {
   ChevronLeft,
   Menu,
@@ -59,6 +59,13 @@ export function ChatRoomScreen({
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
+  const messageStackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stack = messageStackRef.current;
+    if (!stack) return;
+    stack.scrollTo({ top: stack.scrollHeight, behavior: "auto" });
+  }, [messages.length]);
 
   // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
   // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
@@ -224,7 +231,7 @@ export function ChatRoomScreen({
           당근페이
         </button>
       )}
-      <div className={styles.messageStack}>
+      <div ref={messageStackRef} className={styles.messageStack}>
         {messages.map((message, index) =>
           message.payment ? (
             <button
