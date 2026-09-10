@@ -3763,6 +3763,14 @@ img.thumbnail {
   justify-self: end;
 }
 
+.messageUnreadMark {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--color-primary);
+  margin-right: 4px;
+}
+
 .messageComposer {
   position: absolute;
   left: 0;

@@ -89,6 +89,7 @@ export interface ApiChatMessage {
 interface ApiChatMessagePage {
   items: ApiChatMessage[];
   total: number;
+  counterpart_last_read_at: string | null;
 }
 
 function toChatRoom(item: ApiChatRoom): ChatRoomDto {
@@ -166,7 +167,7 @@ export async function createOrGetChatRoom(productId: number): Promise<ChatRoomDt
 export async function listMessages(
   chatRoomId: number,
   signal?: AbortSignal,
-): Promise<{ items: ChatMessageDto[]; total: number }> {
+): Promise<{ items: ChatMessageDto[]; total: number; counterpartLastReadAt: string | null }> {
   const response = await authorizedFetch(`/api/v1/chats/${chatRoomId}/messages?size=200`, {
     signal,
     headers: { Accept: "application/json" },
@@ -174,7 +175,11 @@ export async function listMessages(
   if (!response.ok) throw new Error("메시지를 불러오지 못했습니다.");
 
   const payload: ApiChatMessagePage = await response.json();
-  return { items: payload.items.map(toChatMessage), total: payload.total };
+  return {
+    items: payload.items.map(toChatMessage),
+    total: payload.total,
+    counterpartLastReadAt: payload.counterpart_last_read_at,
+  };
 }
 
 export async function sendMessage(chatRoomId: number, content: string): Promise<ChatMessageDto> {

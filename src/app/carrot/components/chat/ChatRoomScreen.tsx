@@ -66,6 +66,12 @@ export function ChatRoomScreen({
   const statusLabel =
     room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
   const canSend = draft.trim().length > 0;
+  // 카톡식 "1" — 내가 보낸 메시지인데 상대가 아직 안 읽었으면(counterpartLastReadAt보다
+  // 늦게 보냈으면, 혹은 상대가 한 번도 안 읽었으면) 표시.
+  const isUnreadByCounterpart = (message: ChatMessageUi) =>
+    message.mine &&
+    (!room.counterpartLastReadAt ||
+      new Date(message.createdAt).getTime() > new Date(room.counterpartLastReadAt).getTime());
 
   return (
     <section className={styles.chatRoomScreen}>
@@ -236,6 +242,7 @@ export function ChatRoomScreen({
               <Wallet size={16} />
               <span>{message.mine ? "송금완료" : "머니를 받았어요"}</span>
               <strong>{message.payment.amount.toLocaleString("ko-KR")}원</strong>
+              {isUnreadByCounterpart(message) && <em className={styles.messageUnreadMark}>1</em>}
             </button>
           ) : (
             <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
@@ -245,7 +252,10 @@ export function ChatRoomScreen({
               ) : (
                 <p>{message.text}</p>
               )}
-              <span>{message.time}</span>
+              <span>
+                {isUnreadByCounterpart(message) && <em className={styles.messageUnreadMark}>1</em>}
+                {message.time}
+              </span>
             </div>
           ),
         )}
