@@ -18,6 +18,8 @@ interface ApiProductListItem {
   search_keyword?: string | null;
   description?: string | null;
   trade_place?: string | null;
+  trade_place_lat?: number | null;
+  trade_place_lng?: number | null;
   seller_nickname?: string | null;
   seller_manner_temp?: number | null;
   is_mine?: boolean;
@@ -165,6 +167,8 @@ function toTradeProduct(item: ApiProductListItem): TradeProduct {
     searchKeyword: item.search_keyword ?? undefined,
     description: item.description ?? undefined,
     tradePlace: item.trade_place ?? undefined,
+    tradePlaceLat: item.trade_place_lat ?? undefined,
+    tradePlaceLng: item.trade_place_lng ?? undefined,
     sellerNickname: item.seller_nickname ?? undefined,
     sellerMannerTemp: item.seller_manner_temp ?? undefined,
     isMine: item.is_mine ?? false,
@@ -291,6 +295,8 @@ interface ApiProductCreateRequest {
   desired_price?: number | null;
   trade_type?: TradeProduct["tradeType"];
   trade_place?: string | null;
+  trade_place_lat?: number | null;
+  trade_place_lng?: number | null;
 }
 
 interface ApiProductCreated {
@@ -305,6 +311,8 @@ export async function createProduct(input: {
   desiredPrice: number | null;
   tradeType: TradeProduct["tradeType"];
   tradePlace?: string;
+  tradePlaceLat?: number;
+  tradePlaceLng?: number;
 }): Promise<{ id: number }> {
   const body: ApiProductCreateRequest = {
     title: input.title,
@@ -313,6 +321,8 @@ export async function createProduct(input: {
     desired_price: input.desiredPrice,
     trade_type: input.tradeType,
     trade_place: input.tradePlace,
+    trade_place_lat: input.tradePlaceLat,
+    trade_place_lng: input.tradePlaceLng,
   };
 
   const response = await authorizedFetch("/api/v1/trades/products", {
@@ -335,6 +345,8 @@ export async function updateProduct(
     description?: string;
     desiredPrice?: number | null;
     tradePlace?: string;
+    tradePlaceLat?: number;
+    tradePlaceLng?: number;
   },
 ): Promise<TradeProduct> {
   const response = await authorizedFetch(`/api/v1/trades/products/${productId}`, {
@@ -346,6 +358,8 @@ export async function updateProduct(
       description: input.description,
       desired_price: input.desiredPrice,
       trade_place: input.tradePlace,
+      trade_place_lat: input.tradePlaceLat,
+      trade_place_lng: input.tradePlaceLng,
     }),
   });
   if (!response.ok) throw new Error("글을 수정하지 못했습니다.");

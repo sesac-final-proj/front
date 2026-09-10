@@ -14,6 +14,8 @@ export interface TradeProduct {
   searchKeyword?: string;
   description?: string;
   tradePlace?: string;
+  tradePlaceLat?: number;
+  tradePlaceLng?: number;
   sellerNickname?: string;
   sellerMannerTemp?: number;
   isMine?: boolean;

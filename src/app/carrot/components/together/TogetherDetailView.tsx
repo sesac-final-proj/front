@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   ChevronLeft,
   Share2,
@@ -24,6 +24,7 @@ export function TogetherDetailView({
   onToggleJoin,
   onStartChat,
 }: TogetherDetailViewProps) {
+  const [showMannerModal, setShowMannerModal] = useState(false);
   const catMeta = TOGETHER_CATEGORIES[post.category] || TOGETHER_CATEGORIES.etc;
   const isJoined = Boolean(post.isJoined);
   const isFull = post.participantCount >= post.maxParticipants || post.status === "completed";
@@ -190,6 +191,11 @@ export function TogetherDetailView({
           {isJoined ? "참여 취소" : isFull ? "모집 마감" : "같이하기"}
         </button>
       </div>
+      <MannerTemperatureModal
+        isOpen={showMannerModal}
+        onClose={() => setShowMannerModal(false)}
+        targetTemp={post.userMannerTemp ?? 36.5}
+      />
     </section>
   );
 }

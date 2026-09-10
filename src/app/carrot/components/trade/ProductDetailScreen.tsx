@@ -27,27 +27,45 @@ function getMannerEmoji(temp: number): string {
   return "🔥";
 }
 
-export function TradePlaceMap({ query, neighborhoodName }: { query: string; neighborhoodName: string }) {
+export function TradePlaceMap({
+  query,
+  neighborhoodName,
+  lat,
+  lng,
+}: {
+  query: string;
+  neighborhoodName: string;
+  // 글쓰기 지도 피커로 고른 글은 정확한 좌표가 이미 있어서 이걸 바로 쓴다. 좌표가 없는
+  // 옛 글(텍스트만 있던 시절)만 이름으로 재지오코딩하는 예전 방식으로 폴백.
+  lat?: number;
+  lng?: number;
+}) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(KAKAO_MAP_JS_KEY ? "loading" : "error");
   const [usedFallback, setUsedFallback] = useState(false);
 
   useEffect(() => {
-    if (!KAKAO_MAP_JS_KEY) {
-      setStatus("error");
-      return;
-    }
+    if (!KAKAO_MAP_JS_KEY) return;
     let cancelled = false;
-    setStatus("loading");
-    setUsedFallback(false);
+    // setState를 effect 본문에서 동기로 바로 부르지 않고 마이크로태스크로 미룬다(react-hooks/set-state-in-effect) —
+    // query/lat/lng가 바뀌어 재실행될 때 이전 상태(ready/error)를 loading으로 되돌리는 용도.
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setStatus("loading");
+        setUsedFallback(false);
+      }
+    });
 
-    const params = new URLSearchParams({ query });
-    if (neighborhoodName) params.set("fallback", neighborhoodName);
+    const hasCoords = lat !== undefined && lng !== undefined;
+    const geoPromise = hasCoords
+      ? Promise.resolve({ lat, lng, matched: "exact" })
+      : (() => {
+          const params = new URLSearchParams({ query });
+          if (neighborhoodName) params.set("fallback", neighborhoodName);
+          return fetch(`/api/geocode?${params}`).then((res) => (res.ok ? res.json() : null));
+        })();
 
-    Promise.all([
-      fetch(`/api/geocode?${params}`).then((res) => (res.ok ? res.json() : null)),
-      loadKakaoMapScript(KAKAO_MAP_JS_KEY),
-    ])
+    Promise.all([geoPromise, loadKakaoMapScript(KAKAO_MAP_JS_KEY)])
       .then(([geo]) => {
         const kakaoMaps = (window as any).kakao?.maps;
         if (cancelled || !geo || !kakaoMaps || !mapElementRef.current) {
@@ -70,7 +88,7 @@ export function TradePlaceMap({ query, neighborhoodName }: { query: string; neig
     return () => {
       cancelled = true;
     };
-  }, [query, neighborhoodName]);
+  }, [query, neighborhoodName, lat, lng]);
 
   return (
     <div className={styles.tradePlaceBlock}>
@@ -188,7 +206,12 @@ export function ProductDetailScreen({
         </p>
 
         {product.tradePlace && (
-          <TradePlaceMap query={product.tradePlace} neighborhoodName={product.neighborhoodName} />
+          <TradePlaceMap
+            query={product.tradePlace}
+            neighborhoodName={product.neighborhoodName}
+            lat={product.tradePlaceLat}
+            lng={product.tradePlaceLng}
+          />
         )}
 
         {product.mine && (
