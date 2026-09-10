@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { DashboardOverview } from "@/lib/admin/dashboard-api";
 import { EmptyState } from "./AdminUI";
 import styles from "./portal.module.css";
@@ -18,8 +18,24 @@ export function TradeStatusCard({ data, dataByGu }: { data: DashboardOverview["t
    <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
      {GU_TABS.map(t => <button key={t} type="button" onClick={() => setTab(t)} style={{ padding: "5px 11px", borderRadius: 999, fontSize: 11, fontWeight: 550, border: "1px solid #E7E8E5", background: tab === t ? "#FF6F0F" : "#fff", color: tab === t ? "#fff" : "#656b60" }}>{t}</button>)}
    </div>
-   <HorizontalBars data={rows.map(row => ({ name: row.status, count: row.transaction_count }))} />
+   <StatusPieChart data={rows.map(row => ({ name: row.status, count: row.transaction_count }))} />
  </article>;
+}
+// chart.js는 새로 안 깔고 이미 쓰고 있는 recharts의 Pie로 — 애니메이션은 기본 켜짐.
+const PIE_COLORS = ["#FF9D5B", "#ADB9A1", "#8FA6C9", "#D9A6C2", "#C9B458", "#9A9FE0"];
+export function StatusPieChart({ data }: { data: { name: string; count: number }[] }) {
+ if (!data.length) return <EmptyState message="표시할 데이터가 없습니다." />;
+ return <div className={styles.chart} role="img" aria-label={data.map(row => `${row.name}: ${row.count}건`).join(", ")}>
+   <ResponsiveContainer width="100%" height="100%">
+     <PieChart>
+       <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false} animationDuration={700}>
+         {data.map((row, i) => <Cell key={row.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+       </Pie>
+       <Tooltip formatter={(value) => `${Number(value).toLocaleString("ko-KR")}건`} />
+       <Legend verticalAlign="bottom" height={28} wrapperStyle={{ fontSize: 11 }} />
+     </PieChart>
+   </ResponsiveContainer>
+ </div>;
 }
 export function PriceDistributionChart({ data }: { data: DashboardOverview["price_distribution"] }) {
  if (!data.some(row => row.transaction_count)) return <EmptyState message="가격이 있는 거래가 없습니다." />;
