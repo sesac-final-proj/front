@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Scatter, Scatt
 import {
   getPriceComparisonOverview,
   getPriceComparisonSamples,
+  type PriceComparisonCategoryItem,
   type PriceComparisonRegionItem,
   type PriceComparisonSample,
 } from "@/services/adminService";
@@ -79,6 +80,95 @@ function PriceInterestScatter({ samples }: { samples: PriceComparisonSample[] })
       </div>
       <div className={styles.legend}>
         {GU_ORDER.map(gu => <span key={gu} className={styles.legendItem}><i className={styles.legendSwatch} style={{ background: GU_COLOR[gu] }} />{gu}</span>)}
+      </div>
+    </>
+  );
+}
+
+// --------------------------------------------------------------------------
+// 구(gu) 대신 카테고리로 색을 나눈 버전. 실데이터 확인 결과 구별로는 가격/관심수
+// 중앙값이 거의 안 갈리는데(전부 7~8만원, 관심수 4 근처) 카테고리별로는 크게 갈린다
+// (밥솥 3.8만 ~ 음식물처리기 28.6만) — 그래서 실축(가격 x 관심수) 좌표로 그리면 카테고리당
+// 점들이 세로로 가늘게 늘어서기만 하고 "뭉친 원" 느낌이 안 났다. 그래서 좌표를 실제
+// 가격/관심수가 아니라 카테고리별 원형 클러스터 배치(해바라기씨 나선, phyllotaxis)로
+// 바꿔서 카테고리마다 동그랗게 뭉친 덩어리로 보이게 한다 — 실제 값은 툴팁에서 확인.
+// --------------------------------------------------------------------------
+
+const CATEGORY_COLOR_PALETTE = ["#FF9D5B", "#7C9CBF", "#8CC0A6", "#C97FB0", "#D9B44A", "#5B8DEF", "#E15759", "#9B7EDE"];
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈137.5° — 해바라기씨 나선 간격
+const CLUSTER_SPACING = 100;
+
+type CategorySample = PriceComparisonSample & { category: string; cx: number; cy: number };
+
+function clusterCenters(n: number) {
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  return Array.from({ length: n }, (_, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return { x: (col - (cols - 1) / 2) * CLUSTER_SPACING, y: (row - (rows - 1) / 2) * CLUSTER_SPACING };
+  });
+}
+
+// 해바라기씨 나선 — j번째 점을 count개짜리 원형 클러스터 안에 고르게 채워 넣는다.
+function sunflowerOffset(j: number, count: number, radius: number) {
+  const r = radius * Math.sqrt((j + 0.5) / count);
+  const theta = j * GOLDEN_ANGLE;
+  return { dx: r * Math.cos(theta), dy: r * Math.sin(theta) };
+}
+
+function categoryDotShape(colorOf: (category: string) => string) {
+  return (props: any) => (
+    <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2} fill={colorOf(props.payload.category)} fillOpacity={0.55} stroke={colorOf(props.payload.category)} strokeOpacity={0.9} />
+  );
+}
+
+function CategoryPriceInterestScatter({ categories }: { categories: PriceComparisonCategoryItem[] }) {
+  const loader = useCallback(async () => {
+    const pages = await Promise.all(categories.map(c => getPriceComparisonSamples(c.category)));
+    const centers = clusterCenters(categories.length);
+    const rows: CategorySample[] = [];
+    pages.forEach((page, i) => {
+      const center = centers[i];
+      const radius = Math.max(18, Math.min(42, 6 * Math.sqrt(page.samples.length)));
+      page.samples.forEach((s, j) => {
+        const { dx, dy } = sunflowerOffset(j, page.samples.length, radius);
+        rows.push({ ...s, category: categories[i].category, cx: center.x + dx, cy: center.y + dy });
+      });
+    });
+    return rows;
+  }, [categories]);
+  const { data: samples, loading, error, retry } = useAdminResource(loader);
+
+  const colorOf = useCallback(
+    (category: string) => CATEGORY_COLOR_PALETTE[categories.findIndex(c => c.category === category) % CATEGORY_COLOR_PALETTE.length] ?? "#999",
+    [categories],
+  );
+  const shape = useMemo(() => categoryDotShape(colorOf), [colorOf]);
+
+  if (!categories.length) return null;
+  if (loading) return <Skeleton />;
+  if (error || !samples) return <ErrorState message={error} retry={retry} />;
+  if (!samples.length) return <EmptyState message="매물 표본이 없습니다." />;
+
+  return (
+    <>
+      <div className={pStyles.chart} style={{ height: 360 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 4, right: 16, left: -6, bottom: 0 }}>
+            <XAxis type="number" dataKey="cx" hide domain={([min, max]: readonly [number, number]) => [min - 30, max + 30]} />
+            <YAxis type="number" dataKey="cy" hide domain={([min, max]: readonly [number, number]) => [min - 30, max + 30]} />
+            <Tooltip cursor={false} isAnimationActive={false} content={({ payload }) => {
+              const row = payload?.[0]?.payload as CategorySample | undefined;
+              if (!row) return null;
+              return <div style={tooltipBox}>{row.category} · {row.gu} · {money(row.price)} · 관심 {row.interest_count}</div>;
+            }} />
+            <Scatter data={samples} isAnimationActive={false} shape={shape} />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      <div className={styles.legend}>
+        {categories.map(c => <span key={c.category} className={styles.legendItem}><i className={styles.legendSwatch} style={{ background: colorOf(c.category) }} />{c.category}</span>)}
       </div>
     </>
   );
@@ -169,6 +259,11 @@ export function PriceComparisonSection() {
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
           <div className={pStyles.cardHead}><div><h2>가격 x 관심수 분포</h2><p>점 하나 = 매물 하나 · 가로 가격 · 세로 관심수 · 색 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
           {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <PriceInterestScatter samples={samplesState.data.samples} />}
+        </article>
+
+        <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
+          <div className={pStyles.cardHead}><div><h2>카테고리별 매물 클러스터</h2><p>색 = 카테고리 · 점 하나 = 매물 하나(뭉친 위치는 그룹 표시용, 실제 가격/관심수는 점에 마우스를 올려 확인)</p></div></div>
+          <CategoryPriceInterestScatter categories={categories.filter(c => c.category !== "전체")} />
         </article>
 
         <div style={{ marginTop: 20 }}>
