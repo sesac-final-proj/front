@@ -156,7 +156,7 @@ export function PriceComparisonSection() {
     <section style={{ marginTop: 40 }}>
       <div className={pStyles.cardHead}>
         <div><h2 style={{ fontSize: 20 }}>가격 지역별 비교</h2><p>크롤링 분석 세션 산출물 · 송파구/영등포구/노원구 비교 · 관리자 전용</p></div>
-        <button onClick={refreshAll} disabled={loading || samplesState.loading}><RefreshCw size={14} />새로고침</button>
+        <button className={styles.headerBtn} onClick={refreshAll} disabled={loading || samplesState.loading}><RefreshCw size={14} />새로고침</button>
       </div>
 
       {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : !data.categories.length ? <EmptyState message="적재된 가격비교 데이터가 없습니다." /> : <>
