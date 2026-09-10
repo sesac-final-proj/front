@@ -31,6 +31,7 @@ export interface AlbaItem {
   reviewCount?: number;
   thumbnailTone: string;
   thumbnailEmoji?: string;
+  thumbnailUrl?: string;
   bgGradient: string;
   descriptionBullets: string[];
   details: string;
@@ -48,19 +49,21 @@ export type SubPage =
   | { type: "product-detail"; id: string }
   | { type: "product-form"; editId?: string }
   | { type: "community-detail"; id: string }
-  | { type: "community-form" }
+  | { type: "community-form"; editId?: string }
   | { type: "chat-room"; id: string }
   | { type: "chat-room-list"; productId: string; productTitle: string }
   | { type: "payment-amount"; chatRoomId: string }
   | { type: "payment-detail"; chatRoomId: string; transactionId: string }
   | { type: "wallet-charge" }
-  | { type: "wallet-pay" }
+  // storeId가 있으면(QR URL로 바로 진입한 경우) 카메라 스캔 없이 곧장 금액 입력으로 간다.
+  | { type: "wallet-pay"; storeId?: number }
   | { type: "my-menu" }
   | { type: "all-services" }
-  | { type: "merge-game" }
+  | { type: "merge-game"; returnTo?: "my" | "services" }
   | { type: "real-estate" }
   | { type: "dream-dashboard" }
   | { type: "dream-notice" }
+  | { type: "carrot-notice" }
   | { type: "alba"; tab?: "home" | "search" | "applications" | "manage"; category?: string }
   | { type: "alba-detail"; id: string }
   | { type: "alba-form" }
@@ -69,13 +72,14 @@ export type SubPage =
   | { type: "together-form"; category?: TogetherCategory }
   | { type: "together-detail"; id: string }
   | { type: "settings" }
+  | { type: "customer-support" }
   | { type: "sales" }
   | { type: "favorites" }
   | { type: "recently-viewed" }
   | { type: "apartment-verification" }
   | { type: "apartment-community"; apartmentName?: string }
   | { type: "search" }
-  | { type: "region-search"; returnTo?: "dream-dashboard" };
+  | { type: "region-search"; returnTo?: "dream-dashboard" | "settings" };
 
 export type ProductListItem = {
   id: string;
@@ -97,6 +101,8 @@ export type ProductListItem = {
   mine: boolean;
   description: string;
   tradePlace?: string;
+  tradePlaceLat?: number;
+  tradePlaceLng?: number;
   sellerNickname?: string;
   sellerMannerTemp?: number;
   category: string;
@@ -114,6 +120,9 @@ export type ChatMessageUi = {
 
 export type CommunityPost = {
   id: string;
+  authorId?: number;
+  authorNickname?: string;
+  mine?: boolean;
   categoryName: string;
   title: string;
   contentPreview: string;
@@ -124,6 +133,8 @@ export type CommunityPost = {
   viewCount: number;
   commentCount: number;
   reactionCount: number;
+  isReacted?: boolean;
+  thumbnailUrl?: string;
 };
 
 export type ChatRoom = {

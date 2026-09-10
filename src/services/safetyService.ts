@@ -1,6 +1,6 @@
 import { authorizedFetch } from "@/services/tradeService";
 
-export type ReportTargetType = "USER" | "PRODUCT" | "MESSAGE";
+export type ReportTargetType = "USER" | "PRODUCT" | "MESSAGE" | "COMMUNITY_POST";
 
 export async function blockUser(userId: number): Promise<void> {
   const response = await authorizedFetch(`/api/v1/safety/blocks/${userId}`, { method: "POST" });

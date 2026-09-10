@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   ChevronLeft,
   Share2,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { TOGETHER_CATEGORIES, TogetherPost } from "@/types/together";
 import styles from "../../GajiMarketApp.module.css";
+import { MannerTemperatureModal } from "../common/MannerTemperatureModal";
 
 interface TogetherDetailViewProps {
   post: TogetherPost;
@@ -23,6 +24,7 @@ export function TogetherDetailView({
   onToggleJoin,
   onStartChat,
 }: TogetherDetailViewProps) {
+  const [showMannerModal, setShowMannerModal] = useState(false);
   const catMeta = TOGETHER_CATEGORIES[post.category] || TOGETHER_CATEGORIES.etc;
   const isJoined = Boolean(post.isJoined);
   const isFull = post.participantCount >= post.maxParticipants || post.status === "completed";
@@ -83,7 +85,7 @@ export function TogetherDetailView({
             <strong>{post.userName}</strong>
             <span>{post.userNeighborhood}</span>
           </div>
-          <button type="button" className={styles.trustPill}>
+          <button type="button" className={styles.trustPill} onClick={() => setShowMannerModal(true)}>
             신뢰온도 {post.userMannerTemp ?? 36.5}°C
           </button>
         </div>
@@ -189,6 +191,11 @@ export function TogetherDetailView({
           {isJoined ? "참여 취소" : isFull ? "모집 마감" : "같이하기"}
         </button>
       </div>
+      <MannerTemperatureModal
+        isOpen={showMannerModal}
+        onClose={() => setShowMannerModal(false)}
+        targetTemp={post.userMannerTemp ?? 36.5}
+      />
     </section>
   );
 }

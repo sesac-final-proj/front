@@ -10,35 +10,62 @@ import {
   Heart,
   MessageCircle,
   MoreVertical,
+  Trash2,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem, TradeStatus } from "../../types";
 import { KAKAO_MAP_JS_KEY } from "../../constants";
 import { formatPrice } from "../../utils";
-import { loadKakaoMapScript } from "../map";
+import { createEggplantMarkerImage, loadKakaoMapScript } from "../map";
 import { IconButton } from "../common/IconButton";
+import { MannerTemperatureModal, getMannerColor } from "../common/MannerTemperatureModal";
 
-export function TradePlaceMap({ query, neighborhoodName }: { query: string; neighborhoodName: string }) {
+function getMannerEmoji(temp: number): string {
+  if (temp < 36.0) return "😠";
+  if (temp < 40.0) return "🙂";
+  if (temp < 70.0) return "🥰";
+  return "🔥";
+}
+
+export function TradePlaceMap({
+  query,
+  neighborhoodName,
+  lat,
+  lng,
+}: {
+  query: string;
+  neighborhoodName: string;
+  // 글쓰기 지도 피커로 고른 글은 정확한 좌표가 이미 있어서 이걸 바로 쓴다. 좌표가 없는
+  // 옛 글(텍스트만 있던 시절)만 이름으로 재지오코딩하는 예전 방식으로 폴백.
+  lat?: number;
+  lng?: number;
+}) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(KAKAO_MAP_JS_KEY ? "loading" : "error");
   const [usedFallback, setUsedFallback] = useState(false);
 
   useEffect(() => {
-    if (!KAKAO_MAP_JS_KEY) {
-      setStatus("error");
-      return;
-    }
+    if (!KAKAO_MAP_JS_KEY) return;
     let cancelled = false;
-    setStatus("loading");
-    setUsedFallback(false);
+    // setState를 effect 본문에서 동기로 바로 부르지 않고 마이크로태스크로 미룬다(react-hooks/set-state-in-effect) —
+    // query/lat/lng가 바뀌어 재실행될 때 이전 상태(ready/error)를 loading으로 되돌리는 용도.
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setStatus("loading");
+        setUsedFallback(false);
+      }
+    });
 
-    const params = new URLSearchParams({ query });
-    if (neighborhoodName) params.set("fallback", neighborhoodName);
+    const hasCoords = lat !== undefined && lng !== undefined;
+    const geoPromise = hasCoords
+      ? Promise.resolve({ lat, lng, matched: "exact" })
+      : (() => {
+          const params = new URLSearchParams({ query });
+          if (neighborhoodName) params.set("fallback", neighborhoodName);
+          return fetch(`/api/geocode?${params}`).then((res) => (res.ok ? res.json() : null));
+        })();
 
-    Promise.all([
-      fetch(`/api/geocode?${params}`).then((res) => (res.ok ? res.json() : null)),
-      loadKakaoMapScript(KAKAO_MAP_JS_KEY),
-    ])
+    Promise.all([geoPromise, loadKakaoMapScript(KAKAO_MAP_JS_KEY)])
       .then(([geo]) => {
         const kakaoMaps = (window as any).kakao?.maps;
         if (cancelled || !geo || !kakaoMaps || !mapElementRef.current) {
@@ -50,7 +77,7 @@ export function TradePlaceMap({ query, neighborhoodName }: { query: string; neig
           center,
           level: geo.matched === "fallback" ? 6 : 3,
         });
-        new kakaoMaps.Marker({ position: center, map });
+        new kakaoMaps.Marker({ position: center, map, image: createEggplantMarkerImage(kakaoMaps) });
         setUsedFallback(geo.matched === "fallback");
         setStatus("ready");
       })
@@ -61,7 +88,7 @@ export function TradePlaceMap({ query, neighborhoodName }: { query: string; neig
     return () => {
       cancelled = true;
     };
-  }, [query, neighborhoodName]);
+  }, [query, neighborhoodName, lat, lng]);
 
   return (
     <div className={styles.tradePlaceBlock}>
@@ -91,6 +118,7 @@ export function ProductDetailScreen({
   onHideSeller,
   onReportProduct,
   onEdit,
+  onDelete,
 }: {
   product: ProductListItem;
   onBack: () => void;
@@ -100,10 +128,13 @@ export function ProductDetailScreen({
   onHideSeller: (productId: string) => void;
   onReportProduct: (productId: string, reason: string) => void;
   onEdit: (productId: string) => void;
+  onDelete: (productId: string) => void;
 }) {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState("전문 판매업자 같아요");
+  const [showMannerModal, setShowMannerModal] = useState(false);
+  const sellerTemp = product.sellerMannerTemp ?? 36.5;
 
   const reportReasons = [
     "전문 판매업자 같아요",
@@ -135,11 +166,27 @@ export function ProductDetailScreen({
         <div className={styles.sellerCard}>
           <div className={styles.avatar}>가</div>
           <div>
-            <strong>{product.sellerNickname || "주황가지님"}</strong>
+            <strong>{product.sellerNickname || "당근이웃님"}</strong>
             <span>{product.neighborhoodName}</span>
           </div>
-          <button type="button" className={styles.trustPill}>
-            매너온도 {(product.sellerMannerTemp ?? 36.5).toFixed(1)}°C
+          <button
+            type="button"
+            className={styles.mannerTempTrigger}
+            onClick={() => setShowMannerModal(true)}
+            aria-label="매너온도 설명 보기"
+          >
+            <div className={styles.mannerTempHead}>
+              <span
+                className={styles.mannerTempDegree}
+                style={{ color: getMannerColor(sellerTemp) }}
+              >
+                {sellerTemp.toFixed(1)}°C
+              </span>
+              <span className={styles.mannerTempFace}>
+                {getMannerEmoji(sellerTemp)}
+              </span>
+            </div>
+            <span className={styles.mannerTempLabel}>매너온도</span>
           </button>
         </div>
         <div className={styles.priceLine}>
@@ -159,7 +206,12 @@ export function ProductDetailScreen({
         </p>
 
         {product.tradePlace && (
-          <TradePlaceMap query={product.tradePlace} neighborhoodName={product.neighborhoodName} />
+          <TradePlaceMap
+            query={product.tradePlace}
+            neighborhoodName={product.neighborhoodName}
+            lat={product.tradePlaceLat}
+            lng={product.tradePlaceLng}
+          />
         )}
 
         {product.mine && (
@@ -217,17 +269,32 @@ export function ProductDetailScreen({
             </div>
             <div className={styles.productActionGroup}>
               {product.mine ? (
-                <button
-                  type="button"
-                  className={styles.productActionBtn}
-                  onClick={() => {
-                    setShowMoreSheet(false);
-                    onEdit(product.id);
-                  }}
-                >
-                  <FileText size={22} />
-                  <span>글 수정하기</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.productActionBtn}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      onEdit(product.id);
+                    }}
+                  >
+                    <FileText size={22} />
+                    <span>글 수정하기</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.productActionBtn} ${styles.productActionReport}`}
+                    onClick={() => {
+                      setShowMoreSheet(false);
+                      if (window.confirm("정말 삭제하시겠어요?\n삭제하면 되돌릴 수 없어요.")) {
+                        onDelete(product.id);
+                      }
+                    }}
+                  >
+                    <Trash2 size={22} />
+                    <span>삭제하기</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <button
@@ -312,6 +379,11 @@ export function ProductDetailScreen({
           </div>
         </>
       )}
+      <MannerTemperatureModal
+        isOpen={showMannerModal}
+        onClose={() => setShowMannerModal(false)}
+        targetTemp={sellerTemp}
+      />
     </section>
   );
 }

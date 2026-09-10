@@ -1,7 +1,6 @@
 // 목업 데이터 + 화면 전역 상수. 실 API로 대체된 데이터(예: 예전 DREAM_FACILITIES)는
 // 여기서 지워지는 게 정상 — 이 파일이 자꾸 비어가는 게 이 리팩터링의 목표다.
 import {
-  BadgePercent,
   Bike,
   BookOpen,
   CakeSlice,
@@ -225,8 +224,6 @@ export const LOCAL_CATEGORIES: LocalCategory[] = [
   { id: "subway", name: "지하철", icon: TrainFront, tone: "blue" },
   { id: "bike", name: "따릉이", icon: Bike, tone: "green" },
   { id: "danger", name: "위험", icon: ShieldAlert, tone: "rose" },
-  { id: "takeout", name: "포장주문", icon: Utensils, tone: "amber" },
-  { id: "sale", name: "할인중", icon: BadgePercent, tone: "orange" },
   { id: "workout", name: "운동", icon: Dumbbell, tone: "cyan" },
   { id: "lesson", name: "레슨/과외", icon: BookOpen, tone: "rose" },
   { id: "class", name: "클래스", icon: CakeSlice, tone: "amber" },
@@ -345,6 +342,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 4,
     thumbnailTone: "musinsa",
     thumbnailEmoji: "🏢",
+    thumbnailUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #1c1d22 0%, #363942 100%)",
     descriptionBullets: [
       "1. 매장 상품 진열 및 고객 응대",
@@ -377,6 +375,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 1,
     thumbnailTone: "oliveyoung",
     thumbnailEmoji: "💄",
+    thumbnailUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)",
     descriptionBullets: [
       "1. 대기줄 및 매장 질서유지",
@@ -408,6 +407,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     badges: ["모범구인"],
     thumbnailTone: "musinsa_dark",
     thumbnailEmoji: "📦",
+    thumbnailUrl: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #09090b 0%, #27272a 100%)",
     descriptionBullets: [
       "1. 입출고 상품 분류 및 피킹",
@@ -438,6 +438,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 18,
     thumbnailTone: "bbq",
     thumbnailEmoji: "🥩",
+    thumbnailUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #842323 0%, #d32f2f 100%)",
     descriptionBullets: [
       "1. 숯불구이 전문점 홀 서빙 및 테이블 정리",
@@ -468,6 +469,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 10,
     thumbnailTone: "zara",
     thumbnailEmoji: "👗",
+    thumbnailUrl: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)",
     descriptionBullets: [
       "1. 글로벌 SPA 브랜드 자라 고객 어드바이징",
@@ -498,6 +500,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 37,
     thumbnailTone: "cafe",
     thumbnailEmoji: "☕",
+    thumbnailUrl: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #4b3832 0%, #854442 100%)",
     descriptionBullets: [
       "1. 스페셜티 커피 추출 및 음료 제조",
@@ -527,6 +530,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     badges: ["단기", "초보가능"],
     thumbnailTone: "carwash",
     thumbnailEmoji: "🚗",
+    thumbnailUrl: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
     descriptionBullets: [
       "1. 실내외 프리미엄 디테일링 세차 보조",
@@ -557,6 +561,7 @@ export const ALBA_MOCK_DATA: AlbaItem[] = [
     reviewCount: 1,
     thumbnailTone: "noodle",
     thumbnailEmoji: "🍜",
+    thumbnailUrl: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=80",
     bgGradient: "linear-gradient(135deg, #e52d27 0%, #b31217 100%)",
     descriptionBullets: [
       "1. 미슐랭 빕구르망 선정 대만식 우육면 전문점",

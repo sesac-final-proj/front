@@ -8,6 +8,7 @@ import styles from "../../GajiMarketApp.module.css";
 import type { TabId } from "../../types";
 import { formatBadge } from "../../utils";
 import { EggplantPinIcon } from "./EggplantPinIcon";
+import { useSlidingNav } from "../../hooks/useSlidingNav";
 
 export function BottomNav({
   activeTab,
@@ -25,9 +26,11 @@ export function BottomNav({
     { id: "chats", label: "채팅", icon: MessageCircle },
     { id: "my", label: "나의 당근", icon: UserRound },
   ];
+  const tabIds = tabs.map((tab) => tab.id);
+  const { navRef, navGestureProps } = useSlidingNav(tabIds, onNavigate);
 
   return (
-    <nav className={styles.bottomNav} aria-label="주요 화면">
+    <nav ref={navRef} className={styles.bottomNav} aria-label="주요 화면" {...navGestureProps}>
       <svg width="0" height="0" style={{ position: "absolute", pointerEvents: "none", visibility: "hidden" }}>
         <defs>
           <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">

@@ -18,6 +18,8 @@ interface ApiProductListItem {
   search_keyword?: string | null;
   description?: string | null;
   trade_place?: string | null;
+  trade_place_lat?: number | null;
+  trade_place_lng?: number | null;
   seller_nickname?: string | null;
   seller_manner_temp?: number | null;
   is_mine?: boolean;
@@ -165,6 +167,8 @@ function toTradeProduct(item: ApiProductListItem): TradeProduct {
     searchKeyword: item.search_keyword ?? undefined,
     description: item.description ?? undefined,
     tradePlace: item.trade_place ?? undefined,
+    tradePlaceLat: item.trade_place_lat ?? undefined,
+    tradePlaceLng: item.trade_place_lng ?? undefined,
     sellerNickname: item.seller_nickname ?? undefined,
     sellerMannerTemp: item.seller_manner_temp ?? undefined,
     isMine: item.is_mine ?? false,
@@ -271,10 +275,14 @@ export async function recordProductView(id: number): Promise<void> {
 }
 
 // 목록 API는 description을 안 내려줘서(상세 API만 채워짐) 상세 화면 진입 시 따로 조회.
+// 비로그인도 볼 수 있는 공개 API(get_current_user_optional)라 authorizedFetch(토큰 없으면
+// AuthRequiredError)는 못 쓰지만, 로그인 상태면 토큰을 실어 보내야 is_mine이 제대로 나온다 —
+// 안 보내면 백엔드가 항상 user=None으로 보고 본인 글도 "삭제하기"가 안 뜸(버그 리포트).
 export async function getProduct(id: number, signal?: AbortSignal): Promise<TradeProduct> {
+  const token = getAuthToken();
   const response = await fetch(apiUrl(`/api/v1/trades/products/${id}`), {
     signal,
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
   if (!response.ok) {
     throw new Error("상품 상세를 불러오지 못했습니다.");
@@ -291,6 +299,8 @@ interface ApiProductCreateRequest {
   desired_price?: number | null;
   trade_type?: TradeProduct["tradeType"];
   trade_place?: string | null;
+  trade_place_lat?: number | null;
+  trade_place_lng?: number | null;
 }
 
 interface ApiProductCreated {
@@ -305,6 +315,8 @@ export async function createProduct(input: {
   desiredPrice: number | null;
   tradeType: TradeProduct["tradeType"];
   tradePlace?: string;
+  tradePlaceLat?: number;
+  tradePlaceLng?: number;
 }): Promise<{ id: number }> {
   const body: ApiProductCreateRequest = {
     title: input.title,
@@ -313,6 +325,8 @@ export async function createProduct(input: {
     desired_price: input.desiredPrice,
     trade_type: input.tradeType,
     trade_place: input.tradePlace,
+    trade_place_lat: input.tradePlaceLat,
+    trade_place_lng: input.tradePlaceLng,
   };
 
   const response = await authorizedFetch("/api/v1/trades/products", {
@@ -335,6 +349,8 @@ export async function updateProduct(
     description?: string;
     desiredPrice?: number | null;
     tradePlace?: string;
+    tradePlaceLat?: number;
+    tradePlaceLng?: number;
   },
 ): Promise<TradeProduct> {
   const response = await authorizedFetch(`/api/v1/trades/products/${productId}`, {
@@ -346,12 +362,23 @@ export async function updateProduct(
       description: input.description,
       desired_price: input.desiredPrice,
       trade_place: input.tradePlace,
+      trade_place_lat: input.tradePlaceLat,
+      trade_place_lng: input.tradePlaceLng,
     }),
   });
   if (!response.ok) throw new Error("글을 수정하지 못했습니다.");
 
   const payload: ApiProductListItem = await response.json();
   return toTradeProduct(payload);
+}
+
+// 본인 글 삭제. 서버가 찜/최근본/가격분석/걸려있던 채팅방 참조까지 같이 정리한다
+// (연결된 채팅 기록 자체는 보존 — trades/service.py delete_product 참고).
+export async function deleteProduct(productId: number): Promise<void> {
+  const response = await authorizedFetch(`/api/v1/trades/products/${productId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("글을 삭제하지 못했습니다.");
 }
 
 // 상품 이미지는 1장만 유지(재업로드하면 덮어씀). NCP Object Storage에 서버를 거치지

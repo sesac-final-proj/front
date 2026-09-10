@@ -55,13 +55,21 @@ export async function chargeWallet(amount: number): Promise<number> {
   return payload.balance;
 }
 
-// 매장 QR 결제 — 가맹점 연동 없는 mock이라 QR에서 읽은 이름/금액을 그대로 보내면
-// 잔액에서 차감된다.
-export async function payByQr(merchantName: string, amount: number): Promise<number> {
+// 매장 조회 — 결제 QR(=/carrot?pay=<storeId> URL)을 스캔/진입했을 때 표시할 이름을 받아온다.
+export async function getStore(storeId: number): Promise<{ id: number; name: string }> {
+  const response = await authorizedFetch(`/api/v1/wallet/stores/${storeId}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await extractErrorMessage(response, "가맹점을 찾을 수 없습니다."));
+  return response.json();
+}
+
+// 매장 QR 결제 — 가맹점 연동 없는 mock이라 store_id/금액만 보내면 잔액에서 차감된다.
+export async function payByQr(storeId: number, amount: number): Promise<number> {
   const response = await authorizedFetch("/api/v1/wallet/pay", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ merchant_name: merchantName, amount }),
+    body: JSON.stringify({ store_id: storeId, amount }),
   });
   if (!response.ok) throw new Error(await extractErrorMessage(response, "결제하지 못했습니다."));
 

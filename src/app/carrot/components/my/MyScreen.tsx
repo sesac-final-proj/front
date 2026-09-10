@@ -30,6 +30,8 @@ export interface MyScreenProps {
   myProducts: ProductListItem[];
   // null이면 아직 로딩 중 — 그동안은 이전처럼 "0원"으로 보여준다.
   walletBalance?: number | null;
+  // 꿈방울(기부 가능 포인트) — 결제할 때마다 자동 적립되는 값, null이면 로딩 중.
+  dreamPoints?: number | null;
   onOpenSettings: () => void;
   onOpenMenu: () => void;
   onOpenAllServices: () => void;
@@ -51,6 +53,7 @@ export function MyScreen({
   favoriteCount,
   myProducts,
   walletBalance,
+  dreamPoints,
   onOpenSettings,
   onOpenMenu,
   onOpenAllServices,
@@ -70,7 +73,7 @@ export function MyScreen({
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
     { label: "세탁 수거", icon: Shirt, tone: "cyan" },
-    { label: "가지알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
+    { label: "당근알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
     { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];
 
@@ -126,7 +129,7 @@ export function MyScreen({
             머니 <strong>{(walletBalance ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
           <button type="button">
-            포인트 <strong>44원</strong> <ChevronRight size={18} />
+            포인트 <strong>{(dreamPoints ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
         </div>
       </section>

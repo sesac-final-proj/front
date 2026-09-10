@@ -1,13 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Bell,
   Building2,
   CheckCircle2,
   ChevronRight,
+  Edit3,
+  Flag,
+  Trash2,
   MapPin,
   Menu,
+  Heart,
   MessageCircle,
   MoreVertical,
   Search,
@@ -24,10 +28,46 @@ import { StateBlock } from "../common/StateBlock";
 import { ChipScroller } from "../trade/HomeScreen";
 import { TogetherFeedCard } from "../together";
 
-export function CommunityPostRow({ post, onClick }: { post: CommunityPost; onClick: () => void }) {
+export function CommunityPostRow({
+  post,
+  onClick,
+  onEdit,
+  onDelete,
+  onReport,
+  currentUserId,
+}: {
+  post: CommunityPost;
+  onClick: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onReport?: () => void;
+  currentUserId?: number | null;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const isMine =
+    typeof currentUserId === "number" && typeof post.authorId === "number"
+      ? post.authorId === currentUserId
+      : Boolean(post.mine);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeMenu(event: MouseEvent) {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    }
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, [menuOpen]);
+
+  function choose(action?: () => void) {
+    setMenuOpen(false);
+    action?.();
+  }
+
   return (
     <article className={styles.postRow}>
-      <button type="button" onClick={onClick}>
+      <button type="button" className={styles.postRowButton} onClick={onClick}>
         <div className={styles.postText}>
           <span className={styles.categoryBadge}>{post.categoryName}</span>
           <h2>{post.title}</h2>
@@ -41,13 +81,54 @@ export function CommunityPostRow({ post, onClick }: { post: CommunityPost; onCli
             {post.thumbnailCount && post.thumbnailCount > 1 ? <span>{post.thumbnailCount}</span> : null}
           </div>
         )}
-        <MoreVertical size={18} className={styles.postMore} />
-        {post.commentCount > 0 && (
+        {(post.reactionCount > 0 || post.commentCount > 0) && (
           <span className={styles.commentCount}>
-            <MessageCircle size={15} /> {post.commentCount}
+            {post.reactionCount > 0 && (
+              <span className={post.isReacted ? styles.communityStatActive : undefined}>
+                <Heart size={15} fill={post.isReacted ? "currentColor" : "none"} /> {post.reactionCount}
+              </span>
+            )}
+            {post.commentCount > 0 && (
+              <span>
+                <MessageCircle size={15} /> {post.commentCount}
+              </span>
+            )}
           </span>
         )}
       </button>
+      <div className={styles.communityPostMenuWrap} ref={menuRef}>
+        <button
+          type="button"
+          className={styles.communityPostMenuButton}
+          aria-label="게시글 메뉴"
+          aria-expanded={menuOpen}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMenuOpen((value) => !value);
+          }}
+        >
+          <MoreVertical size={18} />
+        </button>
+        {menuOpen && (
+          <div className={styles.communityPostMenu} role="menu">
+            {isMine && (
+              <>
+                <button type="button" role="menuitem" onClick={() => choose(onEdit)}>
+                  <Edit3 size={15} /> 수정하기
+                </button>
+                <button type="button" role="menuitem" className={styles.communityPostMenuDanger} onClick={() => choose(onDelete)}>
+                  <Trash2 size={15} /> 삭제하기
+                </button>
+              </>
+            )}
+            {!isMine && (
+              <button type="button" role="menuitem" className={styles.communityPostMenuDanger} onClick={() => choose(onReport)}>
+                <Flag size={15} /> 신고하기
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </article>
   );
 }
@@ -82,6 +163,10 @@ export function CommunityScreen({
   onOpenNotifications,
   onOpenMenu,
   onPostClick,
+  onPostEdit,
+  onPostDelete,
+  onPostReport,
+  currentUserId,
   verifiedApartment,
   onOpenApartment,
   activeNeighborhood = "개봉동",
@@ -101,6 +186,10 @@ export function CommunityScreen({
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
   onPostClick: (id: string) => void;
+  onPostEdit?: (id: string) => void;
+  onPostDelete?: (post: CommunityPost) => void;
+  onPostReport?: (post: CommunityPost) => void;
+  currentUserId?: number | null;
   verifiedApartment?: string | null;
   onOpenApartment?: () => void;
   activeNeighborhood?: string;
@@ -476,7 +565,15 @@ export function CommunityScreen({
           ) : (
             <div className={styles.postList}>
               {posts.map((post) => (
-                <CommunityPostRow key={post.id} post={post} onClick={() => onPostClick(post.id)} />
+                <CommunityPostRow
+                  key={post.id}
+                  post={post}
+                  onClick={() => onPostClick(post.id)}
+                  onEdit={() => onPostEdit?.(post.id)}
+                  onDelete={() => onPostDelete?.(post)}
+                  onReport={() => onPostReport?.(post)}
+                  currentUserId={currentUserId}
+                />
               ))}
             </div>
           )}

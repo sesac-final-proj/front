@@ -11,6 +11,7 @@ import {
 import styles from "../../GajiMarketApp.module.css";
 import transitStyles from "./TransitSection.module.css";
 import { getSubwayLineColor, getSubwayLineNames, type TransitBounds, type TransitStop } from "@/services/transitService";
+import type { WorkoutFacility } from "@/services/workoutService";
 
 export const KAKAO_MAP_KEY =
   process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
@@ -63,6 +64,38 @@ export function loadKakaoMapScript(appKey: string = KAKAO_MAP_KEY): Promise<void
   });
 
   return kakaoMapScriptPromise;
+}
+
+// BottomNav 지도 탭 아이콘(EggplantPinIcon)과 같은 핀 모양 — 카카오맵 기본 빨간 마커
+// 대신 가지 브랜드 핀을 쓰려고 MarkerImage로 만든다. CustomOverlay가 아니라
+// MarkerImage인 이유: 드래그 가능한 마커(draggable: true)가 CustomOverlay엔 없음.
+// 이미지는 별도 문서 컨텍스트라 CSS 변수(--eggplant-pin-top 등)를 못 읽어서
+// EggplantPinIcon 기본값과 같은 색을 하드코딩해서 쓴다.
+const EGGPLANT_PIN_PATH = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z";
+
+function eggplantPinSvg(size: number) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
+    <defs>
+      <linearGradient id="eggplant-pin-gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#078452" />
+        <stop offset="30%" stop-color="#078452" />
+        <stop offset="30%" stop-color="#ff6f0f" />
+        <stop offset="100%" stop-color="#ff6f0f" />
+      </linearGradient>
+      <filter id="eggplant-pin-shadow" x="-50%" y="-30%" width="200%" height="180%">
+        <feDropShadow dx="0" dy="2" stdDeviation="1.4" flood-color="#1a1c20" flood-opacity="0.35" />
+      </filter>
+    </defs>
+    <path d="${EGGPLANT_PIN_PATH}" fill="url(#eggplant-pin-gradient)" filter="url(#eggplant-pin-shadow)" />
+  </svg>`;
+}
+
+export function createEggplantMarkerImage(kakaoMaps: any, size = 40) {
+  const dataUri = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(eggplantPinSvg(size))}`;
+  // offset = 마커가 좌표를 가리키는 기준점 — 핀 뾰족한 끝(하단 중앙)이 실제 위치를 찍도록.
+  return new kakaoMaps.MarkerImage(dataUri, new kakaoMaps.Size(size, size), {
+    offset: new kakaoMaps.Point(size / 2, size),
+  });
 }
 
 // 사진 2번: 당근 실시간 현 위치 ("내 장소") 동심원 펄스 마커
@@ -449,6 +482,49 @@ export function createSeedPastelHeatmapElement(
   return container;
 }
 
+export function createWorkoutMarkerElement(
+  facility: WorkoutFacility,
+  isSelected: boolean,
+  onSelect: () => void
+): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.setAttribute("aria-label", `${facility.name} (${facility.category})`);
+  button.title = `${facility.name} - ${facility.category}`;
+  button.className = `${styles.workoutMapDot} ${isSelected ? styles.workoutMapDotSelected : ""}`;
+
+  button.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onSelect();
+  });
+
+  return button;
+}
+
+export function createWorkoutClusterMarkerElement(
+  count: number,
+  onSelect: () => void,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = styles.workoutMapCluster;
+  button.setAttribute("aria-label", `이 위치의 운동 시설 ${count}곳 보기`);
+
+  const image = document.createElement("img");
+  image.src = "/images/carrot/workout-carrot-dumbbells.png";
+  image.alt = "";
+  image.draggable = false;
+
+  const badge = document.createElement("span");
+  badge.textContent = String(count);
+  button.append(image, badge);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onSelect();
+  });
+  return button;
+}
+
 export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   activeNeighborhood: string;
   currentLocation: { lat: number; lng: number } | null;
@@ -462,6 +538,11 @@ export interface KakaoMapLayerProps<T extends { lat: number; lng: number }> {
   transitFocus?: TransitStop | null;
   onTransitBoundsChange?: (bounds: TransitBounds) => void;
   onSelectTransit?: (stop: TransitStop) => void;
+  workoutFacilities?: WorkoutFacility[];
+  selectedWorkoutId?: string | null;
+  onSelectWorkoutFacility?: (facility: WorkoutFacility) => void;
+  onSelectWorkoutCluster?: (facilities: WorkoutFacility[]) => void;
+  onWorkoutBoundsChange?: (bounds: { south: number; north: number; west: number; east: number }) => void;
   businesses: T[];
   renderBusinessMarker: (business: T) => HTMLElement;
   onCongestionBoundsChange: (bounds: { south: number; north: number; west: number; east: number }) => void;
@@ -486,6 +567,11 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   transitFocus,
   onTransitBoundsChange,
   onSelectTransit,
+  workoutFacilities = [],
+  selectedWorkoutId,
+  onSelectWorkoutFacility,
+  onSelectWorkoutCluster,
+  onWorkoutBoundsChange,
   businesses,
   renderBusinessMarker,
   onCongestionBoundsChange,
@@ -507,9 +593,11 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
   const isRestaurantMode = selectedCategory === "food";
   const isCongestionMode = selectedCategory === "congestion";
   const isTransitMode = selectedCategory === "subway" || selectedCategory === "bike";
+  const isWorkoutMode = selectedCategory === "workout";
   const restaurantOverlaysRef = useRef<any[]>([]);
   const businessOverlaysRef = useRef<any[]>([]);
   const congestionOverlaysRef = useRef<any[]>([]);
+  const workoutOverlaysRef = useRef<any[]>([]);
   const restaurantRequestIdRef = useRef<number>(0);
   const previousBoundsRef = useRef<{ swLat: number; swLng: number; neLat: number; neLng: number } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1007,6 +1095,105 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     return () => kakao.maps.event.removeListener(map, "idle", publishBounds);
   }, [canUseKakaoMap, isCongestionMode, onCongestionBoundsChange, activeNeighborhood, currentLocation, centerRequest]);
 
+  // Workout facility markers rendering
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isWorkoutMode) {
+      workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+      workoutOverlaysRef.current = [];
+      return;
+    }
+
+    workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+    workoutOverlaysRef.current = [];
+
+    const projection = map.getProjection?.();
+    const clusters: WorkoutFacility[][] = [];
+    workoutFacilities.forEach((facility) => {
+      const position = new kakao.maps.LatLng(facility.lat, facility.lng);
+      const point = projection?.containerPointFromCoords?.(position) ?? projection?.pointFromCoords?.(position);
+      const nearby = point ? clusters.find((cluster) => {
+        const first = cluster[0];
+        const firstPosition = new kakao.maps.LatLng(first.lat, first.lng);
+        const firstPoint = projection?.containerPointFromCoords?.(firstPosition) ?? projection?.pointFromCoords?.(firstPosition);
+        return firstPoint && Math.hypot(point.x - firstPoint.x, point.y - firstPoint.y) <= 28;
+      }) : undefined;
+      if (nearby) nearby.push(facility);
+      else clusters.push([facility]);
+    });
+
+    const newOverlays = clusters.flatMap((cluster) => {
+      const containsSelected = cluster.some((facility) => facility.id === selectedWorkoutId);
+      if (cluster.length === 1 || containsSelected) {
+        return cluster.map((facility) => {
+          const isSelected = facility.id === selectedWorkoutId;
+          const position = new kakao.maps.LatLng(facility.lat, facility.lng);
+          const markerEl = createWorkoutMarkerElement(facility, isSelected, () => {
+            map.panTo(position);
+            onSelectWorkoutFacility?.(facility);
+          });
+          const overlay = new kakao.maps.CustomOverlay({
+            position,
+            content: markerEl,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+            zIndex: isSelected ? 210 : 90,
+          });
+          overlay.setMap(map);
+          return overlay;
+        });
+      }
+
+      const lat = cluster.reduce((sum, facility) => sum + facility.lat, 0) / cluster.length;
+      const lng = cluster.reduce((sum, facility) => sum + facility.lng, 0) / cluster.length;
+      const position = new kakao.maps.LatLng(lat, lng);
+      const markerEl = createWorkoutClusterMarkerElement(cluster.length, () => {
+        map.panTo(position);
+        onSelectWorkoutCluster?.(cluster);
+      });
+      const overlay = new kakao.maps.CustomOverlay({
+        position,
+        content: markerEl,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        zIndex: 180,
+      });
+      overlay.setMap(map);
+      return [overlay];
+    });
+
+    workoutOverlaysRef.current = newOverlays;
+
+    return () => {
+      workoutOverlaysRef.current.forEach((o) => o.setMap(null));
+      workoutOverlaysRef.current = [];
+    };
+  }, [canUseKakaoMap, isWorkoutMode, workoutFacilities, selectedWorkoutId, onSelectWorkoutCluster, onSelectWorkoutFacility]);
+
+  // Workout viewport synchronization
+  useEffect(() => {
+    const kakao = (window as any).kakao;
+    const map = mapRef.current;
+    if (!map || !kakao?.maps || !canUseKakaoMap || !isWorkoutMode) return;
+
+    const publishWorkoutBounds = () => {
+      const bounds = map.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      onWorkoutBoundsChange?.({
+        south: sw.getLat(),
+        north: ne.getLat(),
+        west: sw.getLng(),
+        east: ne.getLng(),
+      });
+    };
+
+    publishWorkoutBounds();
+    kakao.maps.event.addListener(map, "idle", publishWorkoutBounds);
+    return () => kakao.maps.event.removeListener(map, "idle", publishWorkoutBounds);
+  }, [canUseKakaoMap, isWorkoutMode, onWorkoutBoundsChange, activeNeighborhood, currentLocation, centerRequest]);
+
   return (
     <>
       <div className={styles.kakaoMapFrame}>
@@ -1047,6 +1234,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
           const ne = bounds.getNorthEast();
           const currentBounds = { south: sw.getLat(), north: ne.getLat(), west: sw.getLng(), east: ne.getLng() };
           if (isTransitMode) onTransitBoundsChange?.(currentBounds);
+          else if (isWorkoutMode) onWorkoutBoundsChange?.(currentBounds);
           else onSearchBounds(currentBounds);
         }}
       >

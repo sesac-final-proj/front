@@ -12,6 +12,7 @@ import {
   BottomNav,
   BottomSheet,
   FloatingWriteButton,
+  HomeFloatingActionMenu,
   AllServicesScreen,
   RegionSearchScreen,
   SearchScreen,
@@ -37,6 +38,8 @@ import {
   MyScreen,
   MyMenuScreen,
   SettingsScreen,
+  CustomerSupportScreen,
+  CarrotNoticeScreen,
   ManagementScreen,
   FavoriteScreen,
   DreamDashboardScreen,
@@ -79,6 +82,16 @@ import {
   updateProduct,
   uploadProductImage,
   listCategories,
+  deleteProduct,
+  listCommunityPosts,
+  getCommunityPost,
+  createCommunityPost,
+  updateCommunityPost,
+  deleteCommunityPost,
+  toggleCommunityPostEmotion,
+  listCommunityPostComments,
+  createCommunityPostComment,
+  deleteCommunityPostComment,
 } from "@/services";
 import {
   createOrGetChatRoom,
@@ -93,6 +106,7 @@ import {
 } from "@/services/chatService";
 import { blockUser, reportUser } from "@/services/safetyService";
 import { getWalletBalance, sendPayment as sendWalletPayment, chargeWallet, payByQr } from "@/services/walletService";
+import { getDreamPointsBalance } from "@/services/dreamService";
 
 // Types
 import type {
@@ -101,6 +115,7 @@ import type {
   CreateTogetherPostInput,
   Me,
 } from "@/types";
+import type { CommunityComment } from "@/types/community";
 import type {
   AlbaItem,
   ChatMessageUi,
@@ -142,6 +157,7 @@ import {
   toChatRoomUi,
   toDangerBusiness,
   toProductListItem,
+  toCommunityPost,
   writeNeighborhoodCache,
 } from "./utils";
 
@@ -157,6 +173,7 @@ interface ProductFilters {
 }
 
 const DEFAULT_PRODUCT_FILTERS: ProductFilters = { sort: "latest" };
+const COMMUNITY_REPORT_REASONS = ["스팸/홍보", "욕설/비방", "음란하거나 부적절한 내용", "사기/허위 정보", "기타"];
 
 function hasActiveProductFilters(filters: ProductFilters): boolean {
   return (
@@ -197,6 +214,7 @@ export default function GajiMarketApp() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [sheet, setSheet] = useState<SheetId>(null);
+  const [isHomeActionMenuOpen, setIsHomeActionMenuOpen] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
   // 로그인 필수 게이트: getMe() 응답이 오기 전엔 화면을 그리지 않고, 비로그인/토큰
   // 만료면 온보딩으로 보낸다 — 게스트 열람 허용하던 이전 동작을 없앤 것.
@@ -310,8 +328,16 @@ export default function GajiMarketApp() {
   // 버튼이 보이니 여기선 늘 secondary만 채운다. 대표를 바꾸고 싶으면 설정 화면 라디오로.
   // RegionSearchScreen이 이미 등록된 동네를 목록에서 빼주지만, 최근 동네 칩 등으로
   // 우회해서 들어올 수도 있어 여기서도 한 번 더 막는다(중복 등록 방지의 최종 관문).
-  function addNeighborhood(dongName: string) {
+  // 대표/2번째 동네를 서로 맞바꾼다 — 헤더의 동네 이름 더블클릭, 설정 화면 라디오 선택 둘 다 이걸 씀.
+  function swapNeighborhood(dongName: string) {
     if (dongName === activeNeighborhood) return;
+    setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
+    setActiveNeighborhood(dongName);
+  }
+
+  function addNeighborhood(dongName: string) {
+    // 이미 등록된 동네(대표든 2번째든)를 다시 고르면 아무 것도 안 한다 — 중복 등록 방지.
+    if (dongName === activeNeighborhood || dongName === secondaryNeighborhood) return;
     const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
@@ -328,7 +354,7 @@ export default function GajiMarketApp() {
       .then(setCategories)
       .catch((error: unknown) => console.error("카테고리 목록을 불러오지 못했습니다.", error));
   }, []);
-  const [communityTab, setCommunityTab] = useState("동네생활");
+  const [communityTab, setCommunityTab] = useState("전체");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
   const [mapCategory, setMapCategory] = useState<string>("food");
@@ -359,8 +385,17 @@ export default function GajiMarketApp() {
   // 당근페이 잔액 — 송금 화면 진입할 때마다 새로 받아온다(다른 채팅방에서 이미
   // 써버렸을 수 있어서 캐시하지 않음). null이면 아직 로딩 중.
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // 꿈방울(기부 가능 포인트) — 결제(일반결제 1%, 중고거래 0.1%·5,000원 이상)할 때마다
+  // 서버에서 자동 적립되니 여긴 조회만. My탭 "포인트" 배지에 씀.
+  const [dreamPoints, setDreamPoints] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
+  const [deleteCommunityTarget, setDeleteCommunityTarget] = useState<CommunityPost | null>(null);
+  const [reportCommunityTarget, setReportCommunityTarget] = useState<CommunityPost | null>(null);
+  const [communityReportReason, setCommunityReportReason] = useState("스팸/홍보");
+  const [communityComments, setCommunityComments] = useState<Record<string, CommunityComment[]>>({});
+  const [communityCommentsLoading, setCommunityCommentsLoading] = useState(false);
+  const [communityCommentDraft, setCommunityCommentDraft] = useState("");
 
   const openApartmentFlow = useCallback(() => {
     if (verifiedApartment) {
@@ -401,6 +436,20 @@ export default function GajiMarketApp() {
         console.error("잔액을 불러오지 못했습니다.", error);
       });
     return () => controller.abort();
+  }, [me]);
+
+  // 꿈방울 잔액 — 로그인 시점에 한 번 받아두고, 결제 성공(송금/QR결제) 직후 refreshDreamPoints로
+  // 다시 받아온다(적립은 서버가 결제와 같은 트랜잭션에서 처리하니 여긴 조회만).
+  const refreshDreamPoints = useCallback(() => {
+    getDreamPointsBalance()
+      .then(setDreamPoints)
+      .catch((error: unknown) => console.error("포인트를 불러오지 못했습니다.", error));
+  }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    refreshDreamPoints();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- me 바뀔 때만, refreshDreamPoints는 안정적
   }, [me]);
 
   // 서브페이지(상품 상세 등)로 들어갈 때마다 스크롤을 맨 위로 되돌린다 — 공유 스크롤
@@ -492,6 +541,20 @@ export default function GajiMarketApp() {
     syncTabFromHash();
     window.addEventListener("hashchange", syncTabFromHash);
     return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
+
+  // 결제 QR(=/carrot?pay=<storeId>)을 일반 카메라 앱으로 스캔해 브라우저로 바로 열었을 때도
+  // 같은 화면으로 들어오게 — 인앱 스캐너가 읽는 URL과 동일한 파라미터를 여기서도 본다.
+  useEffect(() => {
+    function openWalletPayFromQuery() {
+      const storeId = Number(new URLSearchParams(window.location.search).get("pay"));
+      if (Number.isInteger(storeId) && storeId > 0) {
+        setActiveTab("my");
+        setSubPage({ type: "wallet-pay", storeId });
+      }
+    }
+
+    openWalletPayFromQuery();
   }, []);
 
   useEffect(() => {
@@ -590,6 +653,67 @@ export default function GajiMarketApp() {
     return () => controller.abort();
   }, [regionsLoaded, refreshProducts]);
 
+  const refreshCommunityPosts = useCallback(
+    async (signal?: AbortSignal) => {
+      if (noRegionMatch) {
+        setPosts([]);
+        return;
+      }
+      const page = await listCommunityPosts({ page: 1, size: 60, regionId }, signal);
+      setPosts(page.items.map(toCommunityPost));
+    },
+    [noRegionMatch, regionId],
+  );
+
+  useEffect(() => {
+    if (!regionsLoaded) return;
+    const controller = new AbortController();
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshCommunityPosts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("커뮤니티 글 목록을 불러오지 못했습니다.", error);
+    });
+    return () => controller.abort();
+  }, [regionsLoaded, refreshCommunityPosts]);
+
+  useEffect(() => {
+    if (subPage?.type !== "community-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    const controller = new AbortController();
+    getCommunityPost(id, controller.signal)
+      .then((detail) => {
+        const post = toCommunityPost(detail);
+        setPosts((current) => {
+          const exists = current.some((item) => item.id === post.id);
+          return exists ? current.map((item) => (item.id === post.id ? post : item)) : [post, ...current];
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("커뮤니티 글 상세를 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [subPage]);
+
+  useEffect(() => {
+    if (subPage?.type !== "community-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    const controller = new AbortController();
+    setCommunityCommentsLoading(true);
+    listCommunityPostComments(id, controller.signal)
+      .then((page) => {
+        setCommunityComments((current) => ({ ...current, [subPage.id]: page.items }));
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("댓글을 불러오지 못했습니다.", error);
+      })
+      .finally(() => setCommunityCommentsLoading(false));
+    return () => controller.abort();
+  }, [subPage]);
+
   // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
   const loadMoreProducts = useCallback(() => {
     if (isLoadingMoreProducts || products.length >= productsTotal) return;
@@ -656,6 +780,8 @@ export default function GajiMarketApp() {
                 ...p,
                 description: detail.description ?? p.description,
                 tradePlace: detail.tradePlace,
+                tradePlaceLat: detail.tradePlaceLat,
+                tradePlaceLng: detail.tradePlaceLng,
                 sellerNickname: detail.sellerNickname,
                 sellerMannerTemp: detail.sellerMannerTemp,
                 // 홈 목록에서 바로 들어온 경우 mine=false로 깔려있어서(그 목록 API는
@@ -771,6 +897,7 @@ export default function GajiMarketApp() {
     setActiveTab(tab);
     setSubPage(null);
     setSheet(null);
+    setIsHomeActionMenuOpen(false);
     if (tab === "map") {
       setMapSheetState("half");
     }
@@ -1088,6 +1215,8 @@ export default function GajiMarketApp() {
         getWalletBalance()
           .then(setWalletBalance)
           .catch((error: unknown) => console.error("잔액을 갱신하지 못했습니다.", error));
+        // 중고거래 송금 0.1% 꿈방울 적립(5,000원 이상만) — 서버가 이미 적립해뒀으니 갱신만.
+        refreshDreamPoints();
         if (message.payment) {
           setSubPage({ type: "payment-detail", chatRoomId: chatId, transactionId: String(message.payment.transactionId) });
         } else {
@@ -1120,11 +1249,15 @@ export default function GajiMarketApp() {
       });
   }
 
-  function submitWalletPay(merchantName: string, amount: number) {
-    payByQr(merchantName, amount)
+  // 성공하면 true — WalletPayScreen이 이걸 보고 완료 화면으로 넘어간다(화면 전환은
+  // 거기서 자체적으로 처리하므로 여기선 subPage를 건드리지 않는다).
+  function submitWalletPay(storeId: number, amount: number): Promise<boolean> {
+    return payByQr(storeId, amount)
       .then((balance) => {
         setWalletBalance(balance);
-        setSubPage(null);
+        // 일반결제(QR) 1% 꿈방울 적립 — 서버가 이미 적립해뒀으니 갱신만.
+        refreshDreamPoints();
+        return true;
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
@@ -1133,6 +1266,7 @@ export default function GajiMarketApp() {
           console.error("결제하지 못했습니다.", error);
           alert(error instanceof Error ? error.message : "결제하지 못했습니다.");
         }
+        return false;
       });
   }
 
@@ -1175,6 +1309,14 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => console.error("이미지를 업로드하지 못했습니다.", error));
   }
 
+  // 지도 피커가 hidden input(tradePlaceLat/Lng)에 넣어둔 좌표 파싱 — 값이 없으면(옛 글 그대로
+  // 텍스트만 두거나 위치를 아예 안 고른 경우) undefined로, 서버에 좌표 없이 이름만 보낸다.
+  function readTradePlaceCoords(form: FormData) {
+    const lat = Number(form.get("tradePlaceLat"));
+    const lng = Number(form.get("tradePlaceLng"));
+    return { tradePlaceLat: Number.isFinite(lat) && lat !== 0 ? lat : undefined, tradePlaceLng: Number.isFinite(lng) && lng !== 0 ? lng : undefined };
+  }
+
   function submitProduct(event: FormEvent<HTMLFormElement>, imageFile: File | null) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1184,6 +1326,7 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
+    const { tradePlaceLat, tradePlaceLng } = readTradePlaceCoords(form);
 
     createProduct({
       title,
@@ -1192,6 +1335,8 @@ export default function GajiMarketApp() {
       desiredPrice: isFree ? null : Math.max(0, price),
       tradeType: isFree ? "FREE" : "SALE",
       tradePlace,
+      tradePlaceLat,
+      tradePlaceLng,
     })
       .then(({ id }) => {
         const newProduct: ProductListItem = {
@@ -1215,6 +1360,8 @@ export default function GajiMarketApp() {
           category,
           description,
           tradePlace,
+          tradePlaceLat,
+          tradePlaceLng,
         };
 
         setProducts((current) => [newProduct, ...current]);
@@ -1222,13 +1369,9 @@ export default function GajiMarketApp() {
         // 글도 새로고침 없이 바로 보이게 여기도 같이 반영.
         setMyProducts((current) => [newProduct, ...current]);
         attachImageIfAny(String(id), imageFile);
-        if (isFree) {
-          setActiveTab("my");
-          setSubPage({ type: "sales" });
-        } else {
-          const params = new URLSearchParams({ title, price: String(Math.max(0, price)), productId: String(id) });
-          router.push(`/analysis?${params.toString()}`);
-        }
+        // 등록 완료 후 가격비교/애널리틱스로 이탈하지 않고 즉시 당근 사이트(물품 상세/홈)로 복귀
+        setActiveTab("home");
+        setSubPage({ type: "product-detail", id: String(id) });
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
@@ -1248,6 +1391,7 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
+    const { tradePlaceLat, tradePlaceLng } = readTradePlaceCoords(form);
 
     updateProduct(Number(productId), {
       title,
@@ -1255,6 +1399,8 @@ export default function GajiMarketApp() {
       description,
       desiredPrice: isFree ? null : Math.max(0, price),
       tradePlace,
+      tradePlaceLat,
+      tradePlaceLng,
     })
       .then(() => {
         const patch = (p: ProductListItem) =>
@@ -1268,6 +1414,8 @@ export default function GajiMarketApp() {
                 price: isFree ? null : Math.max(0, price),
                 tradeType: isFree ? ("FREE" as const) : ("SALE" as const),
                 tradePlace,
+                tradePlaceLat,
+                tradePlaceLng,
               }
             : p;
         setProducts((current) => current.map(patch));
@@ -1284,6 +1432,29 @@ export default function GajiMarketApp() {
       });
   }
 
+  // 확인(window.confirm)은 ProductDetailScreen에서 이미 받고 호출한다.
+  function deleteMyProduct(productId: string) {
+    const numericId = Number(productId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteProduct(numericId)
+      .then(() => {
+        setProducts((current) => current.filter((p) => p.id !== productId));
+        setMyProducts((current) => current.filter((p) => p.id !== productId));
+        setFavoriteProducts((current) => current.filter((p) => p.id !== productId));
+        setRecentlyViewedProducts((current) => current.filter((p) => p.id !== productId));
+        goBack();
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
   function submitCommunityPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1291,21 +1462,166 @@ export default function GajiMarketApp() {
     const content = String(form.get("content") ?? "").trim();
     const category = String(form.get("category") ?? "일반");
 
-    const post: CommunityPost = {
-      id: `cpost${Date.now()}`,
-      categoryName: category,
-      title,
-      contentPreview: content,
-      neighborhoodName: activeNeighborhood,
-      createdAt: "방금 전",
-      viewCount: 0,
-      commentCount: 0,
-      reactionCount: 0,
-    };
+    createCommunityPost({ category, title, content })
+      .then(() => refreshCommunityPosts())
+      .then(() => {
+        setActiveTab("community");
+        setCommunityTab("전체");
+        setCommunityFilter("추천");
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 등록하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 등록하지 못했습니다.");
+        }
+      });
+  }
 
-    setPosts((current) => [post, ...current]);
-    setActiveTab("community");
-    setSubPage(null);
+  function submitCommunityPostEdit(event: FormEvent<HTMLFormElement>, postId: string) {
+    event.preventDefault();
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+    const form = new FormData(event.currentTarget);
+    const title = String(form.get("title") ?? "").trim();
+    const content = String(form.get("content") ?? "").trim();
+    const category = String(form.get("category") ?? "일반");
+
+    updateCommunityPost(numericId, { category, title, content })
+      .then((updated) => {
+        const post = toCommunityPost(updated);
+        setPosts((current) => current.map((item) => (item.id === postId ? post : item)));
+        return refreshCommunityPosts().then(() => post);
+      })
+      .then(() => {
+        setSubPage({ type: "community-detail", id: postId });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 수정하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 수정하지 못했습니다.");
+        }
+      });
+  }
+
+  function confirmDeleteCommunityPost() {
+    if (!deleteCommunityTarget) return;
+    const postId = deleteCommunityTarget.id;
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteCommunityPost(numericId)
+      .then(() => {
+        setPosts((current) => current.filter((post) => post.id !== postId));
+        setDeleteCommunityTarget(null);
+        if (subPage?.type === "community-detail" && subPage.id === postId) setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitCommunityReport() {
+    if (!reportCommunityTarget) return;
+    const numericId = Number(reportCommunityTarget.id);
+    if (!Number.isFinite(numericId)) return;
+
+    reportUser({ targetType: "COMMUNITY_POST", targetId: numericId, reason: communityReportReason })
+      .then(() => {
+        setReportCommunityTarget(null);
+        alert("신고가 접수되었습니다.");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("신고 접수에 실패했습니다.", error);
+          alert("신고 접수에 실패했습니다.");
+        }
+      });
+  }
+
+  function toggleCommunityEmotion(postId: string) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    toggleCommunityPostEmotion(numericId)
+      .then(({ reacted, reactionCount }) => {
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === postId ? { ...post, isReacted: reacted, reactionCount } : post,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("공감 상태를 변경하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "공감 상태를 변경하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitCommunityComment(event: FormEvent<HTMLFormElement>, postId: string) {
+    event.preventDefault();
+    const numericId = Number(postId);
+    const content = communityCommentDraft.trim();
+    if (!Number.isFinite(numericId) || !content) return;
+
+    createCommunityPostComment(numericId, content)
+      .then(({ comment, commentCount }) => {
+        setCommunityComments((current) => ({ ...current, [postId]: [...(current[postId] ?? []), comment] }));
+        setPosts((current) =>
+          current.map((post) => (post.id === postId ? { ...post, commentCount } : post)),
+        );
+        setCommunityCommentDraft("");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("댓글을 등록하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "댓글을 등록하지 못했습니다.");
+        }
+      });
+  }
+
+  function removeCommunityComment(postId: string, commentId: number) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteCommunityPostComment(numericId, commentId)
+      .then(() => listCommunityPostComments(numericId))
+      .then((page) => {
+        setCommunityComments((current) => ({ ...current, [postId]: page.items }));
+        setPosts((current) =>
+          current.map((post) => (post.id === postId ? { ...post, commentCount: page.total } : post)),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("댓글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "댓글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
+  // 동네생활 글은 백엔드가 없는 로컬 mock이라 서버 호출 없이 posts 목록에서만 제거한다.
+  function deleteMyPost(postId: string) {
+    setPosts((current) => current.filter((p) => p.id !== postId));
+    goBack();
   }
 
   
@@ -1368,7 +1684,7 @@ export default function GajiMarketApp() {
       ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
       : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
     subPage?.type === "dream-dashboard" ||
     subPage?.type === "dream-notice" ||
@@ -1430,6 +1746,7 @@ export default function GajiMarketApp() {
                 setProducts((prev) => prev.filter((p) => p.id !== id));
               }}
               onEdit={(id) => setSubPage({ type: "product-form", editId: id })}
+              onDelete={deleteMyProduct}
             />
           ) : subPage?.type === "product-form" ? (
             <ProductFormScreen
@@ -1443,9 +1760,34 @@ export default function GajiMarketApp() {
               }
             />
           ) : subPage?.type === "community-detail" && selectedPost ? (
-            <CommunityDetailScreen post={selectedPost} onBack={goBack} />
+            <CommunityDetailScreen
+              post={selectedPost}
+              currentUserId={me?.id}
+              onBack={goBack}
+              onEdit={() => setSubPage({ type: "community-form", editId: selectedPost.id })}
+              onDelete={() => setDeleteCommunityTarget(selectedPost)}
+              onReport={() => {
+                setCommunityReportReason("?ㅽ뙵/?띾낫");
+                setReportCommunityTarget(selectedPost);
+              }}
+              comments={communityComments[selectedPost.id] ?? []}
+              commentsLoading={communityCommentsLoading}
+              commentDraft={communityCommentDraft}
+              onCommentDraftChange={setCommunityCommentDraft}
+              onToggleEmotion={() => toggleCommunityEmotion(selectedPost.id)}
+              onSubmitComment={(event) => submitCommunityComment(event, selectedPost.id)}
+              onDeleteComment={(commentId) => removeCommunityComment(selectedPost.id, commentId)}
+            />
           ) : subPage?.type === "community-form" ? (
-            <CommunityFormScreen onBack={goBack} onSubmit={submitCommunityPost} />
+            <CommunityFormScreen
+              onBack={goBack}
+              initialPost={subPage.editId ? posts.find((post) => post.id === subPage.editId) : undefined}
+              onSubmit={
+                subPage.editId
+                  ? (event) => submitCommunityPostEdit(event, subPage.editId!)
+                  : submitCommunityPost
+              }
+            />
           ) : subPage?.type === "together-intro" ? (
             <TogetherIntroView
               onBack={goBack}
@@ -1515,7 +1857,12 @@ export default function GajiMarketApp() {
           ) : subPage?.type === "wallet-charge" ? (
             <WalletChargeScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletCharge} />
           ) : subPage?.type === "wallet-pay" ? (
-            <WalletPayScreen balance={walletBalance} onBack={goBack} onSubmit={submitWalletPay} />
+            <WalletPayScreen
+              initialStoreId={subPage.storeId}
+              balance={walletBalance}
+              onBack={goBack}
+              onSubmit={submitWalletPay}
+            />
           ) : subPage?.type === "chat-room-list" ? (
             <ChatsScreen
               rooms={productChatRooms}
@@ -1608,11 +1955,19 @@ export default function GajiMarketApp() {
               theme={theme}
               onThemeChange={changeTheme}
               onBack={goBack}
+              activeNeighborhood={activeNeighborhood}
+              onOpenNeighborhood={() => setSubPage({ type: "region-search", returnTo: "settings" })}
               locationAllowed={locationAllowed}
               onLocationToggle={() => setLocationAllowed((value) => !value)}
               onLogout={handleLogout}
               onWithdraw={handleWithdraw}
+              onOpenSupport={() => setSubPage({ type: "customer-support" })}
+              onOpenNotice={() => setSubPage({ type: "carrot-notice" })}
             />
+          ) : subPage?.type === "carrot-notice" ? (
+            <CarrotNoticeScreen onBack={() => setSubPage({ type: "settings" })} />
+          ) : subPage?.type === "customer-support" ? (
+            <CustomerSupportScreen onBack={() => setSubPage({ type: "settings" })} />
           ) : subPage?.type === "sales" ? (
             <ManagementScreen
               title="판매관리"
@@ -1651,7 +2006,7 @@ export default function GajiMarketApp() {
             <RegionSearchScreen
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
-              excludedNeighborhoods={[activeNeighborhood]}
+              excludedNeighborhoods={secondaryNeighborhood ? [activeNeighborhood, secondaryNeighborhood] : [activeNeighborhood]}
               onBack={() => {
                 setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");
@@ -1678,6 +2033,7 @@ export default function GajiMarketApp() {
                   hasMore={products.length < productsTotal}
                   isLoadingMore={isLoadingMoreProducts}
                   onOpenRegion={() => setSheet("region")}
+                  onSwapNeighborhood={swapNeighborhood}
                   onOpenSearch={() => setSubPage({ type: "search" })}
                   onOpenNotifications={() => setSheet("notifications")}
                   onOpenMenu={() => {
@@ -1720,6 +2076,13 @@ export default function GajiMarketApp() {
                     setSubPage({ type: "settings" });
                   }}
                   onPostClick={(id) => setSubPage({ type: "community-detail", id })}
+                  onPostEdit={(id) => setSubPage({ type: "community-form", editId: id })}
+                  onPostDelete={setDeleteCommunityTarget}
+                  onPostReport={(post) => {
+                    setCommunityReportReason("스팸/홍보");
+                    setReportCommunityTarget(post);
+                  }}
+                  currentUserId={me?.id}
                   verifiedApartment={verifiedApartment}
                   onOpenApartment={openApartmentFlow}
                   activeNeighborhood={activeNeighborhood}
@@ -1768,6 +2131,7 @@ export default function GajiMarketApp() {
                   favoriteCount={favoriteProducts.length}
                   myProducts={myProducts}
                   walletBalance={walletBalance}
+                  dreamPoints={dreamPoints}
                   onOpenSettings={() => setSubPage({ type: "settings" })}
                   onOpenMenu={() => setSubPage({ type: "my-menu" })}
                   onOpenAllServices={() => setSubPage({ type: "all-services" })}
@@ -1786,21 +2150,73 @@ export default function GajiMarketApp() {
         </main>
 
         {!subPage && (activeTab === "home" || activeTab === "community" || (activeTab === "map" && mapSheetState === "expanded")) && (
-          <FloatingWriteButton
-            showTogetherTooltip={activeTab === "community"}
-            onTooltipClick={() => setSubPage({ type: "together-intro" })}
-            onClick={() => {
-              if (activeTab === "community") {
-                if (communityTab === "같이해요") {
-                  setSubPage({ type: "together-intro" });
+          activeTab === "home" ? (
+            <HomeFloatingActionMenu
+              isOpen={isHomeActionMenuOpen}
+              onToggle={() => setIsHomeActionMenuOpen((prev) => !prev)}
+              onClose={() => setIsHomeActionMenuOpen(false)}
+              onSellMyProduct={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "product-form" });
+              }}
+              onSellMultipleProducts={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "product-form" });
+                setToastMessage("'여러 물건 팔기' 모드로 글을 작성할 수 있어요.");
+              }}
+              onOpenAlba={() => {
+                setIsHomeActionMenuOpen(false);
+                setSubPage({ type: "alba" });
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenRealEstate={() => {
+                setIsHomeActionMenuOpen(false);
+                openRealEstate();
+              }}
+              onOpenCommunity={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("전체");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenTogether={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("같이해요");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+              onOpenStory={() => {
+                setIsHomeActionMenuOpen(false);
+                setActiveTab("community");
+                setCommunityTab("자유 주제");
+                window.requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                });
+              }}
+            />
+          ) : (
+            <FloatingWriteButton
+              showTogetherTooltip={activeTab === "community"}
+              onTooltipClick={() => setSubPage({ type: "together-intro" })}
+              onClick={() => {
+                if (activeTab === "community") {
+                  if (communityTab === "같이해요") {
+                    setSubPage({ type: "together-intro" });
+                  } else {
+                    setSubPage({ type: "community-form" });
+                  }
                 } else {
-                  setSubPage({ type: "community-form" });
+                  setSheet("write");
                 }
-              } else {
-                setSheet("write");
-              }
-            }}
-          />
+              }}
+            />
+          )
         )}
 
         {showBottomNav && (
@@ -1813,8 +2229,7 @@ export default function GajiMarketApp() {
           secondaryNeighborhood={secondaryNeighborhood}
           onClose={() => setSheet(null)}
           onSelectPrimary={(dongName) => {
-            setSecondaryNeighborhood(activeNeighborhood === dongName ? secondaryNeighborhood : activeNeighborhood);
-            setActiveNeighborhood(dongName);
+            swapNeighborhood(dongName);
             setSheet(null);
           }}
           onRemoveNeighborhood={(target) => {
@@ -1848,9 +2263,45 @@ export default function GajiMarketApp() {
           }}
           totalUnread={totalUnread}
         />
+        {deleteCommunityTarget && (
+          <div className={styles.communityDialogLayer}>
+            <button type="button" className={styles.communityDialogBackdrop} onClick={() => setDeleteCommunityTarget(null)} />
+            <section className={styles.communityDialog} role="dialog" aria-modal="true" aria-labelledby="community-delete-title">
+              <h3 id="community-delete-title">게시글을 삭제하시겠어요?</h3>
+              <p>삭제한 게시글은 커뮤니티 목록에서 보이지 않습니다.</p>
+              <div className={styles.communityDialogActions}>
+                <button type="button" onClick={() => setDeleteCommunityTarget(null)}>취소</button>
+                <button type="button" className={styles.communityDialogDanger} onClick={confirmDeleteCommunityPost}>삭제</button>
+              </div>
+            </section>
+          </div>
+        )}
+        {reportCommunityTarget && (
+          <div className={styles.communityDialogLayer}>
+            <button type="button" className={styles.communityDialogBackdrop} onClick={() => setReportCommunityTarget(null)} />
+            <section className={styles.communityDialog} role="dialog" aria-modal="true" aria-labelledby="community-report-title">
+              <h3 id="community-report-title">신고 사유를 선택해주세요</h3>
+              <div className={styles.reportReasonList}>
+                {COMMUNITY_REPORT_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={`${styles.reportReasonItem} ${communityReportReason === reason ? styles.reportReasonItemSelected : ""}`}
+                    onClick={() => setCommunityReportReason(reason)}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.communityDialogActions}>
+                <button type="button" onClick={() => setReportCommunityTarget(null)}>취소</button>
+                <button type="button" className={styles.communityDialogDanger} onClick={submitCommunityReport}>신고 제출</button>
+              </div>
+            </section>
+          </div>
+        )}
         {toastMessage && <div className={styles.toast}>{toastMessage}</div>}
       </div>
     </div>
   );
 }
-

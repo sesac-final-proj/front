@@ -23,7 +23,11 @@ export function ProductFormScreen({
   const isEdit = Boolean(initialProduct);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialProduct?.thumbnailUrl ?? null);
   const imageFileRef = useRef<File | null>(null);
-  const [tradePlace, setTradePlace] = useState<string | undefined>(initialProduct?.tradePlace);
+  const [tradePlace, setTradePlace] = useState<{ name: string; lat?: number; lng?: number } | undefined>(
+    initialProduct?.tradePlace
+      ? { name: initialProduct.tradePlace, lat: initialProduct.tradePlaceLat, lng: initialProduct.tradePlaceLng }
+      : undefined,
+  );
   const [showPlacePicker, setShowPlacePicker] = useState(false);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -96,7 +100,9 @@ export function ProductFormScreen({
             required
           />
         </label>
-        <input type="hidden" name="tradePlace" value={tradePlace ?? ""} />
+        <input type="hidden" name="tradePlace" value={tradePlace?.name ?? ""} />
+        <input type="hidden" name="tradePlaceLat" value={tradePlace?.lat ?? ""} />
+        <input type="hidden" name="tradePlaceLng" value={tradePlace?.lng ?? ""} />
         <span className={styles.formSectionLabel}>거래 설정</span>
         <button
           type="button"
@@ -105,38 +111,21 @@ export function ProductFormScreen({
         >
           <span>거래 희망 장소</span>
           <span className={styles.tradePlaceRowValue}>
-            {tradePlace || "위치 추가"}
+            {tradePlace?.name || "위치 추가"}
             <ChevronRight size={20} />
           </span>
         </button>
-        {!isEdit && (
-          <button
-            type="button"
-            className={styles.marketAnalysisButton}
-            onClick={(event) => {
-              const form = event.currentTarget.form;
-              if (!form) return;
-              const values = new FormData(form);
-              const title = String(values.get("title") ?? "").trim();
-              const price = String(values.get("price") ?? "").trim();
-              const params = new URLSearchParams({ title, price });
-              window.open(`/analysis?${params.toString()}`, "_blank", "noopener,noreferrer");
-            }}
-          >
-            외부 시세와 먼저 비교
-          </button>
-        )}
         <button type="submit" className={styles.primaryButton}>
           {isEdit ? "수정하기" : "등록하기"}
         </button>
       </form>
       {showPlacePicker && (
         <TradePlacePickerScreen
-          initialLat={initialCenter?.lat}
-          initialLng={initialCenter?.lng}
+          initialLat={tradePlace?.lat ?? initialCenter?.lat}
+          initialLng={tradePlace?.lng ?? initialCenter?.lng}
           onCancel={() => setShowPlacePicker(false)}
           onConfirm={(place) => {
-            setTradePlace(place.name);
+            setTradePlace(place);
             setShowPlacePicker(false);
           }}
         />

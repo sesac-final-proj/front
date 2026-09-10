@@ -25,20 +25,28 @@ export interface SettingsScreenProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
   onBack: () => void;
+  activeNeighborhood: string;
+  onOpenNeighborhood: () => void;
   locationAllowed: boolean;
   onLocationToggle: () => void;
   onLogout: () => void;
   onWithdraw: () => void;
+  onOpenSupport: () => void;
+  onOpenNotice: () => void;
 }
 
 export function SettingsScreen({
   theme,
   onThemeChange,
   onBack,
+  activeNeighborhood,
+  onOpenNeighborhood,
   locationAllowed,
   onLocationToggle,
   onLogout,
   onWithdraw,
+  onOpenSupport,
+  onOpenNotice,
 }: SettingsScreenProps) {
   return (
     <section className={styles.screen}>
@@ -66,7 +74,7 @@ export function SettingsScreen({
       <MenuCard
         title="설정"
         items={[
-          { label: "내 동네 설정", icon: MapPinned },
+          { label: "내 동네 설정", icon: MapPinned, trailing: activeNeighborhood, onClick: onOpenNeighborhood },
           { label: locationAllowed ? "동네 인증됨" : "동네 인증하기", icon: Crosshair, trailing: locationAllowed ? "ON" : "OFF" },
           { label: "QR 코드 스캔", icon: QrCode },
           { label: "앱 설정", icon: Settings },
@@ -81,8 +89,8 @@ export function SettingsScreen({
       <MenuCard
         title="고객지원"
         items={[
-          { label: "공지사항", icon: Bell },
-          { label: "고객센터", icon: Headphones },
+          { label: "공지사항", icon: Bell, onClick: onOpenNotice },
+          { label: "고객센터", icon: Headphones, onClick: onOpenSupport },
           { label: "의견 남기기", icon: Mail },
           { label: "로그아웃", icon: LogOut, onClick: onLogout },
           { label: "탈퇴하기", icon: X, onClick: onWithdraw },

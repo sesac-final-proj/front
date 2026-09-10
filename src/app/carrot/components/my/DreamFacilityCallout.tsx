@@ -34,8 +34,8 @@ export function DreamFacilityCallout({
         </div>
       )}
       <dl className={styles.dreamFacilityCalloutDetails}>
-        <div><dt>주소</dt><dd>{facility.address}</dd></div>
-        {facility.phone && <div><dt>전화</dt><dd>{facility.phone}</dd></div>}
+        <div><dt>주소</dt><dd>{facility.address || "주소 정보 미제공"}</dd></div>
+        <div><dt>전화</dt><dd>{facility.phone ? <a href={`tel:${facility.phone}`}>{facility.phone}</a> : "전화번호 미제공"}</dd></div>
         {facility.establishedDate && <div><dt>인허가일</dt><dd>{facility.establishedDate}</dd></div>}
         {facility.operationStatus && <div><dt>운영 상태</dt><dd>{facility.operationStatus}</dd></div>}
       </dl>
