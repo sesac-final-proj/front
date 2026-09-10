@@ -82,6 +82,15 @@ import {
   uploadProductImage,
   listCategories,
   deleteProduct,
+  listCommunityPosts,
+  getCommunityPost,
+  createCommunityPost,
+  updateCommunityPost,
+  deleteCommunityPost,
+  toggleCommunityPostEmotion,
+  listCommunityPostComments,
+  createCommunityPostComment,
+  deleteCommunityPostComment,
 } from "@/services";
 import {
   createOrGetChatRoom,
@@ -105,6 +114,7 @@ import type {
   CreateTogetherPostInput,
   Me,
 } from "@/types";
+import type { CommunityComment } from "@/types/community";
 import type {
   AlbaItem,
   ChatMessageUi,
@@ -146,6 +156,7 @@ import {
   toChatRoomUi,
   toDangerBusiness,
   toProductListItem,
+  toCommunityPost,
   writeNeighborhoodCache,
 } from "./utils";
 
@@ -161,6 +172,7 @@ interface ProductFilters {
 }
 
 const DEFAULT_PRODUCT_FILTERS: ProductFilters = { sort: "latest" };
+const COMMUNITY_REPORT_REASONS = ["스팸/홍보", "욕설/비방", "음란하거나 부적절한 내용", "사기/허위 정보", "기타"];
 
 function hasActiveProductFilters(filters: ProductFilters): boolean {
   return (
@@ -340,7 +352,7 @@ export default function GajiMarketApp() {
       .then(setCategories)
       .catch((error: unknown) => console.error("카테고리 목록을 불러오지 못했습니다.", error));
   }, []);
-  const [communityTab, setCommunityTab] = useState("동네생활");
+  const [communityTab, setCommunityTab] = useState("전체");
   const [communityFilter, setCommunityFilter] = useState("추천");
   const [chatFilter, setChatFilter] = useState("전체");
   const [mapCategory, setMapCategory] = useState<string>("food");
@@ -376,6 +388,12 @@ export default function GajiMarketApp() {
   const [dreamPoints, setDreamPoints] = useState<number | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [verifiedApartment, setVerifiedApartment] = useState<string | null>(null);
+  const [deleteCommunityTarget, setDeleteCommunityTarget] = useState<CommunityPost | null>(null);
+  const [reportCommunityTarget, setReportCommunityTarget] = useState<CommunityPost | null>(null);
+  const [communityReportReason, setCommunityReportReason] = useState("스팸/홍보");
+  const [communityComments, setCommunityComments] = useState<Record<string, CommunityComment[]>>({});
+  const [communityCommentsLoading, setCommunityCommentsLoading] = useState(false);
+  const [communityCommentDraft, setCommunityCommentDraft] = useState("");
 
   const openApartmentFlow = useCallback(() => {
     if (verifiedApartment) {
@@ -632,6 +650,67 @@ export default function GajiMarketApp() {
     });
     return () => controller.abort();
   }, [regionsLoaded, refreshProducts]);
+
+  const refreshCommunityPosts = useCallback(
+    async (signal?: AbortSignal) => {
+      if (noRegionMatch) {
+        setPosts([]);
+        return;
+      }
+      const page = await listCommunityPosts({ page: 1, size: 60, regionId }, signal);
+      setPosts(page.items.map(toCommunityPost));
+    },
+    [noRegionMatch, regionId],
+  );
+
+  useEffect(() => {
+    if (!regionsLoaded) return;
+    const controller = new AbortController();
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    refreshCommunityPosts(controller.signal).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("커뮤니티 글 목록을 불러오지 못했습니다.", error);
+    });
+    return () => controller.abort();
+  }, [regionsLoaded, refreshCommunityPosts]);
+
+  useEffect(() => {
+    if (subPage?.type !== "community-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    const controller = new AbortController();
+    getCommunityPost(id, controller.signal)
+      .then((detail) => {
+        const post = toCommunityPost(detail);
+        setPosts((current) => {
+          const exists = current.some((item) => item.id === post.id);
+          return exists ? current.map((item) => (item.id === post.id ? post : item)) : [post, ...current];
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("커뮤니티 글 상세를 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [subPage]);
+
+  useEffect(() => {
+    if (subPage?.type !== "community-detail") return;
+    const id = Number(subPage.id);
+    if (!Number.isFinite(id)) return;
+    const controller = new AbortController();
+    setCommunityCommentsLoading(true);
+    listCommunityPostComments(id, controller.signal)
+      .then((page) => {
+        setCommunityComments((current) => ({ ...current, [subPage.id]: page.items }));
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("댓글을 불러오지 못했습니다.", error);
+      })
+      .finally(() => setCommunityCommentsLoading(false));
+    return () => controller.abort();
+  }, [subPage]);
 
   // 무한스크롤: 홈 피드 바닥에 닿으면 다음 페이지를 이어붙인다.
   const loadMoreProducts = useCallback(() => {
@@ -1361,21 +1440,166 @@ export default function GajiMarketApp() {
     const content = String(form.get("content") ?? "").trim();
     const category = String(form.get("category") ?? "일반");
 
-    const post: CommunityPost = {
-      id: `cpost${Date.now()}`,
-      categoryName: category,
-      title,
-      contentPreview: content,
-      neighborhoodName: activeNeighborhood,
-      createdAt: "방금 전",
-      viewCount: 0,
-      commentCount: 0,
-      reactionCount: 0,
-    };
+    createCommunityPost({ category, title, content })
+      .then(() => refreshCommunityPosts())
+      .then(() => {
+        setActiveTab("community");
+        setCommunityTab("전체");
+        setCommunityFilter("추천");
+        setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 등록하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 등록하지 못했습니다.");
+        }
+      });
+  }
 
-    setPosts((current) => [post, ...current]);
-    setActiveTab("community");
-    setSubPage(null);
+  function submitCommunityPostEdit(event: FormEvent<HTMLFormElement>, postId: string) {
+    event.preventDefault();
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+    const form = new FormData(event.currentTarget);
+    const title = String(form.get("title") ?? "").trim();
+    const content = String(form.get("content") ?? "").trim();
+    const category = String(form.get("category") ?? "일반");
+
+    updateCommunityPost(numericId, { category, title, content })
+      .then((updated) => {
+        const post = toCommunityPost(updated);
+        setPosts((current) => current.map((item) => (item.id === postId ? post : item)));
+        return refreshCommunityPosts().then(() => post);
+      })
+      .then(() => {
+        setSubPage({ type: "community-detail", id: postId });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 수정하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 수정하지 못했습니다.");
+        }
+      });
+  }
+
+  function confirmDeleteCommunityPost() {
+    if (!deleteCommunityTarget) return;
+    const postId = deleteCommunityTarget.id;
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteCommunityPost(numericId)
+      .then(() => {
+        setPosts((current) => current.filter((post) => post.id !== postId));
+        setDeleteCommunityTarget(null);
+        if (subPage?.type === "community-detail" && subPage.id === postId) setSubPage(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("커뮤니티 글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "커뮤니티 글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitCommunityReport() {
+    if (!reportCommunityTarget) return;
+    const numericId = Number(reportCommunityTarget.id);
+    if (!Number.isFinite(numericId)) return;
+
+    reportUser({ targetType: "COMMUNITY_POST", targetId: numericId, reason: communityReportReason })
+      .then(() => {
+        setReportCommunityTarget(null);
+        alert("신고가 접수되었습니다.");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("신고 접수에 실패했습니다.", error);
+          alert("신고 접수에 실패했습니다.");
+        }
+      });
+  }
+
+  function toggleCommunityEmotion(postId: string) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    toggleCommunityPostEmotion(numericId)
+      .then(({ reacted, reactionCount }) => {
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === postId ? { ...post, isReacted: reacted, reactionCount } : post,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("공감 상태를 변경하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "공감 상태를 변경하지 못했습니다.");
+        }
+      });
+  }
+
+  function submitCommunityComment(event: FormEvent<HTMLFormElement>, postId: string) {
+    event.preventDefault();
+    const numericId = Number(postId);
+    const content = communityCommentDraft.trim();
+    if (!Number.isFinite(numericId) || !content) return;
+
+    createCommunityPostComment(numericId, content)
+      .then(({ comment, commentCount }) => {
+        setCommunityComments((current) => ({ ...current, [postId]: [...(current[postId] ?? []), comment] }));
+        setPosts((current) =>
+          current.map((post) => (post.id === postId ? { ...post, commentCount } : post)),
+        );
+        setCommunityCommentDraft("");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("댓글을 등록하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "댓글을 등록하지 못했습니다.");
+        }
+      });
+  }
+
+  function removeCommunityComment(postId: string, commentId: number) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+
+    deleteCommunityPostComment(numericId, commentId)
+      .then(() => listCommunityPostComments(numericId))
+      .then((page) => {
+        setCommunityComments((current) => ({ ...current, [postId]: page.items }));
+        setPosts((current) =>
+          current.map((post) => (post.id === postId ? { ...post, commentCount: page.total } : post)),
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AuthRequiredError) {
+          router.replace("/onboarding");
+        } else {
+          console.error("댓글을 삭제하지 못했습니다.", error);
+          alert(error instanceof Error ? error.message : "댓글을 삭제하지 못했습니다.");
+        }
+      });
+  }
+
+  // 동네생활 글은 백엔드가 없는 로컬 mock이라 서버 호출 없이 posts 목록에서만 제거한다.
+  function deleteMyPost(postId: string) {
+    setPosts((current) => current.filter((p) => p.id !== postId));
+    goBack();
   }
 
   
@@ -1514,9 +1738,34 @@ export default function GajiMarketApp() {
               }
             />
           ) : subPage?.type === "community-detail" && selectedPost ? (
-            <CommunityDetailScreen post={selectedPost} onBack={goBack} />
+            <CommunityDetailScreen
+              post={selectedPost}
+              currentUserId={me?.id}
+              onBack={goBack}
+              onEdit={() => setSubPage({ type: "community-form", editId: selectedPost.id })}
+              onDelete={() => setDeleteCommunityTarget(selectedPost)}
+              onReport={() => {
+                setCommunityReportReason("?ㅽ뙵/?띾낫");
+                setReportCommunityTarget(selectedPost);
+              }}
+              comments={communityComments[selectedPost.id] ?? []}
+              commentsLoading={communityCommentsLoading}
+              commentDraft={communityCommentDraft}
+              onCommentDraftChange={setCommunityCommentDraft}
+              onToggleEmotion={() => toggleCommunityEmotion(selectedPost.id)}
+              onSubmitComment={(event) => submitCommunityComment(event, selectedPost.id)}
+              onDeleteComment={(commentId) => removeCommunityComment(selectedPost.id, commentId)}
+            />
           ) : subPage?.type === "community-form" ? (
-            <CommunityFormScreen onBack={goBack} onSubmit={submitCommunityPost} />
+            <CommunityFormScreen
+              onBack={goBack}
+              initialPost={subPage.editId ? posts.find((post) => post.id === subPage.editId) : undefined}
+              onSubmit={
+                subPage.editId
+                  ? (event) => submitCommunityPostEdit(event, subPage.editId!)
+                  : submitCommunityPost
+              }
+            />
           ) : subPage?.type === "together-intro" ? (
             <TogetherIntroView
               onBack={goBack}
@@ -1800,6 +2049,13 @@ export default function GajiMarketApp() {
                     setSubPage({ type: "settings" });
                   }}
                   onPostClick={(id) => setSubPage({ type: "community-detail", id })}
+                  onPostEdit={(id) => setSubPage({ type: "community-form", editId: id })}
+                  onPostDelete={setDeleteCommunityTarget}
+                  onPostReport={(post) => {
+                    setCommunityReportReason("스팸/홍보");
+                    setReportCommunityTarget(post);
+                  }}
+                  currentUserId={me?.id}
                   verifiedApartment={verifiedApartment}
                   onOpenApartment={openApartmentFlow}
                   activeNeighborhood={activeNeighborhood}
@@ -1980,6 +2236,43 @@ export default function GajiMarketApp() {
           }}
           totalUnread={totalUnread}
         />
+        {deleteCommunityTarget && (
+          <div className={styles.communityDialogLayer}>
+            <button type="button" className={styles.communityDialogBackdrop} onClick={() => setDeleteCommunityTarget(null)} />
+            <section className={styles.communityDialog} role="dialog" aria-modal="true" aria-labelledby="community-delete-title">
+              <h3 id="community-delete-title">게시글을 삭제하시겠어요?</h3>
+              <p>삭제한 게시글은 커뮤니티 목록에서 보이지 않습니다.</p>
+              <div className={styles.communityDialogActions}>
+                <button type="button" onClick={() => setDeleteCommunityTarget(null)}>취소</button>
+                <button type="button" className={styles.communityDialogDanger} onClick={confirmDeleteCommunityPost}>삭제</button>
+              </div>
+            </section>
+          </div>
+        )}
+        {reportCommunityTarget && (
+          <div className={styles.communityDialogLayer}>
+            <button type="button" className={styles.communityDialogBackdrop} onClick={() => setReportCommunityTarget(null)} />
+            <section className={styles.communityDialog} role="dialog" aria-modal="true" aria-labelledby="community-report-title">
+              <h3 id="community-report-title">신고 사유를 선택해주세요</h3>
+              <div className={styles.reportReasonList}>
+                {COMMUNITY_REPORT_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={`${styles.reportReasonItem} ${communityReportReason === reason ? styles.reportReasonItemSelected : ""}`}
+                    onClick={() => setCommunityReportReason(reason)}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.communityDialogActions}>
+                <button type="button" onClick={() => setReportCommunityTarget(null)}>취소</button>
+                <button type="button" className={styles.communityDialogDanger} onClick={submitCommunityReport}>신고 제출</button>
+              </div>
+            </section>
+          </div>
+        )}
         {toastMessage && <div className={styles.toast}>{toastMessage}</div>}
       </div>
     </div>

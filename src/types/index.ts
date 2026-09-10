@@ -1,5 +1,6 @@
 // Types Barrel Export (모듈 재수출)
 export * from "./trade";
+export * from "./community";
 export * from "./together";
 export * from "./realEstate";
 export * from "@/app/carrot/types";
