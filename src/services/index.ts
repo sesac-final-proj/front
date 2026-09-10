@@ -8,3 +8,4 @@ export * from "./restaurantService";
 export * from "./togetherService";
 export * from "./tradeService";
 export * from "./supportService";
+export * from "./noticeService";
