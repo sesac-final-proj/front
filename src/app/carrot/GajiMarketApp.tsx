@@ -333,7 +333,8 @@ export default function GajiMarketApp() {
   }
 
   function addNeighborhood(dongName: string) {
-    if (dongName === activeNeighborhood) return;
+    // 이미 등록된 동네(대표든 2번째든)를 다시 고르면 아무 것도 안 한다 — 중복 등록 방지.
+    if (dongName === activeNeighborhood || dongName === secondaryNeighborhood) return;
     const returnTo = subPage?.type === "region-search" ? subPage.returnTo : undefined;
     setSecondaryNeighborhood(dongName);
     setRecentNeighborhoods((current) => [dongName, ...current.filter((n) => n !== dongName)].slice(0, 5));
@@ -1976,7 +1977,7 @@ export default function GajiMarketApp() {
             <RegionSearchScreen
               regions={regions}
               recentNeighborhoods={recentNeighborhoods}
-              excludedNeighborhoods={[activeNeighborhood]}
+              excludedNeighborhoods={secondaryNeighborhood ? [activeNeighborhood, secondaryNeighborhood] : [activeNeighborhood]}
               onBack={() => {
                 setSubPage(subPage.returnTo ? { type: subPage.returnTo } : null);
                 setSheet("region");
