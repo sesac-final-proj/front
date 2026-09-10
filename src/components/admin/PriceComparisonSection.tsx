@@ -126,7 +126,13 @@ export function PriceComparisonSection() {
   const [category, setCategory] = useState<string | null>(null);
   const [guTab, setGuTab] = useState<(typeof GU_TABS)[number]>("전체");
 
-  const selectedCategory = category ?? data?.categories[0]?.category ?? null;
+  // "전체"(합산) 탭이 맨 왼쪽에 오도록 — 백엔드는 카테고리명 가나다순으로 내려줘서
+  // "전체"가 중간(음식물처리기~전자기기 사이)에 끼어 있음.
+  const categories = useMemo(() => {
+    if (!data) return [];
+    return [...data.categories].sort((a, b) => (a.category === "전체" ? -1 : b.category === "전체" ? 1 : 0));
+  }, [data]);
+  const selectedCategory = category ?? categories[0]?.category ?? null;
   const summary = data?.categories.find(c => c.category === selectedCategory);
   const regionRows = useMemo(
     () => (data && selectedCategory ? data.regions.filter(r => r.category === selectedCategory) : []),
@@ -159,9 +165,9 @@ export function PriceComparisonSection() {
         <button className={styles.headerBtn} onClick={refreshAll} disabled={loading || samplesState.loading}><RefreshCw size={14} />새로고침</button>
       </div>
 
-      {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : !data.categories.length ? <EmptyState message="적재된 가격비교 데이터가 없습니다." /> : <>
+      {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : !categories.length ? <EmptyState message="적재된 가격비교 데이터가 없습니다." /> : <>
         <div className={styles.tabs}>
-          {data.categories.map(c => (
+          {categories.map(c => (
             <button key={c.category} type="button" className={`${styles.tab} ${c.category === selectedCategory ? styles.tabActive : ""}`} onClick={() => setCategory(c.category)}>
               {c.category}
             </button>
