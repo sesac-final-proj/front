@@ -113,25 +113,47 @@ function GuDongMap({
           const [cx, cy] = pathGenerator.centroid(f);
           const ratio = count / maxCount;
 
-          // 작은 동은 이름+건수 두 줄이 옆 동까지 넘쳐서 안 보이는 게 아니라 오히려 더 헷갈렸다 —
-          // 도형이 충분히 클 때만 라벨을 그리고, 작은 동은 hover 시 title 툴팁으로만 보여준다.
+          // 이름+건수 두 줄이 다 들어갈 만큼 큰 동만 2줄로, 신길4동처럼 작은 동은 이름만
+          // 작은 글씨 한 줄로라도 표시 — 예전엔 작은 동을 아예 라벨 없이 hover 전용으로
+          // 숨겨서 "이 동은 왜 안 보이냐"는 혼란을 줬다. 정말 점만 한 도형만 최종적으로 스킵.
           const [[x0, y0], [x1, y1]] = pathGenerator.bounds(f);
-          const showLabel = (x1 - x0) >= 46 && (y1 - y0) >= 30;
+          const w = x1 - x0;
+          const h = y1 - y0;
+          const showFullLabel = w >= 46 && h >= 30;
+          const showCompactLabel = !showFullLabel && w >= 14 && h >= 10;
           const textFill = ratio > 0.55 ? "#fff" : "#1A1C20";
           // 흰 배경엔 검정 halo, 진한 주황 배경엔 흰 halo — 배경이 뭐든 글자 테두리가 반대색이라 묻히지 않음.
           // 3px는 9px 글자에 너무 두꺼워서 뭉개졌던 것 — 1.4px로 줄임.
           const haloProps = { paintOrder: "stroke" as const, stroke: textFill === "#fff" ? "#c9500a" : "#fff", strokeWidth: 1.4, strokeLinejoin: "round" as const };
-          if (!showLabel) return null;
-          return (
-            <g key={`label-${rawName}`} style={{ pointerEvents: "none" }}>
-              <text x={cx} y={cy - 4} textAnchor="middle" fontSize={9} fill={textFill} {...haloProps}>
+          if (showFullLabel) {
+            return (
+              <g key={`label-${rawName}`} style={{ pointerEvents: "none" }}>
+                <text x={cx} y={cy - 4} textAnchor="middle" fontSize={9} fill={textFill} {...haloProps}>
+                  {rawName}
+                </text>
+                <text x={cx} y={cy + 8} textAnchor="middle" fontSize={9} fontWeight={700} fill={textFill} {...haloProps}>
+                  {count.toLocaleString("ko-KR")}
+                </text>
+              </g>
+            );
+          }
+          if (showCompactLabel) {
+            return (
+              <text
+                key={`label-${rawName}`}
+                x={cx}
+                y={cy + 2.5}
+                textAnchor="middle"
+                fontSize={6.5}
+                fill={textFill}
+                style={{ pointerEvents: "none" }}
+                {...haloProps}
+              >
                 {rawName}
               </text>
-              <text x={cx} y={cy + 8} textAnchor="middle" fontSize={9} fontWeight={700} fill={textFill} {...haloProps}>
-                {count.toLocaleString("ko-KR")}
-              </text>
-            </g>
-          );
+            );
+          }
+          return null;
         })}
       </svg>
       {unmatched.length > 0 && (
