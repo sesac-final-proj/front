@@ -50,67 +50,30 @@ function RegionBarChart({ rows }: { rows: PriceComparisonRegionItem[] }) {
   );
 }
 
-const DOT_SIZE = 5;
-const BINS = 120;
-const ROW_GAP = 10;
-const MAX_STACK = 22;
+const DOT_SIZE = 9;
 
-function swarmDotShape(props: any) {
-  return <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2.4} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.8} />;
+function scatterDotShape(props: any) {
+  return <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.55} stroke={GU_COLOR[props.payload.gu]} strokeOpacity={0.9} />;
 }
 
-// PricePredictionSection의 detail_type별 스웜 레이아웃과 같은 방식(d3-force 없이 구간별
-// 도트 히스토그램)을 세부유형 대신 구 3개로 적용 — 구별로 가격이 어디에 몰려있는지 한눈에.
-function layoutByGu(samples: PriceComparisonSample[]) {
-  const domainMax = Math.max(...samples.map(s => s.price), 1);
-  const byGu = new Map<string, PriceComparisonSample[]>();
-  samples.forEach(s => { if (!byGu.has(s.gu)) byGu.set(s.gu, []); byGu.get(s.gu)!.push(s); });
-  const binOf = (price: number) => Math.min(BINS - 1, Math.floor((price / domainMax) * BINS));
-
-  const rowHeights = GU_ORDER.map(gu => {
-    const counts = new Map<number, number>();
-    for (const s of byGu.get(gu) ?? []) { const bin = binOf(s.price); counts.set(bin, (counts.get(bin) ?? 0) + 1); }
-    const peak = Math.min(Math.max(1, ...counts.values()), MAX_STACK);
-    return peak * DOT_SIZE + ROW_GAP;
-  });
-  const rowCenters: number[] = [];
-  let cursor = 0;
-  rowHeights.forEach(h => { rowCenters.push(cursor + h / 2); cursor += h; });
-
-  const points: { price: number; gu: string; y: number }[] = [];
-  GU_ORDER.forEach((gu, i) => {
-    const center = rowCenters[i];
-    const stack = new Map<number, number>();
-    for (const s of byGu.get(gu) ?? []) {
-      const bin = binOf(s.price);
-      const idx = stack.get(bin) ?? 0;
-      stack.set(bin, idx + 1);
-      const clamped = Math.min(idx, MAX_STACK - 1);
-      const level = clamped % 2 === 0 ? clamped / 2 : -(clamped + 1) / 2;
-      points.push({ price: s.price, gu, y: center + level * DOT_SIZE });
-    }
-  });
-  return { points, totalHeight: cursor };
-}
-
-function SampleSwarm({ samples }: { samples: PriceComparisonSample[] }) {
-  const { points, totalHeight } = useMemo(() => layoutByGu(samples), [samples]);
-  if (!points.length) return <EmptyState message="매물 표본이 없습니다." />;
-  const height = Math.max(140, totalHeight + 16);
+// 가격(x) x 관심수(y) 실제 두 지표로 그리는 산점도 — 구별로 색을 다르게 줘서
+// 자연스럽게 뭉쳐 보인다(y축을 억지로 만들어내던 예전 스웜 레이아웃과 달리 둘 다 실데이터).
+function PriceInterestScatter({ samples }: { samples: PriceComparisonSample[] }) {
+  if (!samples.length) return <EmptyState message="매물 표본이 없습니다." />;
   return (
     <>
-      <div className={pStyles.chart} style={{ height }}>
+      <div className={pStyles.chart} style={{ height: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 4, right: 16, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#F0F1ED" horizontal={false} />
-            <XAxis type="number" dataKey="price" tickFormatter={v => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
-            <YAxis type="number" dataKey="y" hide domain={[0, totalHeight]} />
+          <ScatterChart margin={{ top: 4, right: 16, left: -6, bottom: 0 }}>
+            <CartesianGrid stroke="#F0F1ED" />
+            <XAxis type="number" dataKey="price" name="가격" tickFormatter={v => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
+            <YAxis type="number" dataKey="interest_count" name="관심수" tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
             <Tooltip cursor={false} isAnimationActive={false} content={({ payload }) => {
-              const row = payload?.[0]?.payload as { gu: string; price: number } | undefined;
+              const row = payload?.[0]?.payload as PriceComparisonSample | undefined;
               if (!row) return null;
-              return <div style={tooltipBox}>{row.gu} · {money(row.price)}</div>;
+              return <div style={tooltipBox}>{row.gu} · {money(row.price)} · 관심 {row.interest_count}</div>;
             }} />
-            <Scatter data={points} isAnimationActive={false} shape={swarmDotShape} />
+            <Scatter data={samples} isAnimationActive={false} shape={scatterDotShape} />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -204,8 +167,8 @@ export function PriceComparisonSection() {
         </div>
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
-          <div className={pStyles.cardHead}><div><h2>구별 가격 분포</h2><p>점 하나 = 매물 하나 · 행 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
-          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <SampleSwarm samples={samplesState.data.samples} />}
+          <div className={pStyles.cardHead}><div><h2>가격 x 관심수 분포</h2><p>점 하나 = 매물 하나 · 가로 가격 · 세로 관심수 · 색 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
+          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <PriceInterestScatter samples={samplesState.data.samples} />}
         </article>
 
         <div style={{ marginTop: 20 }}>

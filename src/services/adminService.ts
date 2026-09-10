@@ -289,6 +289,7 @@ export interface PriceComparisonOverview {
 export interface PriceComparisonSample {
   gu: string;
   price: number;
+  interest_count: number;
 }
 
 export type AdminNoticeService = "dream" | "carrot";
