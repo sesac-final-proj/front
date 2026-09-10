@@ -42,18 +42,19 @@ export interface PricePredictionSummary {
 }
 
 // 거래 대시보드 하단 "가격예측 모델" 블록용 — 지표/분포/차트/세부유형 개수는 자주 안 바뀌니
-// 한 번에 묶어서 useAdminResource 한 번으로 처리한다. 매물 목록은 페이지네이션이 있어 따로 호출.
+const emptyCharts: PriceModelCharts = { predictions: [], feature_importance: [], platform_comparisons: [], platform_tests: [], clusters: [] };
+
 export async function getPricePredictionSummary(): Promise<PricePredictionSummary> {
   const [metrics, distribution, charts, detailTypeCounts] = await Promise.all([
-    getPriceModelMetrics().catch(() => ({ metrics: [] as PriceModelMetricItem[] })),
-    getPriceDistribution().catch(() => ({ categories: [] as PriceDistributionCategory[] })),
-    getPriceModelCharts().catch(() => ({ predictions: [] as PricePredictionItem[], feature_importance: [] as PriceFeatureImportanceItem[] })),
-    getDetailTypeCounts().catch(() => ({ items: [] as DetailTypeCountItem[] })),
+    getPriceModelMetrics().catch(() => ({ metrics: [] })),
+    getPriceDistribution().catch(() => ({ categories: [] })),
+    getPriceModelCharts().catch(() => emptyCharts),
+    getDetailTypeCounts().catch(() => ({ items: [] })),
   ]);
   return {
     metrics: Array.isArray(metrics?.metrics) ? metrics.metrics : [],
     distribution: Array.isArray(distribution?.categories) ? distribution.categories : [],
-    charts: charts && Array.isArray(charts.predictions) && Array.isArray(charts.feature_importance) ? charts : { predictions: [], feature_importance: [] },
+    charts: charts && Array.isArray(charts.predictions) ? charts : emptyCharts,
     detailTypeCounts: Array.isArray(detailTypeCounts?.items) ? detailTypeCounts.items : [],
   };
 }
