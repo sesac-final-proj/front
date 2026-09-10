@@ -25,14 +25,22 @@ export function TradeStatusCard({ data, dataByGu }: { data: DashboardOverview["t
 const PIE_COLORS = ["#FF9D5B", "#ADB9A1", "#8FA6C9", "#D9A6C2", "#C9B458", "#9A9FE0"];
 export function StatusPieChart({ data }: { data: { name: string; count: number }[] }) {
  if (!data.length) return <EmptyState message="표시할 데이터가 없습니다." />;
- return <div className={styles.chart} role="img" aria-label={data.map(row => `${row.name}: ${row.count}건`).join(", ")}>
+ const total = data.reduce((sum, row) => sum + row.count, 0);
+ // 조각 위 라벨을 넣으니 좁은 도넛 위에서 서로 겹치고 범례랑도 부딪혀서 아예 안 보였다 —
+ // 조각엔 라벨을 빼고, 퍼센트는 범례 텍스트에 붙여서 겹칠 자리 자체를 없앤다.
+ return <div style={{ height: 300 }} role="img" aria-label={data.map(row => `${row.name}: ${row.count}건`).join(", ")}>
    <ResponsiveContainer width="100%" height="100%">
      <PieChart>
-       <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false} animationDuration={700}>
+       <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="46%" innerRadius={55} outerRadius={95} paddingAngle={2} animationDuration={700}>
          {data.map((row, i) => <Cell key={row.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
        </Pie>
        <Tooltip formatter={(value) => `${Number(value).toLocaleString("ko-KR")}건`} />
-       <Legend verticalAlign="bottom" height={28} wrapperStyle={{ fontSize: 11 }} />
+       <Legend
+         verticalAlign="bottom"
+         height={48}
+         wrapperStyle={{ fontSize: 11 }}
+         formatter={(name, entry) => `${name} ${total ? Math.round(((entry.payload as any).count / total) * 100) : 0}%`}
+       />
      </PieChart>
    </ResponsiveContainer>
  </div>;
