@@ -39,6 +39,7 @@ import {
   MyMenuScreen,
   SettingsScreen,
   CustomerSupportScreen,
+  CarrotNoticeScreen,
   ManagementScreen,
   FavoriteScreen,
   DreamDashboardScreen,
@@ -1683,7 +1684,7 @@ export default function GajiMarketApp() {
       ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
       : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
     subPage?.type === "dream-dashboard" ||
     subPage?.type === "dream-notice" ||
@@ -1961,7 +1962,10 @@ export default function GajiMarketApp() {
               onLogout={handleLogout}
               onWithdraw={handleWithdraw}
               onOpenSupport={() => setSubPage({ type: "customer-support" })}
+              onOpenNotice={() => setSubPage({ type: "carrot-notice" })}
             />
+          ) : subPage?.type === "carrot-notice" ? (
+            <CarrotNoticeScreen onBack={() => setSubPage({ type: "settings" })} />
           ) : subPage?.type === "customer-support" ? (
             <CustomerSupportScreen onBack={() => setSubPage({ type: "settings" })} />
           ) : subPage?.type === "sales" ? (
@@ -2301,4 +2305,3 @@ export default function GajiMarketApp() {
     </div>
   );
 }
-
