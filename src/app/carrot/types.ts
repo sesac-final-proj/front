@@ -49,7 +49,7 @@ export type SubPage =
   | { type: "product-detail"; id: string }
   | { type: "product-form"; editId?: string }
   | { type: "community-detail"; id: string }
-  | { type: "community-form" }
+  | { type: "community-form"; editId?: string }
   | { type: "chat-room"; id: string }
   | { type: "chat-room-list"; productId: string; productTitle: string }
   | { type: "payment-amount"; chatRoomId: string }
@@ -116,6 +116,9 @@ export type ChatMessageUi = {
 
 export type CommunityPost = {
   id: string;
+  authorId?: number;
+  authorNickname?: string;
+  mine?: boolean;
   categoryName: string;
   title: string;
   contentPreview: string;
@@ -126,6 +129,8 @@ export type CommunityPost = {
   viewCount: number;
   commentCount: number;
   reactionCount: number;
+  isReacted?: boolean;
+  thumbnailUrl?: string;
 };
 
 export type ChatRoom = {

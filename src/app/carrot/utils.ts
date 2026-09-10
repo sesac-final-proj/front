@@ -1,6 +1,7 @@
 // 상태를 안 갖는 순수 변환/포맷 함수 모음 + 네이버맵 스크립트 로더, 테마 저장소.
 // GajiMarketApp.tsx 맨 위에 있던 걸 분리 — 로직 변경 없이 그대로 옮긴 것.
 import { getKakaoPlaceUrl } from "@/services";
+import type { CommunityFeedPost } from "@/types/community";
 import type { CongestionZone, Restaurant, TradeProduct } from "@/types";
 import type { ChatMessageDto, ChatRoomDto } from "@/services/chatService";
 import {
@@ -14,6 +15,7 @@ import {
 import type {
   ChatMessageUi,
   ChatRoom,
+  CommunityPost,
   DangerSignalApiItem,
   LocalBusiness,
   ProductFilters,
@@ -233,6 +235,27 @@ export function toProductListItem(item: TradeProduct): ProductListItem {
     description: item.description ?? (item.searchKeyword ? `연관 검색어: ${item.searchKeyword}` : ""),
     category: "중고거래",
     thumbnailUrl: item.thumbnailUrl,
+  };
+}
+
+export function toCommunityPost(item: CommunityFeedPost): CommunityPost {
+  return {
+    id: String(item.id),
+    authorId: item.authorId,
+    authorNickname: item.authorNickname,
+    mine: item.isMine,
+    categoryName: item.category,
+    title: item.title,
+    contentPreview: item.content,
+    neighborhoodName: item.neighborhoodName,
+    createdAt: formatRelativeTime(item.createdAt),
+    viewCount: item.viewCount,
+    commentCount: item.commentCount,
+    reactionCount: item.reactionCount,
+    isReacted: item.isReacted,
+    thumbnailUrl: item.thumbnailUrl,
+    thumbnailTone: item.thumbnailUrl ? "article" : undefined,
+    thumbnailCount: item.thumbnailUrl ? 1 : undefined,
   };
 }
 
