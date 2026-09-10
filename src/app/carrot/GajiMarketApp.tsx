@@ -777,6 +777,8 @@ export default function GajiMarketApp() {
                 ...p,
                 description: detail.description ?? p.description,
                 tradePlace: detail.tradePlace,
+                tradePlaceLat: detail.tradePlaceLat,
+                tradePlaceLng: detail.tradePlaceLng,
                 sellerNickname: detail.sellerNickname,
                 sellerMannerTemp: detail.sellerMannerTemp,
                 // 홈 목록에서 바로 들어온 경우 mine=false로 깔려있어서(그 목록 API는
@@ -1303,6 +1305,14 @@ export default function GajiMarketApp() {
       .catch((error: unknown) => console.error("이미지를 업로드하지 못했습니다.", error));
   }
 
+  // 지도 피커가 hidden input(tradePlaceLat/Lng)에 넣어둔 좌표 파싱 — 값이 없으면(옛 글 그대로
+  // 텍스트만 두거나 위치를 아예 안 고른 경우) undefined로, 서버에 좌표 없이 이름만 보낸다.
+  function readTradePlaceCoords(form: FormData) {
+    const lat = Number(form.get("tradePlaceLat"));
+    const lng = Number(form.get("tradePlaceLng"));
+    return { tradePlaceLat: Number.isFinite(lat) && lat !== 0 ? lat : undefined, tradePlaceLng: Number.isFinite(lng) && lng !== 0 ? lng : undefined };
+  }
+
   function submitProduct(event: FormEvent<HTMLFormElement>, imageFile: File | null) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1312,6 +1322,7 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
+    const { tradePlaceLat, tradePlaceLng } = readTradePlaceCoords(form);
 
     createProduct({
       title,
@@ -1320,6 +1331,8 @@ export default function GajiMarketApp() {
       desiredPrice: isFree ? null : Math.max(0, price),
       tradeType: isFree ? "FREE" : "SALE",
       tradePlace,
+      tradePlaceLat,
+      tradePlaceLng,
     })
       .then(({ id }) => {
         const newProduct: ProductListItem = {
@@ -1343,6 +1356,8 @@ export default function GajiMarketApp() {
           category,
           description,
           tradePlace,
+          tradePlaceLat,
+          tradePlaceLng,
         };
 
         setProducts((current) => [newProduct, ...current]);
@@ -1372,6 +1387,7 @@ export default function GajiMarketApp() {
     const isFree = form.get("free") === "on";
     const price = Number(form.get("price") ?? 0);
     const tradePlace = String(form.get("tradePlace") ?? "").trim() || undefined;
+    const { tradePlaceLat, tradePlaceLng } = readTradePlaceCoords(form);
 
     updateProduct(Number(productId), {
       title,
@@ -1379,6 +1395,8 @@ export default function GajiMarketApp() {
       description,
       desiredPrice: isFree ? null : Math.max(0, price),
       tradePlace,
+      tradePlaceLat,
+      tradePlaceLng,
     })
       .then(() => {
         const patch = (p: ProductListItem) =>
@@ -1392,6 +1410,8 @@ export default function GajiMarketApp() {
                 price: isFree ? null : Math.max(0, price),
                 tradeType: isFree ? ("FREE" as const) : ("SALE" as const),
                 tradePlace,
+                tradePlaceLat,
+                tradePlaceLng,
               }
             : p;
         setProducts((current) => current.map(patch));

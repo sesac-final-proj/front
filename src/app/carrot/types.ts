@@ -100,6 +100,8 @@ export type ProductListItem = {
   mine: boolean;
   description: string;
   tradePlace?: string;
+  tradePlaceLat?: number;
+  tradePlaceLng?: number;
   sellerNickname?: string;
   sellerMannerTemp?: number;
   category: string;

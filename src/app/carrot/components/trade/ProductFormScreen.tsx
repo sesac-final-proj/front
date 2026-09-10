@@ -23,7 +23,11 @@ export function ProductFormScreen({
   const isEdit = Boolean(initialProduct);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialProduct?.thumbnailUrl ?? null);
   const imageFileRef = useRef<File | null>(null);
-  const [tradePlace, setTradePlace] = useState<string | undefined>(initialProduct?.tradePlace);
+  const [tradePlace, setTradePlace] = useState<{ name: string; lat?: number; lng?: number } | undefined>(
+    initialProduct?.tradePlace
+      ? { name: initialProduct.tradePlace, lat: initialProduct.tradePlaceLat, lng: initialProduct.tradePlaceLng }
+      : undefined,
+  );
   const [showPlacePicker, setShowPlacePicker] = useState(false);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -96,7 +100,9 @@ export function ProductFormScreen({
             required
           />
         </label>
-        <input type="hidden" name="tradePlace" value={tradePlace ?? ""} />
+        <input type="hidden" name="tradePlace" value={tradePlace?.name ?? ""} />
+        <input type="hidden" name="tradePlaceLat" value={tradePlace?.lat ?? ""} />
+        <input type="hidden" name="tradePlaceLng" value={tradePlace?.lng ?? ""} />
         <span className={styles.formSectionLabel}>거래 설정</span>
         <button
           type="button"
@@ -105,7 +111,7 @@ export function ProductFormScreen({
         >
           <span>거래 희망 장소</span>
           <span className={styles.tradePlaceRowValue}>
-            {tradePlace || "위치 추가"}
+            {tradePlace?.name || "위치 추가"}
             <ChevronRight size={20} />
           </span>
         </button>
@@ -115,11 +121,11 @@ export function ProductFormScreen({
       </form>
       {showPlacePicker && (
         <TradePlacePickerScreen
-          initialLat={initialCenter?.lat}
-          initialLng={initialCenter?.lng}
+          initialLat={tradePlace?.lat ?? initialCenter?.lat}
+          initialLng={tradePlace?.lng ?? initialCenter?.lng}
           onCancel={() => setShowPlacePicker(false)}
           onConfirm={(place) => {
-            setTradePlace(place.name);
+            setTradePlace(place);
             setShowPlacePicker(false);
           }}
         />
