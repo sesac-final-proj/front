@@ -13,6 +13,7 @@ import {
   BriefcaseBusiness,
   Building,
   Eye,
+  Heart,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { TogetherCategory, TogetherPost } from "@/types";
@@ -59,16 +60,25 @@ export function ApartmentCommunityScreen({
       category: "생활 정보",
       hasDot: true,
       title: `${apartmentName} 며칠전에 근처 맛집 방문했는데 정말 친절하고 맛있었어요! 입주민 분들께 추천드립니다.`,
+      content: "가족들이랑 저녁 먹으러 갔는데 밑반찬도 정갈하고 사장님도 너무 친절하셨어요. 입주민 분들도 주말에 꼭 한번 가보세요!",
+      time: "1시간 전",
       viewCount: 43,
+      reactionCount: 6,
+      commentCount: 4,
       isMarket: false,
     },
     {
       id: "apt-2",
       category: "중고거래",
       hasDot: false,
-      title: "베이지 콤비 암막블라인드 깔끔하게 사용하기 좋아요. 창문에 설치하면 아늑한 분위기를 ...",
+      title: "베이지 콤비 암막블라인드 깔끔하게 사용하기 좋아요",
+      content: "창문에 설치하면 아늑한 분위기를 연출할 수 있어요. 실사용 기간 2개월 미만이라 상태 거의 새것입니다.",
+      price: "15,000원",
+      time: "3시간 전",
       thumbnail: "warm",
       viewCount: 22,
+      reactionCount: 2,
+      commentCount: 2,
       isMarket: true,
     },
     {
@@ -76,27 +86,41 @@ export function ApartmentCommunityScreen({
       category: "가입인사",
       hasDot: false,
       title: `안녕하세요 ${apartmentName}에 새로 입주한 주민입니다! 잘 부탁드려요 😊`,
+      content: "이번 주에 103동으로 이사 오게 되었습니다. 좋은 이웃분들과 즐겁게 소통하고 지내고 싶습니다.",
+      time: "5시간 전",
       viewCount: 6,
+      reactionCount: 8,
+      commentCount: 5,
       isMarket: false,
     },
     {
       id: "apt-4",
       category: "중고거래",
       hasDot: false,
-      title: "이솝 엘레오스 바디 클렌저 & 레저렉션 핸드워시 새상품 세트예요. 은은한 향으로 기분 좋...",
+      title: "이솝 엘레오스 바디 클렌저 & 레저렉션 핸드워시 새상품 세트",
+      content: "은은한 시트러스 아로마 향으로 기분 전환에 좋아요. 박스 미개봉 정품이라 선물용으로도 좋습니다.",
+      price: "42,000원",
+      time: "12시간 전",
       thumbnail: "botanical",
       photoCount: 2,
       viewCount: 30,
+      reactionCount: 4,
+      commentCount: 1,
       isMarket: true,
     },
     {
       id: "apt-5",
       category: "중고거래",
       hasDot: false,
-      title: "프라다 사피아노 지갑 핑크 새상품이에요. 선물용으로도 괜찮고, 관심 있으...",
+      title: "프라다 사피아노 지갑 핑크 새상품 풀박스",
+      content: "보증서와 정품 케이스 풀박스 보관 중입니다. 단지 내 직거래 가능하신 분께 소정의 네고도 해드립니다.",
+      price: "280,000원",
+      time: "1일 전",
       thumbnail: "leather",
       photoCount: 2,
       viewCount: 16,
+      reactionCount: 5,
+      commentCount: 3,
       isMarket: true,
     },
   ];
@@ -299,23 +323,45 @@ export function ApartmentCommunityScreen({
         <div className={styles.aptPostList}>
           {displayedPosts.map((p) => (
             <article key={p.id} className={styles.postRow}>
-              <button type="button" onClick={() => onOpenPost?.(p.id)}>
+              <button
+                type="button"
+                className={styles.postRowButton}
+                onClick={() => onOpenPost?.(p.id)}
+              >
                 <div className={styles.postText}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                     {p.hasDot && (
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-primary)", display: "inline-block" }} />
                     )}
                     <span className={styles.categoryBadge}>{p.category}</span>
+                    {p.isMarket && p.price && (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>{p.price}</span>
+                    )}
                   </div>
                   <h2>{p.title}</h2>
-                  <span className={styles.postViewCount}>
-                    <Eye size={13} /> {p.viewCount}
-                  </span>
+                  {p.content && <p>{p.content}</p>}
+                  <small>
+                    {apartmentName} · {p.time} · 조회 {p.viewCount}
+                  </small>
                 </div>
                 {p.thumbnail && (
                   <div className={`${styles.postThumb} ${styles[`tone_${p.thumbnail}` as keyof typeof styles] ?? ""}`}>
                     {p.photoCount && p.photoCount > 1 ? <span>{p.photoCount}</span> : null}
                   </div>
+                )}
+                {(p.reactionCount > 0 || p.commentCount > 0) && (
+                  <span className={styles.commentCount}>
+                    {p.reactionCount > 0 && (
+                      <span>
+                        <Heart size={14} /> {p.reactionCount}
+                      </span>
+                    )}
+                    {p.commentCount > 0 && (
+                      <span>
+                        <MessageCircle size={14} /> {p.commentCount}
+                      </span>
+                    )}
+                  </span>
                 )}
               </button>
             </article>

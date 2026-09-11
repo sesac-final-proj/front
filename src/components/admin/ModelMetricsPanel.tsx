@@ -2,8 +2,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { getPriceModelMetrics, type PriceModelMetricItem } from "@/services/adminService";
 import { useAdminResource } from "./useAdminResource";
-import { AdminTable, ErrorState, Skeleton } from "./AdminUI";
-import styles from "./portal.module.css";
+import styles from "@/app/admin/admin.module.css";
 
 // R² 하나를 "꽉 찬 원 중 몇 %" 도넛으로 — 모델 4개(feature set × LightGBM/RandomForest)를
 // 한 파이에 욱여넣으면 조각끼리 비교가 안 돼서(R²는 합이 100%인 값이 아님), 모델별로 따로 그린다.
@@ -57,35 +56,44 @@ export function ModelMetricsPanel() {
   const metrics = data?.metrics ?? [];
 
   return (
-    <article className={styles.card}>
-      <h2>모델 성능 비교</h2>
-      <p>feature set × 모델(LightGBM/RandomForest)별 R². 오차는 낮을수록, R²·Hit%는 높을수록 좋습니다.</p>
-      {loading ? <Skeleton /> : error ? <ErrorState message={error} retry={retry} /> : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginTop: 16 }}>
-            {metrics.map(m => <R2Donut key={`${m.feature_set}-${m.model_key}`} item={m} />)}
-          </div>
-          <AdminTable headers={["지표", ...metrics.map(m => `${m.feature_set} · ${m.label}`)]}>
-            {METRIC_ROWS.map(row => {
-              const values = metrics.map(m => row.format(m));
-              const bestValue = row.better === "min" ? Math.min(...values) : Math.max(...values);
-              return (
-                <tr key={row.label}>
-                  <td>{row.label}</td>
-                  {metrics.map((m, i) => (
-                    <td
-                      key={`${m.feature_set}-${m.model_key}`}
-                      style={values[i] === bestValue ? { color: "#FF6F0F", fontWeight: 700 } : undefined}
-                    >
-                      {formatMetricValue(row, values[i])}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </AdminTable>
-        </>
-      )}
+    <article className={styles.panel}>
+      <div className={styles.panelHead}>
+        <div><h3>모델 성능 비교</h3><p>feature set × 모델(LightGBM/RandomForest)별 R²</p></div>
+      </div>
+      {loading ? <p className={styles.empty}>불러오는 중…</p> : error ? <p className={styles.empty}>{error} <button type="button" onClick={retry}>다시 시도</button></p> : !metrics.length ? <p className={styles.empty}>학습된 모델 지표가 없습니다.</p> : <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+          {metrics.map(m => <R2Donut key={`${m.feature_set}-${m.model_key}`} item={m} />)}
+        </div>
+        <div className={styles.tableScroll} style={{ marginTop: 16 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>지표</th>
+                {metrics.map(m => <th key={`${m.feature_set}-${m.model_key}`}>{m.feature_set} · {m.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {METRIC_ROWS.map(row => {
+                const values = metrics.map(m => row.format(m));
+                const bestValue = row.better === "min" ? Math.min(...values) : Math.max(...values);
+                return (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    {metrics.map((m, i) => (
+                      <td
+                        key={`${m.feature_set}-${m.model_key}`}
+                        style={values[i] === bestValue ? { color: "#FF6F0F", fontWeight: 700 } : undefined}
+                      >
+                        {formatMetricValue(row, values[i])}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </>}
     </article>
   );
 }
