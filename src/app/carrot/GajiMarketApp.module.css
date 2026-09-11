@@ -8955,68 +8955,66 @@ img.thumbnail {
 /* Hero */
 .aptVerifyHero {
   text-align: center;
-  padding: 8px 0 20px;
+  padding: 20px 16px 20px;
 }
 
 .aptVerifyIconBg {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  background: var(--color-primary-container);
-  color: var(--color-primary);
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: #FFF2E8;
+  color: var(--color-primary, #FF6F0F);
   display: grid;
   place-items: center;
   margin: 0 auto 16px;
-  box-shadow: 0 4px 16px rgba(255, 146, 43, 0.24);
 }
 
 .aptVerifyTitle {
   margin: 0 0 8px;
-  font-size: 22px;
-  line-height: 1.3;
+  font-size: 21px;
+  line-height: 1.35;
   font-weight: 800;
   letter-spacing: -0.4px;
-  color: var(--color-text);
+  color: var(--color-text, #191F28);
 }
 
 .aptVerifyTitle em {
   font-style: normal;
-  color: var(--color-primary);
+  color: var(--color-primary, #FF6F0F);
 }
 
 .aptVerifyDesc {
   margin: 0;
   font-size: 14px;
-  color: var(--color-muted);
-  line-height: 1.6;
+  color: var(--color-muted, #4E5968);
+  line-height: 1.55;
 }
 
 /* GPS Button */
 .aptGpsBtn {
   width: 100%;
-  min-height: 52px;
-  border-radius: 14px;
-  border: 1.5px solid var(--color-primary);
-  background: var(--color-primary-container);
-  color: var(--color-primary);
+  min-height: 50px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 111, 15, 0.4);
+  background: #FFF2E8;
+  color: var(--color-primary, #FF6F0F);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   margin-bottom: 20px;
-  transition: background 140ms ease, transform 100ms ease, box-shadow 140ms ease;
-  box-shadow: 0 2px 12px rgba(255, 146, 43, 0.2);
+  transition: all 140ms ease;
 }
 
 .aptGpsBtn:hover {
-  background: rgba(255, 146, 43, 0.22);
+  background: #FFE8D6;
 }
 
 .aptGpsBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
 
 .aptGpsBtn:disabled {
@@ -9305,27 +9303,74 @@ img.thumbnail {
   color: #3b82f6;
 }
 
-/* 아파트 커뮤니티 전용 포스트 리스트: 작고 컴팩트하게 */
+/* 아파트 커뮤니티 전용 포스트 리스트: 당근 Seed Feed 규격 준수 */
 .aptPostList {
   display: grid;
 }
 
-.aptPostList .postRow button {
-  min-height: auto;
-  padding: 14px 0;
+.aptPostList .postRow {
+  border-top: 1px solid var(--color-line);
+  position: relative;
+}
+
+.aptPostList .postRow button,
+.aptPostList .postRowButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 0;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.aptPostList .postText {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
 }
 
 .aptPostList .postText h2 {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.aptPostList .postText p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .aptPostList .categoryBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  width: fit-content;
+}
+
+.aptPostList .postViewCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
-  padding: 2px 6px;
-  min-height: 20px;
+  color: var(--color-muted);
 }
 
 .aptActionRow {

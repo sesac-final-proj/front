@@ -222,7 +222,7 @@ export function CommunityScreen({
             onClick={() => onTabChange(tab)}
           >
             {tab}
-            {tab === "아파트" && <em className={styles.communityNBadge} style={{ background: "#4dabf7" }}>APT</em>}
+            {tab === "아파트" && <em className={styles.communityNBadge}>APT</em>}
             {tab === "같이해요" && <em className={styles.communityNBadge}>N</em>}
           </button>
         ))}
@@ -236,13 +236,13 @@ export function CommunityScreen({
             margin: "12px 16px 8px",
             padding: "14px 16px",
             borderRadius: "16px",
-            background: "linear-gradient(135deg, #f0f7ff 0%, #e7f2ff 100%)",
-            border: "1px solid #d0ebff",
+            background: "linear-gradient(135deg, #ffffff 0%, #fff8f3 100%)",
+            border: "1px solid rgba(255, 111, 15, 0.25)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(34, 139, 230, 0.08)",
+            boxShadow: "0 2px 10px rgba(255, 111, 15, 0.06)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -251,7 +251,7 @@ export function CommunityScreen({
                 width: "42px",
                 height: "42px",
                 borderRadius: "12px",
-                backgroundColor: "#228be6",
+                backgroundColor: "var(--color-primary, #FF6F0F)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -267,26 +267,26 @@ export function CommunityScreen({
                   style={{
                     fontSize: "11px",
                     fontWeight: 700,
-                    color: "#1c7ed6",
-                    backgroundColor: "#e7f5ff",
+                    color: "var(--color-primary, #FF6F0F)",
+                    backgroundColor: "#FFF2E8",
                     padding: "2px 6px",
                     borderRadius: "4px",
                   }}
                 >
                   {verifiedApartment ? "인증 입주민" : "입주민 전용"}
                 </span>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#1971c2" }}>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-text, #191F28)" }}>
                   {verifiedApartment ? `${verifiedApartment} 커뮤니티` : "우리 아파트 커뮤니티"}
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: "12px", color: "#495057" }}>
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--color-muted, #4E5968)" }}>
                 {verifiedApartment
                   ? "우리 단지 이웃과 소통하는 공간으로 가기"
                   : "GPS로 내 아파트 인증하고 단지 전용 소통 공간 열기"}
               </p>
             </div>
           </div>
-          <ChevronRight size={20} color="#228be6" />
+          <ChevronRight size={20} color="var(--color-primary, #FF6F0F)" />
         </div>
       )}
 
@@ -326,10 +326,10 @@ export function CommunityScreen({
             <div
               style={{
                 borderRadius: "20px",
-                background: "linear-gradient(145deg, #ffffff 0%, #f8faff 100%)",
-                border: "1.5px solid #d0ebff",
+                background: "linear-gradient(145deg, #ffffff 0%, #fffbf8 100%)",
+                border: "1.5px solid rgba(255, 111, 15, 0.25)",
                 padding: "24px 20px",
-                boxShadow: "0 4px 16px rgba(34, 139, 230, 0.08)",
+                boxShadow: "0 4px 16px rgba(255, 111, 15, 0.06)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -338,8 +338,8 @@ export function CommunityScreen({
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "4px",
-                    backgroundColor: "#e7f5ff",
-                    color: "#1971c2",
+                    backgroundColor: "#FFF2E8",
+                    color: "var(--color-primary, #FF6F0F)",
                     fontSize: "12px",
                     fontWeight: 700,
                     padding: "3px 8px",
@@ -348,36 +348,36 @@ export function CommunityScreen({
                 >
                   <CheckCircle2 size={13} /> 인증 완료
                 </span>
-                <span style={{ fontSize: "12px", color: "#868e96" }}>실거주 입주민 전용</span>
+                <span style={{ fontSize: "12px", color: "var(--color-muted, #868e96)" }}>실거주 입주민 전용</span>
               </div>
-              <h2 style={{ fontSize: "21px", fontWeight: 800, margin: "0 0 6px", color: "#1864ab" }}>
+              <h2 style={{ fontSize: "21px", fontWeight: 800, margin: "0 0 6px", color: "var(--color-text, #191F28)" }}>
                 {verifiedApartment}
               </h2>
-              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "#495057", lineHeight: 1.5 }}>
+              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--color-muted, #495057)", lineHeight: 1.5 }}>
                 우리 아파트 주민들만 모여 소통하는 공간입니다.<br />
                 층간소음, 주차, 단지 소식을 이웃과 함께 나눠보세요.
               </p>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "var(--color-surface-2, #f1f3f5)" }}>
                   <div style={{ fontSize: "16px", marginBottom: "4px" }}>📢</div>
                   <strong style={{ fontSize: "13px", display: "block" }}>단지 소식·공지</strong>
-                  <span style={{ fontSize: "11px", color: "#868e96" }}>관리사무소 안내</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-muted, #868e96)" }}>관리사무소 안내</span>
                 </div>
-                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "var(--color-surface-2, #f1f3f5)" }}>
                   <div style={{ fontSize: "16px", marginBottom: "4px" }}>🚗</div>
                   <strong style={{ fontSize: "13px", display: "block" }}>주차·충전기</strong>
-                  <span style={{ fontSize: "11px", color: "#868e96" }}>지하주차장 소통</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-muted, #868e96)" }}>지하주차장 소통</span>
                 </div>
-                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "var(--color-surface-2, #f1f3f5)" }}>
                   <div style={{ fontSize: "16px", marginBottom: "4px" }}>🤫</div>
                   <strong style={{ fontSize: "13px", display: "block" }}>층간소음 배려</strong>
-                  <span style={{ fontSize: "11px", color: "#868e96" }}>이웃 간 배려 문화</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-muted, #868e96)" }}>이웃 간 배려 문화</span>
                 </div>
-                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "#f1f3f5" }}>
+                <div style={{ padding: "12px", borderRadius: "12px", backgroundColor: "var(--color-surface-2, #f1f3f5)" }}>
                   <div style={{ fontSize: "16px", marginBottom: "4px" }}>🎁</div>
                   <strong style={{ fontSize: "13px", display: "block" }}>단지 나눔·공구</strong>
-                  <span style={{ fontSize: "11px", color: "#868e96" }}>배송비 아끼는 공구</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-muted, #868e96)" }}>배송비 아끼는 공구</span>
                 </div>
               </div>
 
@@ -389,13 +389,13 @@ export function CommunityScreen({
                     width: "100%",
                     padding: "14px",
                     borderRadius: "12px",
-                    backgroundColor: "#228be6",
+                    backgroundColor: "var(--color-primary, #FF6F0F)",
                     color: "#ffffff",
                     border: "none",
                     fontSize: "15px",
                     fontWeight: 700,
                     cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(34, 139, 230, 0.3)",
+                    boxShadow: "0 2px 10px rgba(255, 111, 15, 0.25)",
                   }}
                 >
                   {verifiedApartment} 라운지 입장하기
@@ -408,7 +408,7 @@ export function CommunityScreen({
                     padding: "10px",
                     borderRadius: "10px",
                     backgroundColor: "transparent",
-                    color: "#868e96",
+                    color: "var(--color-muted, #868e96)",
                     border: "none",
                     fontSize: "13px",
                     cursor: "pointer",
@@ -423,11 +423,11 @@ export function CommunityScreen({
             <div
               style={{
                 borderRadius: "20px",
-                background: "linear-gradient(145deg, #ffffff 0%, #f8faff 100%)",
-                border: "1.5px solid #d0ebff",
+                background: "linear-gradient(145deg, #ffffff 0%, #fffbf8 100%)",
+                border: "1.5px solid rgba(255, 111, 15, 0.25)",
                 padding: "26px 20px",
                 textAlign: "center",
-                boxShadow: "0 4px 16px rgba(34, 139, 230, 0.08)",
+                boxShadow: "0 4px 16px rgba(255, 111, 15, 0.06)",
               }}
             >
               <div
@@ -435,21 +435,21 @@ export function CommunityScreen({
                   width: "56px",
                   height: "56px",
                   borderRadius: "18px",
-                  backgroundColor: "#228be6",
+                  backgroundColor: "var(--color-primary, #FF6F0F)",
                   color: "#ffffff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   margin: "0 auto 16px",
-                  boxShadow: "0 4px 12px rgba(34, 139, 230, 0.25)",
+                  boxShadow: "0 4px 14px rgba(255, 111, 15, 0.25)",
                 }}
               >
                 <Building2 size={30} />
               </div>
-              <h2 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 8px", color: "#1864ab" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 8px", color: "var(--color-text, #191F28)" }}>
                 입주민 전용 커뮤니티
               </h2>
-              <p style={{ fontSize: "14px", color: "#495057", lineHeight: 1.6, margin: "0 0 20px" }}>
+              <p style={{ fontSize: "14px", color: "var(--color-muted, #495057)", lineHeight: 1.6, margin: "0 0 20px" }}>
                 실제 거주 중인 아파트를 GPS로 인증하면<br />
                 외부인은 볼 수 없는 <strong>우리 단지 비밀 라운지</strong>가 열려요!
               </p>
@@ -461,7 +461,7 @@ export function CommunityScreen({
                   width: "100%",
                   padding: "15px",
                   borderRadius: "14px",
-                  backgroundColor: "#228be6",
+                  backgroundColor: "var(--color-primary, #FF6F0F)",
                   color: "#ffffff",
                   border: "none",
                   fontSize: "15px",
@@ -471,7 +471,7 @@ export function CommunityScreen({
                   justifyContent: "center",
                   gap: "8px",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(34, 139, 230, 0.3)",
+                  boxShadow: "0 4px 14px rgba(255, 111, 15, 0.25)",
                   marginBottom: "20px",
                 }}
               >
@@ -483,14 +483,14 @@ export function CommunityScreen({
                   textAlign: "left",
                   padding: "14px 16px",
                   borderRadius: "12px",
-                  backgroundColor: "#f8f9fa",
-                  border: "1px solid #e9ecef",
+                  backgroundColor: "var(--color-surface, #f8f9fa)",
+                  border: "1px solid var(--color-line, #e9ecef)",
                 }}
               >
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "#1971c2", display: "block", marginBottom: "6px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-primary, #FF6F0F)", display: "block", marginBottom: "6px" }}>
                   ✨ 아파트 인증 시 제공되는 혜택
                 </span>
-                <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "#495057", lineHeight: 1.7 }}>
+                <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "var(--color-muted, #495057)", lineHeight: 1.7 }}>
                   <li>철저한 GPS 위치 기반으로 <strong>인증된 입주민만 이용</strong></li>
                   <li>층간소음, 주차 문제, 단지 하자 등 솔직한 이웃 소통</li>
                   <li>가까운 동·호수 이웃과의 단지 내 직거래 및 공동구매</li>
