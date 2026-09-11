@@ -1,4 +1,4 @@
-import React, { useState, FormEvent } from "react";
+import React, { useEffect, useRef, useState, FormEvent } from "react";
 import {
   ChevronLeft,
   Menu,
@@ -59,6 +59,13 @@ export function ChatRoomScreen({
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
+  const messageStackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stack = messageStackRef.current;
+    if (!stack) return;
+    stack.scrollTo({ top: stack.scrollHeight, behavior: "auto" });
+  }, [messages.length]);
 
   // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
   // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
@@ -66,6 +73,12 @@ export function ChatRoomScreen({
   const statusLabel =
     room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
   const canSend = draft.trim().length > 0;
+  // 카톡식 "1" — 내가 보낸 메시지인데 상대가 아직 안 읽었으면(counterpartLastReadAt보다
+  // 늦게 보냈으면, 혹은 상대가 한 번도 안 읽었으면) 표시.
+  const isUnreadByCounterpart = (message: ChatMessageUi) =>
+    message.mine &&
+    (!room.counterpartLastReadAt ||
+      new Date(message.createdAt).getTime() > new Date(room.counterpartLastReadAt).getTime());
 
   return (
     <section className={styles.chatRoomScreen}>
@@ -224,7 +237,7 @@ export function ChatRoomScreen({
           당근페이
         </button>
       )}
-      <div className={styles.messageStack}>
+      <div ref={messageStackRef} className={styles.messageStack}>
         {messages.map((message, index) =>
           message.payment ? (
             <button
@@ -236,6 +249,7 @@ export function ChatRoomScreen({
               <Wallet size={16} />
               <span>{message.mine ? "송금완료" : "머니를 받았어요"}</span>
               <strong>{message.payment.amount.toLocaleString("ko-KR")}원</strong>
+              {isUnreadByCounterpart(message) && <em className={styles.messageUnreadMark}>1</em>}
             </button>
           ) : (
             <div key={`${message.text}-${index}`} className={message.mine ? styles.messageMine : styles.messageOther}>
@@ -245,7 +259,10 @@ export function ChatRoomScreen({
               ) : (
                 <p>{message.text}</p>
               )}
-              <span>{message.time}</span>
+              <span>
+                {isUnreadByCounterpart(message) && <em className={styles.messageUnreadMark}>1</em>}
+                {message.time}
+              </span>
             </div>
           ),
         )}

@@ -44,6 +44,7 @@ import {
   FavoriteScreen,
   DreamDashboardScreen,
   DreamNoticeScreen,
+  DreamPointsHistoryScreen,
   WalletChargeScreen,
   WalletPayScreen,
   // real-estate
@@ -514,6 +515,7 @@ export default function GajiMarketApp() {
             [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)),
           }));
           recordOtherUserId(chatId, page.items);
+          applyCounterpartLastReadAt(chatId, page.counterpartLastReadAt);
         })
         .catch(() => {});
     }, 3000);
@@ -833,15 +835,23 @@ export default function GajiMarketApp() {
   }, [activeNeighborhood, communityFilter, posts, secondaryNeighborhood]);
 
   const filteredChats = useMemo(() => {
-    return chats.filter((chat) => {
-      if (chatFilter === "전체") return true;
-      if (chatFilter === "판매") return chat.tradeRole === "SELLER";
-      if (chatFilter === "구매") return chat.tradeRole === "BUYER";
-      if (chatFilter === "안읽음") return chat.unreadCount > 0;
-      if (chatFilter === "모임") return chat.type === "GROUP";
-      if (chatFilter === "알바") return chat.title.includes("알바");
-      return true;
-    });
+    return chats
+      .filter((chat) => {
+        if (chatFilter === "전체") return true;
+        if (chatFilter === "판매") return chat.tradeRole === "SELLER";
+        if (chatFilter === "구매") return chat.tradeRole === "BUYER";
+        if (chatFilter === "안읽음") return chat.unreadCount > 0;
+        if (chatFilter === "모임") return chat.type === "GROUP";
+        if (chatFilter === "알바") return chat.title.includes("알바");
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (a.lastMessageAtRaw ? new Date(a.lastMessageAtRaw).getTime() : 0) <
+          (b.lastMessageAtRaw ? new Date(b.lastMessageAtRaw).getTime() : 0)
+            ? 1
+            : -1,
+      );
   }, [chatFilter, chats]);
 
   const localBusinesses = useMemo(() => {
@@ -934,6 +944,10 @@ export default function GajiMarketApp() {
     ) {
       setActiveTab("my");
       setSubPage(null);
+      return;
+    }
+    if (subPage?.type === "dream-points-history") {
+      setSubPage({ type: "dream-dashboard" });
       return;
     }
     if (subPage?.type === "alba-detail") {
@@ -1042,6 +1056,13 @@ export default function GajiMarketApp() {
     );
   }
 
+  // 카톡식 "1" 표시용 — 메시지 목록을 받아올 때마다 상대방이 마지막으로 읽은 시각을 갱신.
+  function applyCounterpartLastReadAt(chatId: string, counterpartLastReadAt: string | null) {
+    setChats((current) =>
+      current.map((chat) => (chat.id === chatId ? { ...chat, counterpartLastReadAt } : chat)),
+    );
+  }
+
   function openChat(chatId: string) {
     markChatRead(chatId);
     setSubPage({ type: "chat-room", id: chatId });
@@ -1051,6 +1072,7 @@ export default function GajiMarketApp() {
       .then((page) => {
         setRoomMessages((current) => ({ ...current, [chatId]: page.items.map((m) => toChatMessageUi(m, me?.id)) }));
         recordOtherUserId(chatId, page.items);
+        applyCounterpartLastReadAt(chatId, page.counterpartLastReadAt);
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {
@@ -1077,7 +1099,9 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: text, lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? { ...chat, lastMessage: text, lastMessageAt: "방금 전", lastMessageAtRaw: new Date().toISOString() }
+              : chat,
           ),
         );
       })
@@ -1101,7 +1125,14 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: "사진을 보냈습니다", lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: "사진을 보냈습니다",
+                  lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
+                }
+              : chat,
           ),
         );
       })
@@ -1143,7 +1174,14 @@ export default function GajiMarketApp() {
         }));
         setChats((current) =>
           current.map((chat) =>
-            chat.id === chatId ? { ...chat, lastMessage: message.content ?? "", lastMessageAt: "방금 전" } : chat,
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  lastMessage: message.content ?? "",
+                  lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
+                }
+              : chat,
           ),
         );
         // 채팅방에 걸린 상품 상태도 같이 반영 — 목록/판매내역/상세 화면 전부 동일 값을 보게.
@@ -1198,6 +1236,7 @@ export default function GajiMarketApp() {
                   ...chat,
                   lastMessage: `${amount.toLocaleString("ko-KR")}원을 보냈어요`,
                   lastMessageAt: "방금 전",
+                  lastMessageAtRaw: new Date().toISOString(),
                   // 백엔드가 송금 시점에 거래완료로 바꿔주므로(계획 문서 3-2절) 프론트도
                   // 곧장 반영 — 안 그러면 새로고침 전까진 여전히 "판매중"으로 보인다.
                   productTradeStatus: "SOLD",
@@ -1684,10 +1723,11 @@ export default function GajiMarketApp() {
       ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
       : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "dream-points-history", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
     subPage?.type === "dream-dashboard" ||
     subPage?.type === "dream-notice" ||
+    subPage?.type === "dream-points-history" ||
     (subPage?.type === "region-search" && subPage.returnTo === "dream-dashboard");
 
   // 로그인 확인 전엔 앱을 그리지 않는다 — 비로그인/토큰 만료면 위 getMe() effect가
@@ -1891,7 +1931,15 @@ export default function GajiMarketApp() {
               onOpenGame={() => setSubPage({ type: "merge-game" })}
             />
           ) : subPage?.type === "merge-game" ? (
-            <GajiMergeGameScreen onBack={() => setSubPage({ type: "all-services" })} />
+            <GajiMergeGameScreen
+              onBack={() => {
+                if (subPage.returnTo === "my") {
+                  setSubPage(null);
+                } else {
+                  goBack();
+                }
+              }}
+            />
           ) : subPage?.type === "apartment-verification" ? (
             <ApartmentVerificationScreen
               activeNeighborhood={activeNeighborhood}
@@ -1923,9 +1971,12 @@ export default function GajiMarketApp() {
               onBack={goBack}
               onChangeNeighborhood={() => setSheet("region")}
               onOpenNotice={() => setSubPage({ type: "dream-notice" })}
+              onOpenPointsHistory={() => setSubPage({ type: "dream-points-history" })}
             />
           ) : subPage?.type === "dream-notice" ? (
             <DreamNoticeScreen onBack={goBack} />
+          ) : subPage?.type === "dream-points-history" ? (
+            <DreamPointsHistoryScreen onBack={goBack} />
           ) : subPage?.type === "alba" ? (
             <AlbaMainScreen
               activeNeighborhood={activeNeighborhood}
@@ -2137,6 +2188,7 @@ export default function GajiMarketApp() {
                   onOpenAllServices={() => setSubPage({ type: "all-services" })}
                   onOpenDream={() => setSubPage({ type: "dream-dashboard" })}
                   onOpenAlba={() => setSubPage({ type: "alba" })}
+                  onOpenGame={() => setSubPage({ type: "merge-game", returnTo: "my" })}
                   onOpenSales={() => setSubPage({ type: "sales" })}
                   onOpenFavorites={() => setSubPage({ type: "favorites" })}
                   onOpenRecentlyViewed={() => setSubPage({ type: "recently-viewed" })}

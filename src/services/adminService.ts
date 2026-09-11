@@ -32,6 +32,8 @@ export interface AdminDataStatus {
     completed_count: number;
     average_price: number | null;
   }[];
+  category_counts_by_gu: { gu_name: string; category: string; transaction_count: number }[];
+  category_counts_by_region: { region_name: string; category: string; transaction_count: number }[];
   recent_transactions: {
     id: number;
     product_title: string;
@@ -213,6 +215,26 @@ export interface PricePlatformComparisonItem {
   p75_price: number;
 }
 
+export interface ListingSentimentSummary {
+  platform: string;
+  category: string | null;
+  total: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  score: number;
+  top_positive_terms: string[];
+  top_negative_terms: string[];
+}
+
+export interface ListingSentimentAnalysis {
+  method: string;
+  unit: string;
+  analyzed_count: number;
+  platforms: ListingSentimentSummary[];
+  categories: ListingSentimentSummary[];
+}
+
 export interface PricePlatformTestItem {
   category: string;
   platform_a: string;
@@ -260,6 +282,7 @@ export interface PriceComparisonCategoryItem {
   price_trend_pct: number | null;
   frequency_grade: string;
   listings_per_month: number;
+  completion_rate: number;
 }
 
 export interface PriceComparisonRegionItem {
@@ -269,6 +292,8 @@ export interface PriceComparisonRegionItem {
   median_price: number;
   completion_rate: number;
   avg_manner_temp: number;
+  cv_price: number;
+  frequency_grade: string;
 }
 
 export interface PriceComparisonDetailTypeItem {
@@ -289,6 +314,18 @@ export interface PriceComparisonOverview {
 export interface PriceComparisonSample {
   gu: string;
   price: number;
+  interest_count: number;
+}
+
+export interface PriceDongStatItem {
+  gu: string;
+  dong: string;
+  sample_count: number;
+  median_price: number;
+  within_pct: number;
+  below_pct: number;
+  above_pct: number;
+  dev_pct: number;
 }
 
 export type AdminNoticeService = "dream" | "carrot";
@@ -510,6 +547,14 @@ export async function getPriceComparisonSamples(category: string, gu?: string, s
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error(await errorMessage(response, "매물 표본을 불러오지 못했습니다."));
+  return response.json();
+}
+
+export async function getPriceComparisonDongMap(category: string): Promise<{ category: string; dongs: PriceDongStatItem[] }> {
+  const response = await adminAuthorizedFetch(`/api/v1/admin/price-comparison/dong-map?${new URLSearchParams({ category })}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorMessage(response, "동네 시세지도를 불러오지 못했습니다."));
   return response.json();
 }
 

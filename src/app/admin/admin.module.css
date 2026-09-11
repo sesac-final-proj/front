@@ -42,6 +42,13 @@
 .logo span { width: 30px; height: 30px; display: grid; place-items: center; color: #fff; background: var(--carrot); border-radius: 9px; }
 .sidebar nav { display: grid; gap: 22px; margin-top: 38px; }
 .navGroup { display: grid; gap: 4px; }
+.navGroupToggle { justify-content: space-between !important; align-items: center !important; padding: 10px 12px !important; }
+.navGroupToggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navChevron, .navChevronOpen { flex: 0 0 auto; transition: transform .2s ease, color .2s ease; }
+.navChevronOpen { transform: rotate(180deg); color: var(--carrot); }
+.sidebar nav section > button { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; }
+.sidebar nav section > button > svg { flex: 0 0 auto; transition: transform .2s ease, color .2s ease; }
+.navGroup { display: grid; gap: 4px; }
 .navGroup > p { margin: 0 12px 6px; color: #71776e; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
 .sidebar nav button { width: 100%; display: flex; align-items: center; gap: 11px; padding: 12px; border: 0; border-radius: 9px; color: #aeb4ac; background: transparent; font: inherit; font-size: 12px; font-weight: 700; text-align: left; cursor: pointer; }
 .sidebar nav button:hover { color: #fff; background: #2c302b; }
@@ -348,6 +355,10 @@
 .externalTrendChip { color: var(--muted) !important; border-color: var(--line) !important; background: #f5f4ef !important; }
 .externalTrendChip:hover { color: var(--ink) !important; background: #ebe9e3 !important; }
 .externalTrendChipActive { color: #fff !important; border-color: var(--carrot) !important; background: var(--carrot) !important; }
+.radarCategoryPicker { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 8px; }
+.radarCategoryPicker button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--paper); font: 700 10px inherit; cursor: pointer; transition: .18s ease; }
+.radarCategoryPicker button:hover { color: var(--ink); border-color: var(--carrot); }
+.radarCategoryPicker .radarCategoryActive { color: #fff; border-color: var(--carrot); background: var(--carrot); }
 .externalMarketEvidence > div:nth-child(3) { border-color: var(--line) !important; background: #f7f6f2 !important; }
 .externalMarketEvidence > div:nth-child(3) span { color: var(--muted) !important; }
 .externalMarketEvidence > div:nth-child(3) > div:first-child span:first-child { color: var(--ink) !important; }

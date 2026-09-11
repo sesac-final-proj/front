@@ -11,7 +11,7 @@ interface TogetherIntroViewProps {
 
 export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
   return (
-    <section className={styles.screen}>
+    <section className={styles.togetherDetailScreen}>
       {/* ScreenHeader */}
       <header className={styles.screenHeader}>
         <button
@@ -27,7 +27,7 @@ export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
       </header>
 
       {/* Intro Body */}
-      <div className={styles.togetherIntroStack} style={{ paddingBottom: 100 }}>
+      <div className={styles.togetherIntroStack} style={{ paddingBottom: 110 }}>
         <div className={styles.togetherIntroHero}>
           <h1>
             우리 동네 이웃과 함께하는<br />
@@ -79,19 +79,25 @@ export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
 
         {/* Seed Info Box */}
         <div className={styles.togetherBox} style={{ margin: 0 }}>
-          <strong>💡 같이해요 이용 팁</strong>
-          <p style={{ margin: 0, color: "var(--color-muted)", fontSize: 13, lineHeight: 1.5 }}>
-            모임에 참여하거나 직접 모집 글을 올려 이웃과 1:1 채팅 또는 모임으로 연결될 수 있습니다.
+          <div className={styles.togetherBoxHeader} style={{ borderBottom: 0, paddingBottom: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className={styles.togetherBoxIcon}>💡</span>
+              <span>같이해요 이용 팁</span>
+            </div>
+          </div>
+          <p style={{ margin: 0, color: "var(--color-muted)", fontSize: 13.5, lineHeight: 1.55 }}>
+            모임에 참여하거나 직접 모집 글을 올려 이웃과 1:1 채팅 또는 모임으로 안전하게 연결될 수 있습니다.
           </p>
         </div>
       </div>
 
       {/* Bottom Sticky Action Bar */}
-      <div className={styles.detailActionBar}>
+      <div className={styles.togetherDetailActionBar}>
         <button
           type="button"
           onClick={onStart}
-          className={styles.togetherStartButton}
+          className={`${styles.togetherDetailJoinBtn} ${styles.togetherDetailJoinBtnActive}`}
+          aria-label="같이해요 시작하기"
         >
           같이해요 시작하기
         </button>
@@ -99,4 +105,3 @@ export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
     </section>
   );
 }
-

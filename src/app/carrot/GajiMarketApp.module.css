@@ -157,6 +157,11 @@
   position: relative;
 }
 
+.homeScreen {
+  min-height: calc(var(--app-height) - 72px);
+  padding-bottom: 34px;
+}
+
 .pullToRefreshIndicator {
   position: absolute;
   top: -44px;
@@ -3601,7 +3606,13 @@ img.thumbnail {
 }
 
 .chatRoomScreen {
+  position: relative;
+  height: var(--app-height);
+  min-height: 0;
   padding: 16px 17px 88px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .chatProductCard {
@@ -3715,6 +3726,16 @@ img.thumbnail {
 .messageStack {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  align-content: start;
+  padding: 4px 0 12px;
+  scrollbar-width: none;
+}
+
+.messageStack::-webkit-scrollbar {
+  display: none;
 }
 
 .messageMine,
@@ -3761,6 +3782,14 @@ img.thumbnail {
 
 .messageMine span {
   justify-self: end;
+}
+
+.messageUnreadMark {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--color-primary);
+  margin-right: 4px;
 }
 
 .messageComposer {
@@ -4824,6 +4853,45 @@ img.thumbnail {
 .dreamPointsRow strong {
   flex-shrink: 0;
   color: var(--dream-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dreamPointsHistoryList {
+  padding: 4px 16px 24px;
+  background: var(--dream-surface);
+}
+
+.dreamPointsHistoryRow {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--dream-border);
+  color: var(--dream-text-primary);
+}
+
+.dreamPointsHistoryRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.dreamPointsHistoryRow strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.dreamPointsHistoryRow time {
+  color: var(--dream-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.dreamPointsHistoryRow > span {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--dream-orange);
   font-variant-numeric: tabular-nums;
 }
 
@@ -6816,7 +6884,7 @@ img.thumbnail {
   color: var(--color-bg);
 }
 
-.stage[data-theme="light"] :is(.mapSearch, .mapControls button, .mapCategoryFab, .bottomNav, .messageComposer, .detailActionBar) {
+.stage[data-theme="light"] :is(.mapSearch, .mapControls button, .mapCategoryFab, .bottomNav, .messageComposer, .detailActionBar, .togetherDetailActionBar) {
   background: rgba(255, 255, 255, 0.94);
   border-color: var(--color-line);
 }
@@ -8887,68 +8955,66 @@ img.thumbnail {
 /* Hero */
 .aptVerifyHero {
   text-align: center;
-  padding: 8px 0 20px;
+  padding: 20px 16px 20px;
 }
 
 .aptVerifyIconBg {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  background: var(--color-primary-container);
-  color: var(--color-primary);
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: #FFF2E8;
+  color: var(--color-primary, #FF6F0F);
   display: grid;
   place-items: center;
   margin: 0 auto 16px;
-  box-shadow: 0 4px 16px rgba(255, 146, 43, 0.24);
 }
 
 .aptVerifyTitle {
   margin: 0 0 8px;
-  font-size: 22px;
-  line-height: 1.3;
+  font-size: 21px;
+  line-height: 1.35;
   font-weight: 800;
   letter-spacing: -0.4px;
-  color: var(--color-text);
+  color: var(--color-text, #191F28);
 }
 
 .aptVerifyTitle em {
   font-style: normal;
-  color: var(--color-primary);
+  color: var(--color-primary, #FF6F0F);
 }
 
 .aptVerifyDesc {
   margin: 0;
   font-size: 14px;
-  color: var(--color-muted);
-  line-height: 1.6;
+  color: var(--color-muted, #4E5968);
+  line-height: 1.55;
 }
 
 /* GPS Button */
 .aptGpsBtn {
   width: 100%;
-  min-height: 52px;
-  border-radius: 14px;
-  border: 1.5px solid var(--color-primary);
-  background: var(--color-primary-container);
-  color: var(--color-primary);
+  min-height: 50px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 111, 15, 0.4);
+  background: #FFF2E8;
+  color: var(--color-primary, #FF6F0F);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   margin-bottom: 20px;
-  transition: background 140ms ease, transform 100ms ease, box-shadow 140ms ease;
-  box-shadow: 0 2px 12px rgba(255, 146, 43, 0.2);
+  transition: all 140ms ease;
 }
 
 .aptGpsBtn:hover {
-  background: rgba(255, 146, 43, 0.22);
+  background: #FFE8D6;
 }
 
 .aptGpsBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
 
 .aptGpsBtn:disabled {
@@ -9237,27 +9303,74 @@ img.thumbnail {
   color: #3b82f6;
 }
 
-/* 아파트 커뮤니티 전용 포스트 리스트: 작고 컴팩트하게 */
+/* 아파트 커뮤니티 전용 포스트 리스트: 당근 Seed Feed 규격 준수 */
 .aptPostList {
   display: grid;
 }
 
-.aptPostList .postRow button {
-  min-height: auto;
-  padding: 14px 0;
+.aptPostList .postRow {
+  border-top: 1px solid var(--color-line);
+  position: relative;
+}
+
+.aptPostList .postRow button,
+.aptPostList .postRowButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 0;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.aptPostList .postText {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
 }
 
 .aptPostList .postText h2 {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.aptPostList .postText p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .aptPostList .categoryBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  width: fit-content;
+}
+
+.aptPostList .postViewCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
-  padding: 2px 6px;
-  min-height: 20px;
+  color: var(--color-muted);
 }
 
 .aptActionRow {
@@ -9529,14 +9642,63 @@ img.thumbnail {
 .togetherCategoryArrow,
 .togetherBannerArrow {
   color: var(--color-dim);
+  transition: transform 160ms ease, color 160ms ease;
 }
 
-.togetherPostBtn {
-  min-height: 0 !important;
-  grid-template-columns: minmax(0, 1fr) 20px !important;
-  gap: 10px !important;
-  padding: 17px 0 !important;
-  transition: transform 160ms ease;
+/* ==========================================================================
+   Together (같이해요) Premium Feed Card & Components
+   ========================================================================== */
+
+.togetherFeedCard {
+  width: 100%;
+  margin-bottom: 12px;
+  background: linear-gradient(180deg, #1d1e24 0%, #16171c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 16px 14px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), border-color 180ms ease, box-shadow 180ms ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.togetherFeedCard:hover {
+  border-color: rgba(255, 146, 43, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
+}
+
+.togetherFeedCard:active {
+  transform: scale(0.99);
+}
+
+.togetherFeedCardBtn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.togetherFeedCardBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+/* Card Header: Badges & Arrow */
+.togetherCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .togetherBadgeRow {
@@ -9546,51 +9708,162 @@ img.thumbnail {
   gap: 6px;
 }
 
-.togetherBadgeRow .categoryBadge {
-  padding: 4px 7px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.togetherStatusActive {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 14%, transparent);
-}
-
-.togetherPostBtn .postText h2 {
-  overflow: hidden;
-  margin: 1px 0 0;
-  font-size: 16px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.togetherPostBtn .postText p {
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.togetherPostBtn .postText small {
-  font-size: 11px;
-}
-
-.togetherInlinePrice {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  color: var(--color-muted);
-  font-size: 12px;
-}
-
-.togetherInlinePrice strong {
+.togetherCategoryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   color: var(--color-text);
-  font-size: 14px;
+  letter-spacing: -0.01em;
 }
 
-.togetherProgressWrap {
-  padding-top: 2px;
+.togetherStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.togetherStatusPillActive {
+  color: #20b77a;
+  background: rgba(32, 183, 122, 0.12);
+  border: 1px solid rgba(32, 183, 122, 0.28);
+}
+
+.togetherStatusPillFull {
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #20b77a;
+  box-shadow: 0 0 7px rgba(32, 183, 122, 0.7);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.togetherDdayPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #ff922b;
+  background: rgba(255, 146, 43, 0.12);
+  border: 1px solid rgba(255, 146, 43, 0.25);
+  letter-spacing: -0.01em;
+}
+
+.togetherCardArrow {
+  color: var(--color-dim);
+  flex-shrink: 0;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.togetherFeedCard:hover .togetherCardArrow {
+  color: var(--color-text);
+  transform: translateX(2px);
+}
+
+/* Card Body: Title & Preview */
+.togetherCardBody {
+  margin-bottom: 10px;
+}
+
+.togetherCardTitle {
+  margin: 0 0 6px;
+  font-size: 16.5px;
+  font-weight: 750;
+  line-height: 1.4;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.togetherCardContent {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-muted);
+  word-break: keep-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Group Buy Highlight Tag */
+.togetherPriceTag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 146, 43, 0.08);
+  border: 1px solid rgba(255, 146, 43, 0.22);
+  margin-bottom: 12px;
+}
+
+.togetherPriceLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.togetherPriceAmount {
+  font-size: 15px;
+  font-weight: 850;
+  color: #ff922b;
+  letter-spacing: -0.01em;
+}
+
+/* Linear Progress Bar Section */
+.togetherProgressSection {
+  margin-bottom: 12px;
+}
+
+.togetherProgressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.togetherProgressCount {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.togetherProgressCount strong {
+  color: var(--color-text);
+}
+
+.togetherProgressPercent {
+  font-weight: 800;
+  color: #ff922b;
 }
 
 .togetherProgressBar {
@@ -9598,98 +9871,399 @@ img.thumbnail {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--color-surface-2);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .togetherProgressFill {
   height: 100%;
   border-radius: inherit;
-  background: var(--color-primary);
+  background: linear-gradient(90deg, #ff922b, #ff6f0f);
   transition: width 240ms ease;
 }
+
+/* Card Footer: Location, Author, Views */
+.togetherCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-dim);
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.togetherCardMetaLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.togetherDotDivider {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.togetherCardMetaRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Legacy togetherPostBtn fallback for any unmigrated instances */
+.togetherPostBtn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 14px 0 !important;
+}
+
+.togetherPostBtn .postText h2 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 4px 0;
+  text-align: left;
+}
+
+.togetherPostBtn .postText p {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  text-align: left;
+}
+
+.togetherPostBtn .postText small {
+  font-size: 12px;
+  color: var(--color-dim);
+  text-align: left;
+}
+
+/* ==========================================================================
+   Together Detail View Components & Layout
+   ========================================================================== */
 
 .detailArticle .togetherBadgeRow {
   margin-bottom: 12px;
 }
 
 .detailArticle .togetherBox {
-  margin-top: 20px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.togetherBoxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--color-text);
+}
+
+.togetherBoxIcon {
+  font-size: 17px;
+}
+
+.togetherPercentBadge {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ff922b;
+  background: rgba(255, 146, 43, 0.12);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* Key-Value Info Grid for Group Buy */
+.togetherInfoGrid {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.togetherInfoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.togetherInfoRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.togetherInfoLabel {
+  font-size: 13.5px;
+  color: var(--color-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.togetherInfoValue {
+  font-size: 14px;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: right;
+  word-break: keep-all;
+}
+
+.togetherInfoPrice {
+  font-size: 16px;
+  font-weight: 850;
+  color: #ff922b;
+  text-align: right;
+}
+
+/* Participant List & Rows */
 .togetherParticipantList {
   display: grid;
   gap: 0;
-  border-top: 1px solid var(--color-line);
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.togetherParticipantRow,
-.togetherEmptyRow {
-  min-height: 48px;
+.togetherParticipantRow {
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid var(--color-line);
-  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13.5px;
+}
+
+.togetherParticipantRow:last-child {
+  border-bottom: 0;
 }
 
 .togetherParticipantUser {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.togetherMiniAvatar,
-.togetherEmptyAvatar {
-  width: 28px;
-  height: 28px;
+.togetherMiniAvatar {
+  width: 34px;
+  height: 34px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 9px;
-  background: var(--color-surface-2);
-  color: var(--color-muted);
-  font-size: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2b2c34 0%, #1f2026 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--color-text);
+  font-size: 13px;
   font-weight: 800;
-}
-
-.togetherEmptyRow {
-  color: var(--color-dim);
 }
 
 .togetherTagHost,
 .togetherTagMe {
-  padding: 3px 5px;
-  border-radius: 4px;
-  color: var(--color-primary);
-  background: var(--color-primary-container);
-  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
   font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.togetherTagHost {
+  color: #ff922b;
+  background: rgba(255, 146, 43, 0.14);
+  border: 1px solid rgba(255, 146, 43, 0.28);
 }
 
 .togetherTagMe {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: #20b77a;
+  background: rgba(32, 183, 122, 0.14);
+  border: 1px solid rgba(32, 183, 122, 0.28);
 }
 
-.togetherBox label {
+/* Empty Participant Slot */
+.togetherEmptyRow {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: var(--color-dim);
+}
+
+.togetherEmptyRow:last-child {
+  border-bottom: 0;
+}
+
+.togetherEmptyUser {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.togetherEmptyAvatar {
+  width: 34px;
+  height: 34px;
   display: grid;
-  gap: 7px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.18);
+  color: var(--color-dim);
+  font-size: 16px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.togetherStartButton {
+.togetherEmptyLabel {
+  color: var(--color-dim);
+  font-weight: 500;
+}
+
+.togetherEmptyBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-dim);
+}
+
+/* ==========================================================================
+   Dedicated Together Bottom Action Bar (Eliminates grid squeezing)
+   ========================================================================== */
+
+.togetherDetailScreen {
+  min-height: var(--app-height);
+  padding: 16px 17px 18px;
+  position: static;
+  box-sizing: border-box;
+}
+
+.togetherDetailActionBar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
   width: 100%;
-  grid-column: 1 / -1;
-  min-height: 48px;
+  min-height: 76px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgba(18, 18, 22, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 55;
+  box-sizing: border-box;
+}
+
+.togetherDetailChatBtn {
+  flex: 0 0 auto;
+  min-width: 104px;
+  height: 48px;
   padding: 0 16px;
-  border: 0;
   border-radius: 12px;
-  background: var(--color-primary);
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 14.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
   white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.togetherDetailChatBtn:hover {
+  background: var(--color-surface-3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.togetherDetailChatBtn:active {
+  transform: scale(0.98);
+}
+
+.togetherDetailJoinBtn {
+  flex: 1;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: 0;
+  font-size: 15px;
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.togetherDetailJoinBtn:active {
+  transform: scale(0.98);
+}
+
+.togetherDetailJoinBtnActive {
+  background: linear-gradient(135deg, #ff8a3d 0%, #ff6f0f 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 111, 15, 0.32);
+}
+
+.togetherDetailJoinBtnJoined {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.togetherDetailJoinBtnFull {
+  background: var(--color-surface-2);
+  color: var(--color-dim);
+  cursor: not-allowed;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Light Theme Overrides (Seed Design Alignment) */
+.stage[data-theme="light"] .togetherDetailActionBar {
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--color-line);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.stage[data-theme="light"] .togetherDetailChatBtn {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+}
+
+.stage[data-theme="light"] .togetherDetailChatBtn:hover {
+  background: var(--color-surface-3);
+  border-color: var(--color-line);
+}
+
+.stage[data-theme="light"] .togetherDetailJoinBtnJoined {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+}
+
+.stage[data-theme="light"] .togetherDetailJoinBtnFull {
+  background: #f1f3f5;
+  color: #8c94a0;
+  border: 1px solid var(--color-line);
 }
 
 .daangnBannerDots {
@@ -9776,36 +10350,38 @@ img.thumbnail {
 .floatingWriteWrapper {
   position: absolute;
   right: 18px;
-  bottom: calc(88px + env(safe-area-inset-bottom));
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
   z-index: 55;
   pointer-events: none;
 }
 
 .togetherFabTooltip {
   background: #ffffff;
-  color: #111111;
+  color: #161618;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
   position: relative;
   white-space: nowrap;
-  animation: bounceTooltip 2.2s infinite ease-in-out;
+  animation: bounceTooltip 2.4s infinite ease-in-out;
   cursor: pointer;
   pointer-events: auto;
-  margin-right: 2px;
+  margin-right: 0;
+  user-select: none;
 }
 
 .togetherFabTooltip::after {
   content: "";
   position: absolute;
   bottom: -6px;
-  right: 20px;
+  right: 21px;
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
@@ -9813,9 +10389,226 @@ img.thumbnail {
   border-top: 6px solid #ffffff;
 }
 
+/* Together feed: align with core trade surfaces, remove promotional/AI chrome. */
+.togetherFeedCard {
+  margin-bottom: 14px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: none;
+}
+.togetherFeedCard:hover { border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-line)); transform: none; box-shadow: none; }
+.togetherFeedCardBtn { padding: 16px; }
+.togetherCardHeader { margin-bottom: 14px; }
+.togetherBadgeRow { gap: 6px; }
+.togetherCategoryPill, .togetherStatusPill, .togetherDdayPill { border-radius: 6px; padding: 4px 8px; font-size: 11px; }
+.togetherCategoryPill { color: var(--color-muted); background: var(--color-surface-2); border-color: var(--color-line); }
+.togetherStatusPillActive { color: var(--color-primary); background: var(--color-primary-container); border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-line)); }
+.togetherStatusPillFull { color: var(--color-dim); background: transparent; border-color: var(--color-line); }
+.statusDot { width: 5px; height: 5px; background: var(--color-primary); box-shadow: none; animation: none; }
+.togetherDdayPill { color: var(--color-primary); background: transparent; border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-line)); }
+.togetherCardArrow { color: var(--color-dim); }
+.togetherCardTitle { font-size: 17px; line-height: 1.3; letter-spacing: -0.025em; }
+.togetherCardContent { max-width: 56ch; color: var(--color-muted); font-size: 13px; line-height: 1.5; }
+.togetherPriceTag { margin-top: 14px; margin-bottom: 14px; padding: 9px 12px; border-radius: 8px; background: var(--color-surface-2); border-color: var(--color-line); }
+.togetherPriceAmount, .togetherProgressPercent { color: var(--color-primary); }
+.togetherProgressBar { height: 5px; border-radius: 4px; background: var(--color-surface-3); }
+.togetherProgressFill { border-radius: 4px; background: var(--color-primary); }
+.togetherCardFooter { padding-top: 12px; color: var(--color-dim); border-top-color: var(--color-line); }
+.togetherFabTooltip { display: none; }
+
+/* Together feed is part of community: flat, quiet, and centered on neighbors. */
+.togetherFeedCard {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.togetherFeedCard:hover {
+  border-color: var(--color-line);
+  background: color-mix(in srgb, var(--color-surface-2) 54%, transparent);
+}
+.togetherFeedCard:active { transform: none; }
+.togetherFeedCardBtn { padding: 18px 2px 17px; }
+.togetherFeedCardBtn:focus-visible {
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.togetherCardHeader { margin-bottom: 10px; }
+.togetherBadgeRow { gap: 8px; }
+.togetherCategoryPill,
+.togetherStatusPill,
+.togetherDdayPill {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.togetherCategoryPill { color: var(--color-muted); }
+.togetherStatusPillActive { color: var(--color-primary); }
+.togetherStatusPillFull { color: var(--color-dim); }
+.togetherDdayPill {
+  color: var(--color-dim);
+  font-weight: 650;
+}
+.togetherCardTitle {
+  margin-bottom: 5px;
+  font-size: 17px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+.togetherCardBody { margin-bottom: 11px; }
+.togetherCardContent {
+  font-size: 13.5px;
+  line-height: 1.52;
+}
+.togetherPriceTag {
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.togetherPriceLabel { color: var(--color-muted); }
+.togetherPriceAmount {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.togetherNeighborSummary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  margin-bottom: 12px;
+}
+.togetherNeighborAvatars {
+  display: flex;
+  flex: 0 0 auto;
+  padding-left: 2px;
+}
+.togetherNeighborAvatar,
+.togetherNeighborAvatarEmpty {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  margin-left: -7px;
+  border: 2px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+.togetherNeighborAvatar:first-child,
+.togetherNeighborAvatarEmpty:first-child { margin-left: 0; }
+.togetherNeighborAvatar:nth-child(2) {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.togetherNeighborAvatar:nth-child(3) {
+  background: var(--color-surface-3);
+  color: var(--color-muted);
+}
+.togetherNeighborAvatarEmpty {
+  width: 34px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-2);
+  color: var(--color-dim);
+  font-size: 9px;
+}
+.togetherNeighborCopy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 12.5px;
+}
+.togetherNeighborCopy strong {
+  color: var(--color-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.togetherRemainingLabel {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.togetherCardFooter {
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}
+.togetherDotDivider { color: var(--color-dim); }
+
+.detailArticle .togetherBox {
+  border-color: var(--color-line);
+  border-radius: 14px;
+}
+.togetherBoxHeader {
+  align-items: flex-start;
+  border-bottom-color: var(--color-line);
+}
+.togetherNeighborDetailCopy {
+  margin: 5px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.togetherNeighborDetailCopy strong {
+  color: var(--color-text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.togetherParticipantList {
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 0;
+  list-style: none;
+}
+.togetherParticipantRow,
+.togetherEmptyRow { border-bottom-color: var(--color-line); }
+.togetherMiniAvatar {
+  border-color: var(--color-line);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.togetherEmptyAvatar {
+  border-color: var(--color-line);
+  background: transparent;
+}
+.togetherDetailJoinBtnActive {
+  background: var(--color-primary);
+  box-shadow: none;
+}
+.togetherDetailChatBtn:focus-visible,
+.togetherDetailJoinBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .togetherFeedCardBtn { padding: 17px 2px 16px; }
+  .togetherCardTitle { font-size: 16px; }
+  .togetherCardContent { -webkit-line-clamp: 3; }
+  .togetherNeighborSummary { gap: 8px; }
+  .togetherNeighborCopy span { display: none; }
+}
+
 @keyframes bounceTooltip {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-5px); }
 }
 
 .circleFab {
@@ -9823,22 +10616,23 @@ img.thumbnail {
   height: 54px;
   border-radius: 50%;
   border: 0;
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #ff922b 0%, #ff6f0f 100%);
   color: #ffffff;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 16px rgba(255, 111, 15, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgba(255, 111, 15, 0.42), 0 2px 6px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 160ms cubic-bezier(0.2, 0, 0, 1), box-shadow 160ms ease;
 }
 
 .circleFab:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(255, 111, 15, 0.52), 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
 .circleFab:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 /* Post View Count Meta */

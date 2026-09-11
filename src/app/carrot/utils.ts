@@ -268,6 +268,7 @@ export function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
     avatarTone: "product",
     lastMessage: dto.lastMessage ?? "",
     lastMessageAt: dto.lastMessageAt ? formatRelativeTime(dto.lastMessageAt) : "",
+    lastMessageAtRaw: dto.lastMessageAt ?? "",
     unreadCount: dto.unreadCount,
     verified: dto.verified,
     muted: false,
@@ -286,6 +287,7 @@ export function toChatMessageUi(dto: ChatMessageDto, myUserId: number | undefine
     mine: dto.senderId === myUserId,
     text: dto.content ?? "",
     time: formatRelativeTime(dto.createdAt),
+    createdAt: dto.createdAt,
     imageUrl: dto.messageType === "IMAGE" ? (dto.imageUrl ?? undefined) : undefined,
     payment:
       dto.messageType === "PAYMENT" && dto.payment

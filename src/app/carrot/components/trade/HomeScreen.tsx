@@ -260,7 +260,7 @@ export function HomeScreen({
     usePullToRefresh(onRefresh);
 
   return (
-    <section className={styles.screen} {...pullHandlers}>
+    <section className={`${styles.screen} ${styles.homeScreen}`} {...pullHandlers}>
       <PullToRefreshIndicator pullOffset={pullOffset} isRefreshing={isRefreshing} />
       <div style={pullContentStyle}>
       <ScreenHeader

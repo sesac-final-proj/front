@@ -27,14 +27,14 @@ export function TogetherDetailView({
   const [showMannerModal, setShowMannerModal] = useState(false);
   const catMeta = TOGETHER_CATEGORIES[post.category] || TOGETHER_CATEGORIES.etc;
   const isJoined = Boolean(post.isJoined);
+  const isCancelled = post.status === "cancelled";
   const isFull = post.participantCount >= post.maxParticipants || post.status === "completed";
-  const progressPercent = Math.min(
-    100,
-    Math.round((post.participantCount / post.maxParticipants) * 100)
-  );
+  const isClosed = isFull || isCancelled;
+  const remainingCount = Math.max(0, post.maxParticipants - post.participantCount);
+  const statusLabel = isCancelled ? "모임 취소" : isFull ? "모집 완료" : "모집중";
 
   return (
-    <section className={styles.screen}>
+    <section className={styles.togetherDetailScreen}>
       {/* ScreenHeader */}
       <header className={styles.screenHeader}>
         <button
@@ -60,17 +60,34 @@ export function TogetherDetailView({
       <article className={styles.detailArticle} style={{ paddingBottom: 110 }}>
         {/* Badges */}
         <div className={styles.togetherBadgeRow}>
-          <span className={styles.categoryBadge}>{catMeta.label}</span>
-          <span className={`${styles.categoryBadge} ${isFull ? "" : styles.togetherStatusActive}`}>
-            {isFull ? "모집완료" : "모집중"}
+          <span className={styles.togetherCategoryPill}>
+            <span>{catMeta.label}</span>
           </span>
-          <span className={styles.categoryBadge}>
+          <span
+            className={`${styles.togetherStatusPill} ${
+              isClosed ? styles.togetherStatusPillFull : styles.togetherStatusPillActive
+            }`}
+          >
+            <span>{statusLabel}</span>
+          </span>
+          <span className={styles.togetherDdayPill}>
             {post.deadlineDaysLeft > 0 ? `D-${post.deadlineDaysLeft}` : "오늘 마감"}
           </span>
         </div>
 
         {/* Title */}
-        <h1>{post.title}</h1>
+        <h1
+          style={{
+            fontSize: 21,
+            fontWeight: 800,
+            margin: "10px 0 6px",
+            lineHeight: 1.35,
+            wordBreak: "keep-all",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {post.title}
+        </h1>
 
         <p className={styles.metaLine}>
           {post.regionName} · {post.deadline} 마감 · 조회 {post.viewCount}
@@ -91,49 +108,69 @@ export function TogetherDetailView({
         </div>
 
         {/* Content Body */}
-        <p className={styles.detailDescription}>{post.content}</p>
+        <p
+          className={styles.detailDescription}
+          style={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "keep-all",
+            lineHeight: 1.65,
+            fontSize: 15,
+            color: "var(--color-text)",
+            margin: "16px 0 8px",
+          }}
+        >
+          {post.content}
+        </p>
 
         {/* Group Buy Section if applicable */}
         {post.category === "group_buy" && (post.productName || post.targetPrice) && (
           <div className={styles.togetherBox}>
-            <strong>🛒 공동구매 상세</strong>
-            {post.productName && (
-              <div>
-                <span>구매 품목</span>
-                <strong>{post.productName}</strong>
+            <div className={styles.togetherBoxHeader}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>공동구매 상세 정보</span>
               </div>
-            )}
-            {post.targetPrice && (
-              <div>
-                <span>1인당 예상 분담금</span>
-                <strong style={{ color: "var(--color-primary)" }}>
-                  {post.targetPrice.toLocaleString()}원
-                </strong>
-              </div>
-            )}
+            </div>
+            <div className={styles.togetherInfoGrid}>
+              {post.productName && (
+                <div className={styles.togetherInfoRow}>
+                  <span className={styles.togetherInfoLabel}>구매 품목</span>
+                  <strong className={styles.togetherInfoValue}>{post.productName}</strong>
+                </div>
+              )}
+              {post.targetPrice && (
+                <div className={styles.togetherInfoRow}>
+                  <span className={styles.togetherInfoLabel}>1인당 예상 분담금</span>
+                  <strong className={styles.togetherInfoPrice}>
+                    {post.targetPrice.toLocaleString()}원
+                  </strong>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Participant Progress & List */}
+        {/* Neighbor participation, expressed as people instead of a percentage. */}
         <div className={styles.togetherBox}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <strong>👥 참여 이웃 ({post.participantCount} / {post.maxParticipants}명)</strong>
-            <span style={{ fontSize: 13, color: "var(--color-primary)", fontWeight: 700 }}>
-              {progressPercent}%
+          <div className={styles.togetherBoxHeader}>
+            <div>
+              <span>같이 참여하는 이웃</span>
+              <p className={styles.togetherNeighborDetailCopy}>
+                <strong>{post.participantCount}명</strong>이 함께하고 있어요
+              </p>
+            </div>
+            <span className={styles.togetherRemainingLabel}>
+              {isCancelled
+                ? "취소된 모임"
+                : isFull
+                  ? "모집이 끝났어요"
+                  : `${remainingCount}자리 남았어요`}
             </span>
           </div>
-          <div className={styles.togetherProgressBar}>
-            <div
-              className={styles.togetherProgressFill}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          <div className={styles.togetherParticipantList}>
+          <ul className={styles.togetherParticipantList} aria-label="참여 이웃 목록">
             {post.participants.map((p, idx) => (
-              <div key={idx} className={styles.togetherParticipantRow}>
+              <li key={`${p.userId}-${idx}`} className={styles.togetherParticipantRow}>
                 <div className={styles.togetherParticipantUser}>
-                  <div className={styles.togetherMiniAvatar}>
+                  <div className={styles.togetherMiniAvatar} aria-hidden="true">
                     {p.userName.slice(0, 1)}
                   </div>
                   <span>{p.userName}</span>
@@ -147,50 +184,53 @@ export function TogetherDetailView({
                 <small style={{ color: "var(--color-muted)", fontSize: 12 }}>
                   {p.joinedAt.slice(0, 10)}
                 </small>
-              </div>
+              </li>
             ))}
 
             {Array.from({ length: Math.max(0, post.maxParticipants - post.participants.length) }).map(
               (_, i) => (
-                <div key={`empty-${i}`} className={styles.togetherEmptyRow}>
-                  <div className={styles.togetherEmptyAvatar}>+</div>
-                  <span>참여 가능한 빈자리</span>
-                </div>
+                <li key={`empty-${i}`} className={styles.togetherEmptyRow}>
+                  <div className={styles.togetherEmptyUser}>
+                    <div className={styles.togetherEmptyAvatar} aria-hidden="true">+</div>
+                    <span className={styles.togetherEmptyLabel}>함께할 이웃을 기다려요</span>
+                  </div>
+                </li>
               )
             )}
-          </div>
+          </ul>
         </div>
       </article>
 
-      {/* Fixed Bottom Action Bar */}
-      <div className={styles.detailActionBar}>
+      {/* Dedicated Fixed Bottom Action Bar */}
+      <div className={styles.togetherDetailActionBar}>
         {post.allowChat && (
           <button
             type="button"
             onClick={onStartChat}
-            style={{ width: "auto", minWidth: 96 }}
+            className={styles.togetherDetailChatBtn}
+            aria-label="채팅하기"
           >
-            <MessageCircle size={18} style={{ marginRight: 4 }} />
-            채팅하기
+            <MessageCircle size={18} />
+            <span>채팅하기</span>
           </button>
         )}
         <button
           type="button"
           onClick={onToggleJoin}
-          disabled={!isJoined && isFull}
-          style={{
-            flex: 1,
-            background: isJoined
-              ? "#303136"
-              : isFull
-              ? "var(--color-dim)"
-              : "var(--color-primary)",
-            color: isJoined ? "var(--color-text)" : "#ffffff",
-          }}
+          disabled={!isJoined && isClosed}
+          className={`${styles.togetherDetailJoinBtn} ${
+            isJoined
+              ? styles.togetherDetailJoinBtnJoined
+              : isClosed
+              ? styles.togetherDetailJoinBtnFull
+              : styles.togetherDetailJoinBtnActive
+          }`}
+          aria-label={isJoined ? "참여 취소" : isCancelled ? "취소된 모임" : isFull ? "모집 마감" : "같이하기"}
         >
-          {isJoined ? "참여 취소" : isFull ? "모집 마감" : "같이하기"}
+          {isJoined ? "참여 취소" : isCancelled ? "취소된 모임" : isFull ? "모집 마감" : "같이하기"}
         </button>
       </div>
+
       <MannerTemperatureModal
         isOpen={showMannerModal}
         onClose={() => setShowMannerModal(false)}
@@ -199,4 +239,3 @@ export function TogetherDetailView({
     </section>
   );
 }
-

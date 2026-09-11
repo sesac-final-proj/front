@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Sprout } from "lucide-react";
+import { ChevronLeft, ChevronRight, History, Sprout } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { DonationFacility } from "@/types";
 import { NEIGHBORHOOD_DISTRICTS } from "../../constants";
@@ -18,11 +18,13 @@ export interface DreamDashboardScreenProps {
   onBack: () => void;
   onChangeNeighborhood: () => void;
   onOpenNotice: () => void;
+  onOpenPointsHistory: () => void;
 }
 
 export function DreamDashboardScreen({
   activeNeighborhood,
   onBack,
+  onOpenPointsHistory,
   onChangeNeighborhood,
   onOpenNotice,
 }: DreamDashboardScreenProps) {
@@ -85,6 +87,11 @@ export function DreamDashboardScreen({
         leading={
           <IconButton label="뒤로" onClick={onBack}>
             <ChevronLeft size={27} />
+          </IconButton>
+        }
+        actions={
+          <IconButton label="꿈방울 적립 내역" onClick={onOpenPointsHistory}>
+            <History size={22} />
           </IconButton>
         }
       />
@@ -212,7 +219,7 @@ export function DreamDashboardScreen({
                       className={styles.dreamFacilityHomepageButton}
                       href={facility.homepageUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       <span className={styles.homepageLogoBadge}>
                         <Image src="/brand/daangn-mark.svg" alt="" width={16} height={16} />
