@@ -32,6 +32,8 @@ export interface AdminDataStatus {
     completed_count: number;
     average_price: number | null;
   }[];
+  category_counts_by_gu: { gu_name: string; category: string; transaction_count: number }[];
+  category_counts_by_region: { region_name: string; category: string; transaction_count: number }[];
   recent_transactions: {
     id: number;
     product_title: string;
