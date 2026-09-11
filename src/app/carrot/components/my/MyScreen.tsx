@@ -13,7 +13,7 @@ import {
   Building2,
   Utensils,
   Dumbbell,
-  Shirt,
+  Gamepad2,
   BriefcaseBusiness,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
@@ -37,6 +37,7 @@ export interface MyScreenProps {
   onOpenAllServices: () => void;
   onOpenDream: () => void;
   onOpenAlba: () => void;
+  onOpenGame?: () => void;
   onOpenSales: () => void;
   onOpenFavorites: () => void;
   onOpenRecentlyViewed: () => void;
@@ -59,6 +60,7 @@ export function MyScreen({
   onOpenAllServices,
   onOpenDream,
   onOpenAlba,
+  onOpenGame,
   onOpenSales,
   onOpenFavorites,
   onOpenRecentlyViewed,
@@ -67,12 +69,12 @@ export function MyScreen({
   onOpenWalletPay,
 }: MyScreenProps) {
   const services: IconItem[] = [
-    { label: "중고거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
+    { label: "나의 거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
     { label: "모임", icon: UsersRound, tone: "primary" },
     { label: "내 아파트", icon: Building2, tone: "primary", onClick: onOpenApartment },
     { label: "포장주문", icon: Utensils, tone: "amber" },
     { label: "동네걷기", icon: Dumbbell, tone: "yellow" },
-    { label: "세탁 수거", icon: Shirt, tone: "cyan" },
+    { label: "게임", icon: Gamepad2, tone: "primary", onClick: onOpenGame },
     { label: "당근알바", icon: BriefcaseBusiness, tone: "primary", onClick: onOpenAlba },
     { label: "전체보기", icon: ChevronRight, tone: "muted", onClick: onOpenAllServices },
   ];

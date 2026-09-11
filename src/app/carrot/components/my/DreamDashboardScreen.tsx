@@ -219,7 +219,7 @@ export function DreamDashboardScreen({
                       className={styles.dreamFacilityHomepageButton}
                       href={facility.homepageUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       <span className={styles.homepageLogoBadge}>
                         <Image src="/brand/daangn-mark.svg" alt="" width={16} height={16} />

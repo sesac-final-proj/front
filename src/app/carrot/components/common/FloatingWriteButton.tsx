@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 
 export function FloatingWriteButton({
@@ -13,16 +13,28 @@ export function FloatingWriteButton({
   showTogetherTooltip?: boolean;
   onTooltipClick?: () => void;
 }) {
+  const handleTooltipClick = onTooltipClick || onClick;
+
   return (
     <div className={styles.floatingWriteWrapper}>
       {showTogetherTooltip && (
         <div
           className={styles.togetherFabTooltip}
-          onClick={onTooltipClick || onClick}
+          onClick={handleTooltipClick}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleTooltipClick();
+            }
+          }}
           role="button"
           tabIndex={0}
+          aria-label="같이해요 기능 시작하기 안내"
         >
-          <span>같이해요 기능이 출시되었어요!</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Sparkles size={14} style={{ color: "#ff922b" }} />
+            같이해요 기능이 출시되었어요!
+          </span>
         </div>
       )}
       <button

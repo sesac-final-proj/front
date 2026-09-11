@@ -1,15 +1,54 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { answerInquiry, closeAdminInquiry, listAdminInquiries, type SupportInquiry } from "@/services/supportService";
-import styles from "@/components/admin/portal.module.css";
-
+import { useEffect, useState } from "react";
+import { answerInquiry, closeAdminInquiry, deleteAdminInquiry, listAdminInquiryPage, getAdminInquiry, type SupportPage, type SupportInquiry } from "@/services/supportService";
+import { AdminTable } from "../AdminUI";
+import styles from "../portal.module.css";
 const labels = { WAITING: "답변 대기", ANSWERED: "사용자 확인 대기", CLOSED: "종료" } as const;
 export default function SupportSection() {
-  const [items, setItems] = useState<SupportInquiry[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [busyId, setBusyId] = useState<number | null>(null);
-  const load = useCallback(async () => { setLoading(true); setError(""); try { setItems(await listAdminInquiries()); } catch (e) { setError(e instanceof Error ? e.message : "문의를 불러오지 못했습니다."); } finally { setLoading(false); } }, []);
-  useEffect(() => { void load(); }, [load]);
-  async function submit(id: number, answer: string) { setBusyId(id); setError(""); try { await answerInquiry(id, answer); await load(); } catch (e) { setError(e instanceof Error ? e.message : "답변을 저장하지 못했습니다."); } finally { setBusyId(null); } }
-  async function complete(id: number) { setBusyId(id); setError(""); try { await closeAdminInquiry(id); await load(); } catch (e) { setError(e instanceof Error ? e.message : "문의를 종료하지 못했습니다."); } finally { setBusyId(null); } }
-  if (loading) return <div className={styles.state}>문의 목록을 불러오는 중입니다.</div>;
-  return <div className={styles.supportAdmin}>{error && <p className={styles.feedback}>{error}</p>}{items.length === 0 ? <div className={styles.state}>접수된 문의가 없습니다.</div> : items.map(item => <article className={styles.card} key={item.id}><header><div><span className={styles.supportStatus}>{labels[item.status]}</span><h2>{item.title}</h2><small>{item.user_nickname} · {item.user_email} · {new Date(item.created_at).toLocaleString("ko-KR")}</small></div></header><div className={styles.supportThread}>{item.messages.map((message, index) => <div className={message.author_role === "ADMIN" ? styles.supportSavedAnswer : styles.supportQuestion} key={message.id ?? `${message.author_role}-${index}`}><b>{message.author_role === "ADMIN" ? "관리자 답변" : "사용자 질문"}</b><p>{message.content}</p></div>)}</div>{item.status !== "CLOSED" && <form onSubmit={e => { e.preventDefault(); void submit(item.id, String(new FormData(e.currentTarget).get("answer"))); }}><textarea name="answer" minLength={2} maxLength={4000} placeholder="사용자에게 보낼 답변을 입력하세요." required /><div className={styles.supportActions}><button disabled={busyId === item.id}>답변 등록</button><button type="button" className={styles.completeButton} disabled={busyId === item.id} onClick={() => void complete(item.id)}>답변 완료</button></div></form>}</article>)}</div>;
+  const [result, setResult] = useState<SupportPage>({ items: [], total: 0, page: 1, page_size: 15 });
+  const [loading, setLoading] = useState(true), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<SupportInquiry | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [query, setQuery] = useState(""), [status, setStatus] = useState("all"), [page, setPage] = useState(1);
+  useEffect(() => {
+    let active = true;
+    const request = selectedId === null
+      ? listAdminInquiryPage(page, status, query).then(rows => { if (active) setResult(rows); })
+      : getAdminInquiry(selectedId).then(row => { if (active) setSelected(row); });
+    request
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : "문의를 불러오지 못했습니다."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [page, status, query, selectedId, revision]);
+  function reload() { setLoading(true); setError(""); setRevision(value => value + 1); }
+  function select(id: number | null) { setSelected(null); setSelectedId(id); reload(); }
+  async function action(run: () => Promise<unknown>) {
+    setBusy(true); setError("");
+    try { await run(); reload(); }
+    catch (e) { setError(e instanceof Error ? e.message : "요청 실패"); }
+    finally { setBusy(false); }
+  }
+  const pages = Math.max(1, Math.ceil(result.total / result.page_size)), currentPage = result.page;
+  return <div className={styles.supportAdmin}>
+    {error && <p role="alert" className={styles.feedback}>{error}</p>}
+    {loading && <p role="status">문의 목록 갱신 중…</p>}
+    {selectedId !== null ? <article className={styles.card}>
+      <button disabled={busy} onClick={() => select(null)}>목록으로</button>
+      {selected && <>
+      <h2>{selected.title}</h2><p>{labels[selected.status]} · {selected.user_nickname} · {selected.user_email}</p>
+      <div className={styles.supportThread}>{selected.messages.map((message, index) => <div key={message.id ?? index}><b>{message.author_role === "ADMIN" ? "관리자" : "사용자"}</b><p style={{ whiteSpace: "pre-wrap" }}>{message.content}</p></div>)}</div>
+      {selected.status !== "CLOSED" ? <form onSubmit={event => { event.preventDefault(); const answer = String(new FormData(event.currentTarget).get("answer")); void action(() => answerInquiry(selected.id, answer)); }}>
+        <textarea key={selected.messages.length} name="answer" aria-label="문의 답변" minLength={2} maxLength={4000} required />
+        <div className={styles.supportActions}><button disabled={busy}>답변 등록</button><button type="button" disabled={busy} onClick={() => void action(() => closeAdminInquiry(selected.id))}>문의 종료</button></div>
+      </form> : <button disabled={busy} onClick={() => { if (window.confirm("종료된 문의와 대화 내역을 영구 삭제합니다. 사용자 목록에서도 사라지며 복구할 수 없습니다. 삭제할까요?")) void action(async () => { await deleteAdminInquiry(selected.id); select(null); }); }}>종료 문의 삭제</button>}
+      </>}
+    </article> : <article className={styles.card}>
+      <div className={styles.supportActions}><input type="search" maxLength={120} aria-label="문의 제목·작성자 검색" placeholder="제목·작성자 검색" value={query} onChange={event => { setQuery(event.target.value); setPage(1); reload(); }} /><select aria-label="문의 상태" value={status} onChange={event => { setStatus(event.target.value); setPage(1); reload(); }}><option value="all">전체 상태</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button onClick={reload} disabled={loading}>새로고침</button></div>
+      <p>{result.total}건</p>
+      <AdminTable headers={["상태", "문의 제목", "작성자", "접수일"]}>{result.items.map(item => <tr key={item.id}><td>{labels[item.status]}</td><td><button disabled={loading} onClick={() => select(item.id)}>{item.title}</button></td><td>{item.user_nickname ?? item.user_email}</td><td>{new Date(item.created_at).toLocaleDateString("ko-KR")}</td></tr>)}</AdminTable>
+      {!loading && !result.items.length && <p>조건에 맞는 문의가 없습니다.</p>}
+      <div className={styles.supportActions}><button disabled={loading || currentPage <= 1} onClick={() => { setPage(currentPage - 1); reload(); }}>이전</button><span>{currentPage} / {pages}</span><button disabled={loading || currentPage >= pages} onClick={() => { setPage(currentPage + 1); reload(); }}>다음</button></div>
+    </article>}
+  </div>;
 }

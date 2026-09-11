@@ -242,7 +242,6 @@ function OptunaParamsCard({ metrics }: { metrics: PriceModelMetricItem[] }) {
     </article>
   );
 }
-
 function PlatformComparisonChart({ rows }: { rows: PricePlatformComparisonItem[] }) {
   // 플랫폼별로 그룹 막대(중위가) + 오차막대(p25~p75)를 카테고리마다 나란히 — 표보다 플랫폼 간 격차가 한눈에 들어온다.
   const platforms = Array.from(new Set(rows.map(r => r.platform)));
@@ -394,7 +393,7 @@ export function PricePredictionSection() {
       </div>
 
       {loading ? <Skeleton /> : error || !data ? <ErrorState message={error} retry={retry} /> : <>
-        <div className={styles.chartGrid}>
+        <div className={styles.chartGrid} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
           <article className={styles.card}>
             <div className={styles.cardHead}><div><h2>모델 지표</h2><p>feature set × 모델별 검증 성능 · Hit@20%(오차 ±20% 이내 적중률)와 구간 커버리지(예측 10~90% 구간 안에 실제가가 들어올 확률, 목표 80%)는 서로 다른 지표</p></div></div>
             <AdminTable headers={["Feature Set", "모델", "R²", "RMSE", "MAE", "MAPE", "Hit@10%", "Hit@20%", "구간 커버리지(10-90%)"]}>
@@ -404,10 +403,6 @@ export function PricePredictionSection() {
                 <td>{m.extra?.range_coverage_10_90 != null ? `${(m.extra.range_coverage_10_90 * 100).toFixed(1)}%` : "—"}</td>
               </tr>)}
             </AdminTable>
-          </article>
-          <article className={styles.card}>
-            <div className={styles.cardHead}><div><h2>R² 비교</h2><p>값이 높을수록(100에 가까울수록) 설명력이 좋음</p></div></div>
-            <MetricsR2Bar metrics={data.metrics} />
           </article>
         </div>
 
