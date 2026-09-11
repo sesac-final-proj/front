@@ -15,3 +15,30 @@
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
 .legendItem{display:flex;align-items:center;gap:6px;font-size:11px;color:#656b60}
 .legendSwatch{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+/* 카테고리 전체 요약 — 메인은 아래 지역별 비교라, 이건 작고 조용한 보조 정보로 */
+.overviewStrip{display:flex;flex-wrap:wrap;gap:10px 26px;padding:16px 20px;margin:10px 0 30px;background:#F7F7F5;border-radius:12px}
+.overviewChip{display:flex;align-items:baseline;gap:7px;white-space:nowrap}
+.overviewChip span{font-size:11px;color:#8b9184}
+.overviewChip strong{font-size:13px;font-weight:700;color:#42483b}
+
+/* 지역별 비교가 이 섹션의 메인이라 굵은 강조 헤더 + 카드 둘레 강조로 눈에 띄게 한다 */
+.primaryHeading{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.primaryHeading h2{font-size:19px;font-weight:800;letter-spacing:-.4px;margin:0}
+.primaryBadge{font-size:11px;font-weight:700;color:#fff;background:#FF6F0F;padding:4px 11px;border-radius:999px}
+.primaryCard{border:1.5px solid #FFD9B8;box-shadow:0 4px 18px -12px rgba(255,111,15,.4)}
+
+/* 구별 통계 표는 "구" 칸에 짧은 값(예: 송파구)만 들어가는데, 공용 표 스타일의
+   첫 칸 min-width:180px(긴 제목용) 때문에 카드 폭보다 넓어져서 가로 스크롤이
+   생겼다 — 이 표에서만 첫 칸 최소폭을 없앤다(element selector로 특이도를 올려
+   공용 규칙을 덮어씀). */
+.regionTable table td:first-child{min-width:0;max-width:none}
+
+/* 컬럼이 늘어나서(거래빈도/가격 변동성 추가) 좁은 화면에선 다시 넘칠 수 있다 —
+   기본 스크롤바는 맥OS 등에서 스크롤할 때만 잠깐 보여서 "잘렸는데 스크롤할 데가
+   없다"고 느껴진다. 항상 보이는 얇은 스크롤바를 직접 그려서 넘친다는 걸 바로 알림. */
+.regionTable > div{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#FF9D5B #F0F1ED}
+.regionTable > div::-webkit-scrollbar{height:8px}
+.regionTable > div::-webkit-scrollbar-track{background:#F0F1ED;border-radius:4px}
+.regionTable > div::-webkit-scrollbar-thumb{background:#FF9D5B;border-radius:4px}
+.regionTable > div::-webkit-scrollbar-thumb:hover{background:#FF6F0F}
