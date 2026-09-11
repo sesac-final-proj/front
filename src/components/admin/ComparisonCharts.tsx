@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart, registerables, type ChartConfiguration, type Plugin } from "chart.js";
-import type { PricePlatformComparisonItem } from "@/services/adminService";
+import type { PriceComparisonDetailTypeItem, PriceComparisonRegionItem, PricePlatformComparisonItem } from "@/services/adminService";
 import {
   COLORS,
+  EXTERNAL_RADAR_METRICS,
   PLATFORMS,
-  RADAR_CATEGORY_LIMITS,
-  reconcileRadarCategories,
+  REGION_RADAR_METRICS,
+  carrotBenchmarkValues,
+  regionRadarValues,
   reviewComparisons,
-  toggleRadarCategory,
 } from "./comparison-data";
 import styles from "./portal.module.css";
 
@@ -17,74 +18,63 @@ Chart.register(...registerables);
 
 const RADAR_FILLS = ["rgba(214, 94, 19, .1)", "rgba(39, 100, 165, .08)", "rgba(130, 106, 39, .08)"];
 const RADAR_SHAPES = ["circle", "rect", "triangle"] as const;
+type RadarMode = "external" | "regions";
 
-export function ComparisonCharts({ rows }: { rows: PricePlatformComparisonItem[] }) {
-  const radar = useRef<HTMLCanvasElement>(null);
+function CategoryRadar({ category, platformRows, regionRows, detailRows, mode }: {
+  category: string;
+  platformRows: PricePlatformComparisonItem[];
+  regionRows: PriceComparisonRegionItem[];
+  detailRows: PriceComparisonDetailTypeItem[];
+  mode: RadarMode;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const carrot = platformRows.find(row => row.platform === "당근");
+  const seriesRows = mode === "external" ? platformRows : regionRows;
+  const labels = mode === "external" ? EXTERNAL_RADAR_METRICS : REGION_RADAR_METRICS;
+  const series = seriesRows.map(row => mode === "external" ? (row as PricePlatformComparisonItem).platform : (row as PriceComparisonRegionItem).gu);
+  const values = mode === "external"
+    ? carrotBenchmarkValues(platformRows)
+    : regionRadarValues(regionRows, detailRows, carrot?.median_price ?? 0);
+
+  useEffect(() => {
+    if (!canvas.current || values.length < 2) return;
+    const chart = new Chart(canvas.current, {
+      type: "radar",
+      data: { labels: [...labels], datasets: values.map((data, index) => ({
+        label: series[index], data, borderColor: COLORS[index], backgroundColor: RADAR_FILLS[index],
+        pointBackgroundColor: COLORS[index], pointBorderColor: "#f3f2ed", pointStyle: RADAR_SHAPES[index],
+        pointRadius: 3, pointHoverRadius: 5, borderWidth: 2, borderDash: index ? [index * 3, 3] : [], fill: true,
+      })) },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: 14 },
+        scales: { r: { min: 0, max: 200, angleLines: { color: "rgba(67,72,65,.14)" }, grid: { color: context => context.tick.value === 100 ? "rgba(214,94,19,.48)" : "rgba(67,72,65,.12)", circular: false }, pointLabels: { color: "#30362e", font: { size: 10, weight: 600 }, padding: 9 }, ticks: { stepSize: 50, color: "#777d72", backdropColor: "transparent", showLabelBackdrop: false, font: { size: 8 } } } },
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: "#242823", padding: 10, callbacks: { label: context => `${context.dataset.label}: 지수 ${Number(context.raw).toFixed(0)}` } } },
+      },
+    });
+    return () => chart.destroy();
+  }, [labels, series, values]);
+
+  if (values.length < 2) return <article className={styles.radarCard}><h4>{category}</h4><p className={styles.radarEmpty}>이 비교 방식의 표본이 부족합니다.</p></article>;
+  return <article className={styles.radarCard}>
+    <header><div><h4>{category}</h4><small>{mode === "external" ? "당근 = 100 기준" : `${regionRows.length}개 구 비교`}</small></div><span>{seriesRows.reduce((sum, row) => sum + row.sample_count, 0).toLocaleString()}건</span></header>
+    <div className={styles.radarPlot}><canvas ref={canvas} role="img" aria-label={`${category} ${mode === "external" ? "외부 플랫폼" : "구별"} 거래 지표 비교`} /></div>
+    <div className={styles.radarLegend}>{series.map((name, index) => <span key={name} data-series={index + 1}><i aria-hidden="true" />{name}</span>)}</div>
+  </article>;
+}
+
+export function ComparisonCharts({ rows, regions, detailTypes }: { rows: PricePlatformComparisonItem[]; regions: PriceComparisonRegionItem[]; detailTypes: PriceComparisonDetailTypeItem[] }) {
   const boxes = useRef<HTMLCanvasElement>(null);
   const changes = useRef<HTMLCanvasElement>(null);
   const reviewed = useMemo(() => reviewComparisons(rows), [rows]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(reviewed.comparable.slice(0, RADAR_CATEGORY_LIMITS.max));
-  const radarCategories = useMemo(
-    () => reconcileRadarCategories(selectedCategories, reviewed.comparable),
-    [selectedCategories, reviewed.comparable],
-  );
+  const [radarMode, setRadarMode] = useState<RadarMode>("external");
+  const radarCategories = useMemo(() => [...new Set([...reviewed.categories, ...regions.map(row => row.category)])]
+    .filter(category => category !== "전체")
+    .sort((a, b) => a.localeCompare(b, "ko")), [regions, reviewed.categories]);
 
   useEffect(() => {
-    const { rows: valid, comparable, gaps } = reviewComparisons(rows);
+    const { rows: valid, gaps } = reviewComparisons(rows);
     const charts: Chart[] = [];
     const base = { responsive: true, maintainAspectRatio: false, animation: false as const };
-
-    if (radar.current && comparable.length >= RADAR_CATEGORY_LIMITS.min && radarCategories.length >= RADAR_CATEGORY_LIMITS.min) {
-      const categories = radarCategories;
-      charts.push(new Chart(radar.current, {
-        type: "radar",
-        data: {
-          labels: categories,
-          datasets: PLATFORMS.map((platform, index) => ({
-            label: platform,
-            borderColor: COLORS[index],
-            backgroundColor: RADAR_FILLS[index],
-            pointBackgroundColor: COLORS[index],
-            pointBorderColor: "#f3f2ed",
-            pointStyle: RADAR_SHAPES[index],
-            pointRadius: 4,
-            pointHoverRadius: 5,
-            borderWidth: 2,
-            borderDash: index ? [index * 3, 3] : [],
-            fill: true,
-            data: categories.map(category => {
-              const group = valid.filter(row => row.category === category);
-              return 100 * group.find(row => row.platform === platform)!.median_price / Math.max(1, ...group.map(row => row.median_price));
-            }),
-          })),
-        },
-        options: {
-          ...base,
-          layout: { padding: 22 },
-          scales: {
-            r: {
-              min: 0,
-              max: 100,
-              angleLines: { color: "rgba(67, 72, 65, .14)", lineWidth: 1 },
-              grid: { color: "rgba(67, 72, 65, .14)", circular: false },
-              pointLabels: { color: "#30362e", font: { size: 12, weight: 600 }, padding: 13 },
-              ticks: { stepSize: 25, color: "#6f756c", backdropColor: "transparent", showLabelBackdrop: false, font: { size: 10 } },
-            },
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "#242823",
-              titleColor: "#f7f7f5",
-              bodyColor: "#f7f7f5",
-              padding: 11,
-              displayColors: true,
-              callbacks: { label: context => `${context.dataset.label}: 지수 ${Number(context.raw).toFixed(1)}` },
-            },
-          },
-        },
-      }));
-    }
 
     if (changes.current && gaps.length) {
       charts.push(new Chart(changes.current, {
@@ -119,50 +109,19 @@ export function ComparisonCharts({ rows }: { rows: PricePlatformComparisonItem[]
     }
 
     return () => charts.forEach(chart => chart.destroy());
-  }, [rows, radarCategories]);
-
-  const updateCategory = (category: string) => {
-    setSelectedCategories(current => toggleRadarCategory(current, category, reviewed.comparable));
-  };
+  }, [rows]);
 
   return <>
     <section className={styles.radarSection} aria-labelledby="radar-title">
       <header className={styles.radarHeader}>
         <div>
-          <h3 id="radar-title">플랫폼별 품목 가격 지수</h3>
-          <p id="radar-description">각 품목의 최고 중앙값을 100으로 환산해 플랫폼별 가격 수준을 비교합니다.</p>
+          <h3 id="radar-title">품목별 거래 기준 비교</h3>
+          <p id="radar-description">품목마다 레이더를 분리했습니다. 외부 비교는 당근을 100으로, 구별 비교는 같은 품목의 지역별 가격·거래 양상을 보여줍니다.</p>
         </div>
-        <span id="radar-selection-status" className={styles.radarSelectionStatus} aria-live="polite">
-          선택 {radarCategories.length} / {RADAR_CATEGORY_LIMITS.max}
-        </span>
+        <label className={styles.radarControl}>비교 기준<select value={radarMode} onChange={event => setRadarMode(event.target.value as RadarMode)}><option value="external">외부 플랫폼 비교</option><option value="regions">구별 비교</option></select></label>
       </header>
-      {reviewed.comparable.length >= RADAR_CATEGORY_LIMITS.min ? <>
-        <fieldset className={styles.radarCategoryPicker} aria-describedby="radar-selection-status">
-          <legend>비교 품목</legend>
-          <div>
-            {reviewed.comparable.map(category => {
-              const checked = radarCategories.includes(category);
-              const disabled = checked
-                ? radarCategories.length <= RADAR_CATEGORY_LIMITS.min
-                : radarCategories.length >= RADAR_CATEGORY_LIMITS.max;
-              return <label key={category} className={styles.radarCategoryOption}>
-                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => updateCategory(category)} />
-                <span>{category}</span>
-              </label>;
-            })}
-          </div>
-        </fieldset>
-        <figure className={styles.radarFigure} aria-describedby="radar-description radar-selection-status">
-          <div className={styles.radarLegend} aria-label="플랫폼 범례">
-            {PLATFORMS.map((platform, index) => <span key={platform} data-series={index + 1}>
-              <i aria-hidden="true" />{platform}
-            </span>)}
-          </div>
-          <div className={styles.radarPlot}>
-            <canvas ref={radar} role="img" aria-label={`당근, 중고나라, 번개장터의 ${radarCategories.join(", ")} 가격 지수 레이더 차트`} />
-          </div>
-        </figure>
-      </> : <p className={styles.radarEmpty}>3개 플랫폼의 공통 품목이 3개 이상 있어야 레이더를 표시합니다.</p>}
+      <p className={styles.radarModeNote}>{radarMode === "external" ? "주황 기준선(당근)=100 · 100보다 크면 당근보다 높은 값입니다." : "구별 지표는 해당 품목 안에서 비교합니다. 가격 안정성은 세부유형별 변동계수로 계산합니다."}</p>
+      <div className={styles.radarGrid}>{radarCategories.map(category => <CategoryRadar key={`${category}-${radarMode}`} category={category} mode={radarMode} platformRows={reviewed.rows.filter(row => row.category === category)} regionRows={regions.filter(row => row.category === category)} detailRows={detailTypes.filter(row => row.category === category)} />)}</div>
     </section>
 
     <h3>오늘 확인할 외부 시장 변화</h3><p>현재 스냅샷에서 당근 대비 가격 격차 · 과거 스냅샷이 없어 전일 증감은 미산출.</p>

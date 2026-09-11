@@ -6884,7 +6884,7 @@ img.thumbnail {
   color: var(--color-bg);
 }
 
-.stage[data-theme="light"] :is(.mapSearch, .mapControls button, .mapCategoryFab, .bottomNav, .messageComposer, .detailActionBar) {
+.stage[data-theme="light"] :is(.mapSearch, .mapControls button, .mapCategoryFab, .bottomNav, .messageComposer, .detailActionBar, .togetherDetailActionBar) {
   background: rgba(255, 255, 255, 0.94);
   border-color: var(--color-line);
 }
@@ -10098,13 +10098,20 @@ img.thumbnail {
    Dedicated Together Bottom Action Bar (Eliminates grid squeezing)
    ========================================================================== */
 
+.togetherDetailScreen {
+  min-height: var(--app-height);
+  padding: 16px 17px 18px;
+  position: static;
+  box-sizing: border-box;
+}
+
 .togetherDetailActionBar {
   position: absolute;
   left: 0;
   bottom: 0;
   width: 100%;
-  min-height: 80px;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  min-height: 76px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background: rgba(18, 18, 22, 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -10118,15 +10125,15 @@ img.thumbnail {
 
 .togetherDetailChatBtn {
   flex: 0 0 auto;
-  min-width: 110px;
-  height: 50px;
+  min-width: 104px;
+  height: 48px;
   padding: 0 16px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: var(--color-surface-2);
   color: var(--color-text);
   font-size: 14.5px;
-  font-weight: 750;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10147,12 +10154,12 @@ img.thumbnail {
 
 .togetherDetailJoinBtn {
   flex: 1;
-  height: 50px;
+  height: 48px;
   padding: 0 20px;
   border-radius: 12px;
   border: 0;
-  font-size: 15.5px;
-  font-weight: 850;
+  font-size: 15px;
+  font-weight: 750;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10166,9 +10173,9 @@ img.thumbnail {
 }
 
 .togetherDetailJoinBtnActive {
-  background: linear-gradient(135deg, #ff922b 0%, #ff6f0f 100%);
+  background: linear-gradient(135deg, #ff8a3d 0%, #ff6f0f 100%);
   color: #ffffff;
-  box-shadow: 0 4px 16px rgba(255, 111, 15, 0.38);
+  box-shadow: 0 4px 14px rgba(255, 111, 15, 0.32);
 }
 
 .togetherDetailJoinBtnJoined {
@@ -10182,6 +10189,36 @@ img.thumbnail {
   color: var(--color-dim);
   cursor: not-allowed;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Light Theme Overrides (Seed Design Alignment) */
+.stage[data-theme="light"] .togetherDetailActionBar {
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--color-line);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.stage[data-theme="light"] .togetherDetailChatBtn {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+}
+
+.stage[data-theme="light"] .togetherDetailChatBtn:hover {
+  background: var(--color-surface-3);
+  border-color: var(--color-line);
+}
+
+.stage[data-theme="light"] .togetherDetailJoinBtnJoined {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+}
+
+.stage[data-theme="light"] .togetherDetailJoinBtnFull {
+  background: #f1f3f5;
+  color: #8c94a0;
+  border: 1px solid var(--color-line);
 }
 
 .daangnBannerDots {

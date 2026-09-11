@@ -11,7 +11,7 @@ interface TogetherIntroViewProps {
 
 export function TogetherIntroView({ onBack, onStart }: TogetherIntroViewProps) {
   return (
-    <section className={styles.screen}>
+    <section className={styles.togetherDetailScreen}>
       {/* ScreenHeader */}
       <header className={styles.screenHeader}>
         <button

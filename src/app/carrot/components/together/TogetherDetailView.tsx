@@ -34,7 +34,7 @@ export function TogetherDetailView({
   const statusLabel = isCancelled ? "모임 취소" : isFull ? "모집 완료" : "모집중";
 
   return (
-    <section className={styles.screen}>
+    <section className={styles.togetherDetailScreen}>
       {/* ScreenHeader */}
       <header className={styles.screenHeader}>
         <button

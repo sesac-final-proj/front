@@ -1,24 +1,71 @@
-import type { PricePlatformComparisonItem } from "@/services/adminService";
+import type { PriceComparisonDetailTypeItem, PriceComparisonRegionItem, PricePlatformComparisonItem } from "@/services/adminService";
 export const PLATFORMS = ["당근", "중고나라", "번개장터"] as const;
 export const COLORS = ["#d65e13", "#2764a5", "#826a27"];
-export const RADAR_CATEGORY_LIMITS = { min: 3, max: 6 } as const;
+export const RADAR_SERIES_LIMITS = { min: 2, max: 3 } as const;
+export const EXTERNAL_RADAR_METRICS = ["표본 수", "평균가", "가격 편차", "1사분위가", "중앙값", "3사분위가"] as const;
+export const REGION_RADAR_METRICS = ["당근 중위가", "표본 규모", "거래 완료율", "매너온도", "가격 안정성", "세부유형 폭"] as const;
 
-export function reconcileRadarCategories(selected: string[], available: string[]): string[] {
+export function reconcileRadarSeries(selected: string[], available: string[]): string[] {
   const valid = selected.filter((category, index) => available.includes(category) && selected.indexOf(category) === index);
   for (const category of available) {
-    if (valid.length >= RADAR_CATEGORY_LIMITS.min) break;
+    if (valid.length >= RADAR_SERIES_LIMITS.min) break;
     if (!valid.includes(category)) valid.push(category);
   }
-  return valid.slice(0, RADAR_CATEGORY_LIMITS.max);
+  return valid.slice(0, RADAR_SERIES_LIMITS.max);
 }
 
-export function toggleRadarCategory(selected: string[], category: string, available: string[]): string[] {
-  const current = reconcileRadarCategories(selected, available);
+export function toggleRadarSeries(selected: string[], category: string, available: string[]): string[] {
+  const current = reconcileRadarSeries(selected, available);
   if (!available.includes(category)) return current;
   if (current.includes(category)) {
-    return current.length <= RADAR_CATEGORY_LIMITS.min ? current : current.filter(item => item !== category);
+    return current.length <= RADAR_SERIES_LIMITS.min ? current : current.filter(item => item !== category);
   }
-  return current.length >= RADAR_CATEGORY_LIMITS.max ? current : [...current, category];
+  return current.length >= RADAR_SERIES_LIMITS.max ? current : [...current, category];
+}
+
+export function normalizedRadarValues(rows: PricePlatformComparisonItem[]): number[][] {
+  const keys = ["sample_count", "mean_price", "std_price", "p25_price", "median_price", "p75_price"] as const;
+  const columns = keys.map(key => rows.map(row => Number(row[key])));
+  return rows.map((_, rowIndex) => columns.map(values => {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) return 50;
+    return (values[rowIndex] - min) * 100 / (max - min);
+  }));
+}
+
+export function carrotBenchmarkValues(rows: PricePlatformComparisonItem[]): number[][] {
+  const keys = ["sample_count", "mean_price", "std_price", "p25_price", "median_price", "p75_price"] as const;
+  const carrot = rows.find(row => platformName(row.platform) === "당근");
+  if (!carrot) return [];
+  return rows.map(row => keys.map(key => {
+    const baseline = carrot[key];
+    if (baseline === 0) return row[key] === 0 ? 100 : 200;
+    return Math.min(200, Math.max(0, row[key] * 100 / baseline));
+  }));
+}
+
+export function regionRadarValues(
+  rows: PriceComparisonRegionItem[],
+  details: PriceComparisonDetailTypeItem[],
+  carrotMedian: number,
+): number[][] {
+  const maxSamples = Math.max(1, ...rows.map(row => row.sample_count));
+  const maxDetailCount = Math.max(1, ...rows.map(row => new Set(details.filter(item => item.gu === row.gu).map(item => item.detail_type)).size));
+  return rows.map(row => {
+    const related = details.filter(item => item.gu === row.gu);
+    const weight = related.reduce((sum, item) => sum + item.sample_count, 0);
+    const cv = weight ? related.reduce((sum, item) => sum + item.cv_price * item.sample_count, 0) / weight : 100;
+    const detailCount = new Set(related.map(item => item.detail_type)).size;
+    return [
+      carrotMedian > 0 ? Math.min(200, row.median_price * 100 / carrotMedian) : 100,
+      row.sample_count * 100 / maxSamples,
+      Math.min(100, Math.max(0, row.completion_rate)),
+      Math.min(100, Math.max(0, row.avg_manner_temp * 2)),
+      Math.min(100, Math.max(0, 100 - cv)),
+      detailCount * 100 / maxDetailCount,
+    ];
+  });
 }
 
 export function platformName(value: string): string {
@@ -36,7 +83,7 @@ export function reviewComparisons(input: PricePlatformComparisonItem[]) {
   const rows = candidates.filter(row => {
     return PLATFORMS.some(platform => platform === row.platform) && row.category.trim() &&
       !duplicates.has(`${row.category}|${row.platform}`) && Number.isInteger(row.sample_count) && row.sample_count > 0 &&
-      [row.p25_price, row.median_price, row.p75_price].every(value => Number.isFinite(value) && value >= 0) &&
+      [row.mean_price, row.std_price, row.p25_price, row.median_price, row.p75_price].every(value => Number.isFinite(value) && value >= 0) &&
       row.p25_price <= row.median_price && row.median_price <= row.p75_price;
   });
   const categories = [...new Set(rows.map(row => row.category))].sort();
