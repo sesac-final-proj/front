@@ -1,16 +1,16 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   getPriceComparisonOverview,
   getPriceComparisonSamples,
-  type PriceComparisonCategoryItem,
   type PriceComparisonRegionItem,
   type PriceComparisonSample,
 } from "@/services/adminService";
 import { useAdminResource } from "./useAdminResource";
-import { AdminTable, EmptyState, ErrorState, MetricCard, Skeleton } from "./AdminUI";
+import { AdminTable, EmptyState, ErrorState, Skeleton } from "./AdminUI";
+import { PriceGuMap } from "./PriceGuMap";
 import pStyles from "./portal.module.css";
 import styles from "./price-comparison.module.css";
 
@@ -18,18 +18,49 @@ const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}�
 const GU_TABS = ["전체", "영등포구", "노원구", "송파구"] as const;
 const GU_ORDER = ["송파구", "영등포구", "노원구"] as const;
 const GU_COLOR: Record<string, string> = { 송파구: "#FF9D5B", 영등포구: "#7C9CBF", 노원구: "#8CC0A6" };
-const GRADE_COLOR: Record<string, string> = { S: "#A3480A", A: "#E0630F", B: "#FF9D5B", C: "#FFC08A" };
+// 계속 "탁하다/흐리다"는 피드백이 반복된 이유 — 흰 글자가 보이게 하려고 배경을
+// 어둡게(명도를 낮춰서) 잡다 보니, 진짜 쨍한 색(예: 순수 빨강 #FF0000류)은 다
+// 후보에서 빠지고 매번 탁한 톤만 남았다. 그래서 이제 배경은 마음껏 쨍하고
+// 밝은 색으로 고르고, 글자색을 그 배경 밝기에 맞춰 자동으로 흰색/검정 중
+// 골라서 대비를 맞춘다(gradeTextColor) — "선명함"과 "글자 가독성"을 서로
+// 안 부딪히게 분리한 것.
+function gradeTextColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return luminance > 0.42 ? "#1A1C20" : "#fff";
+}
+
+// 거래빈도 등급 색 — S~C 등급 구분은 칩 안의 글자(S/A/B/C)가 하므로, 색은
+// "거래빈도 종류"라는 것만 최대한 쨍하게 전달하면 된다(가격 변동성의 초록/주황/
+// 빨강 신호등 배색과는 확실히 다른 색 계열 — 진짜 선명한 파랑).
+const GRADE_COLOR_SOLID = "#2563EB";
+const GRADE_COLOR: Record<string, string> = { S: GRADE_COLOR_SOLID, A: GRADE_COLOR_SOLID, B: GRADE_COLOR_SOLID, C: GRADE_COLOR_SOLID };
 const GRADE_LABEL: Record<string, string> = { S: "매우 활발", A: "활발", B: "보통", C: "저조" };
+
+// 가격 변동성 등급 — cv_price(변동계수%)를 3단계로 나눈다. 경계값은 실데이터
+// cv_price 분포(31~106, 카테고리 7개) 보고 역산: 31(음식물처리기)만 눈에 띄게
+// 낮고 나머지는 46~106에 퍼져있어서, 40/70을 경계로 하면 안정/보통/변동큼이
+// 대략 1:2:4로 갈린다 — 거래빈도 등급의 _GRADE_THRESHOLDS와 같은 성격의 값이라
+// 실제 분포 보고 조정 필요하면 여기만 고치면 된다. 신호등 배색(초록=안정,
+// 주황=보통, 빨강=변동큼)인데, 이번엔 눈에 확 띄는 쨍한 톤으로 골랐다.
+function volatilityGrade(cvPrice: number): { label: string; color: string } {
+  if (cvPrice < 40) return { label: "안정적", color: "#16A34A" };
+  if (cvPrice < 70) return { label: "보통", color: "#F59E0B" };
+  return { label: "변동 큼", color: "#DC2626" };
+}
 const tooltipBox = { background: "#fff", border: "1px solid #E7E8E5", borderRadius: 8, padding: "8px 10px", fontSize: 12, lineHeight: 1.6 } as const;
 
-function RegionBarChart({ rows }: { rows: PriceComparisonRegionItem[] }) {
+function RegionBarChart({ rows, height }: { rows: PriceComparisonRegionItem[]; height?: number }) {
   const data = GU_ORDER.filter(gu => rows.some(r => r.gu === gu)).map(gu => {
     const row = rows.find(r => r.gu === gu)!;
     return { gu, median_price: row.median_price, row };
   });
   if (!data.length) return <EmptyState message="지역별 데이터가 없습니다." />;
   return (
-    <div className={pStyles.chart}>
+    <div className={pStyles.chart} style={height ? { height } : undefined}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 10, right: 16, left: -18, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#F0F1ED" />
@@ -51,124 +82,64 @@ function RegionBarChart({ rows }: { rows: PriceComparisonRegionItem[] }) {
   );
 }
 
-const DOT_SIZE = 9;
 
-function scatterDotShape(props: any) {
-  return <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2} fill={GU_COLOR[props.payload.gu]} fillOpacity={0.55} stroke={GU_COLOR[props.payload.gu]} strokeOpacity={0.9} />;
+// --------------------------------------------------------------------------
+// 산점도(점 하나 = 매물 하나)는 점 수백 개가 겹치면 색이 섞여버려서 "구별로
+// 다르다"는 느낌이 잘 안 산다 — 이런 "그룹 간 분포 비교"엔 히스토그램(가격
+// 구간별로 구 3개 막대를 나란히)이 훨씬 낫다. 같은 가격대에 구별로 몇 건 있는지
+// 막대 높이로 바로 비교되니까 그룹 차이가 뚜렷하게 보인다. 좌표는 여전히 실데이터
+// (구간 나누기 = 집계일 뿐, 값 자체를 손대지 않음).
+// --------------------------------------------------------------------------
+
+const HISTOGRAM_BINS = 10;
+
+function buildGuHistogram(samples: PriceComparisonSample[]): { label: string; counts: Record<string, number> }[] {
+  if (!samples.length) return [];
+  const prices = samples.map(s => s.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const width = (max - min) / HISTOGRAM_BINS || 1;
+
+  const bins = Array.from({ length: HISTOGRAM_BINS }, (_, i) => {
+    const start = min + i * width;
+    const end = start + width;
+    const counts: Record<string, number> = {};
+    GU_ORDER.forEach(gu => { counts[gu] = 0; });
+    return { label: `${Math.round(start / 10000)}~${Math.round(end / 10000)}만`, counts };
+  });
+
+  samples.forEach(s => {
+    const idx = Math.min(HISTOGRAM_BINS - 1, Math.max(0, Math.floor((s.price - min) / width)));
+    bins[idx].counts[s.gu] += 1;
+  });
+  return bins;
 }
 
-// 가격(x) x 관심수(y) 실제 두 지표로 그리는 산점도 — 구별로 색을 다르게 줘서
-// 자연스럽게 뭉쳐 보인다(y축을 억지로 만들어내던 예전 스웜 레이아웃과 달리 둘 다 실데이터).
-function PriceInterestScatter({ samples }: { samples: PriceComparisonSample[] }) {
-  if (!samples.length) return <EmptyState message="매물 표본이 없습니다." />;
+function GuPriceHistogram({ samples }: { samples: PriceComparisonSample[] }) {
+  const bins = useMemo(() => buildGuHistogram(samples), [samples]);
+  if (!bins.length) return <EmptyState message="표본이 없습니다." />;
+  const data = bins.map(b => ({ label: b.label, ...b.counts }));
   return (
     <>
       <div className={pStyles.chart} style={{ height: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 4, right: 16, left: -6, bottom: 0 }}>
-            <CartesianGrid stroke="#F0F1ED" />
-            <XAxis type="number" dataKey="price" name="가격" tickFormatter={v => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
-            <YAxis type="number" dataKey="interest_count" name="관심수" tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
-            <Tooltip cursor={false} isAnimationActive={false} content={({ payload }) => {
-              const row = payload?.[0]?.payload as PriceComparisonSample | undefined;
-              if (!row) return null;
-              return <div style={tooltipBox}>{row.gu} · {money(row.price)} · 관심 {row.interest_count}</div>;
+          <BarChart data={data} margin={{ top: 4, right: 16, left: -6, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke="#F0F1ED" />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={48} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#8b9184" }} axisLine={false} tickLine={false} />
+            <Tooltip cursor={{ fill: "#F7F7F5" }} isAnimationActive={false} content={({ payload, label }) => {
+              if (!payload?.length) return null;
+              return <div style={tooltipBox}>
+                <b>{label}</b><br />
+                {GU_ORDER.map(gu => <span key={gu}>{gu} {payload.find(p => p.dataKey === gu)?.value ?? 0}건<br /></span>)}
+              </div>;
             }} />
-            <Scatter data={samples} isAnimationActive={false} shape={scatterDotShape} />
-          </ScatterChart>
+            {GU_ORDER.map(gu => <Bar key={gu} dataKey={gu} fill={GU_COLOR[gu]} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive={false} />)}
+          </BarChart>
         </ResponsiveContainer>
       </div>
       <div className={styles.legend}>
         {GU_ORDER.map(gu => <span key={gu} className={styles.legendItem}><i className={styles.legendSwatch} style={{ background: GU_COLOR[gu] }} />{gu}</span>)}
-      </div>
-    </>
-  );
-}
-
-// --------------------------------------------------------------------------
-// 구(gu) 대신 카테고리로 색을 나눈 버전. 실데이터 확인 결과 구별로는 가격/관심수
-// 중앙값이 거의 안 갈리는데(전부 7~8만원, 관심수 4 근처) 카테고리별로는 크게 갈린다
-// (밥솥 3.8만 ~ 음식물처리기 28.6만) — 그래서 실축(가격 x 관심수) 좌표로 그리면 카테고리당
-// 점들이 세로로 가늘게 늘어서기만 하고 "뭉친 원" 느낌이 안 났다. 그래서 좌표를 실제
-// 가격/관심수가 아니라 카테고리별 원형 클러스터 배치(해바라기씨 나선, phyllotaxis)로
-// 바꿔서 카테고리마다 동그랗게 뭉친 덩어리로 보이게 한다 — 실제 값은 툴팁에서 확인.
-// --------------------------------------------------------------------------
-
-const CATEGORY_COLOR_PALETTE = ["#FF9D5B", "#7C9CBF", "#8CC0A6", "#C97FB0", "#D9B44A", "#5B8DEF", "#E15759", "#9B7EDE"];
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈137.5° — 해바라기씨 나선 간격
-const CLUSTER_SPACING = 100;
-
-type CategorySample = PriceComparisonSample & { category: string; cx: number; cy: number };
-
-function clusterCenters(n: number) {
-  const cols = Math.ceil(Math.sqrt(n));
-  const rows = Math.ceil(n / cols);
-  return Array.from({ length: n }, (_, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    return { x: (col - (cols - 1) / 2) * CLUSTER_SPACING, y: (row - (rows - 1) / 2) * CLUSTER_SPACING };
-  });
-}
-
-// 해바라기씨 나선 — j번째 점을 count개짜리 원형 클러스터 안에 고르게 채워 넣는다.
-function sunflowerOffset(j: number, count: number, radius: number) {
-  const r = radius * Math.sqrt((j + 0.5) / count);
-  const theta = j * GOLDEN_ANGLE;
-  return { dx: r * Math.cos(theta), dy: r * Math.sin(theta) };
-}
-
-function categoryDotShape(colorOf: (category: string) => string) {
-  return (props: any) => (
-    <circle cx={props.cx} cy={props.cy} r={DOT_SIZE / 2} fill={colorOf(props.payload.category)} fillOpacity={0.55} stroke={colorOf(props.payload.category)} strokeOpacity={0.9} />
-  );
-}
-
-function CategoryPriceInterestScatter({ categories }: { categories: PriceComparisonCategoryItem[] }) {
-  const loader = useCallback(async () => {
-    const pages = await Promise.all(categories.map(c => getPriceComparisonSamples(c.category)));
-    const centers = clusterCenters(categories.length);
-    const rows: CategorySample[] = [];
-    pages.forEach((page, i) => {
-      const center = centers[i];
-      const radius = Math.max(18, Math.min(42, 6 * Math.sqrt(page.samples.length)));
-      page.samples.forEach((s, j) => {
-        const { dx, dy } = sunflowerOffset(j, page.samples.length, radius);
-        rows.push({ ...s, category: categories[i].category, cx: center.x + dx, cy: center.y + dy });
-      });
-    });
-    return rows;
-  }, [categories]);
-  const { data: samples, loading, error, retry } = useAdminResource(loader);
-
-  const colorOf = useCallback(
-    (category: string) => CATEGORY_COLOR_PALETTE[categories.findIndex(c => c.category === category) % CATEGORY_COLOR_PALETTE.length] ?? "#999",
-    [categories],
-  );
-  const shape = useMemo(() => categoryDotShape(colorOf), [colorOf]);
-
-  if (!categories.length) return null;
-  if (loading) return <Skeleton />;
-  if (error || !samples) return <ErrorState message={error} retry={retry} />;
-  if (!samples.length) return <EmptyState message="매물 표본이 없습니다." />;
-
-  return (
-    <>
-      <div className={pStyles.chart} style={{ height: 360 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 4, right: 16, left: -6, bottom: 0 }}>
-            <XAxis type="number" dataKey="cx" hide domain={([min, max]: readonly [number, number]) => [min - 30, max + 30]} />
-            <YAxis type="number" dataKey="cy" hide domain={([min, max]: readonly [number, number]) => [min - 30, max + 30]} />
-            <Tooltip cursor={false} isAnimationActive={false} content={({ payload }) => {
-              const row = payload?.[0]?.payload as CategorySample | undefined;
-              if (!row) return null;
-              return <div style={tooltipBox}>{row.category} · {row.gu} · {money(row.price)} · 관심 {row.interest_count}</div>;
-            }} />
-            <Scatter data={samples} isAnimationActive={false} shape={shape} />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
-      <div className={styles.legend}>
-        {categories.map(c => <span key={c.category} className={styles.legendItem}><i className={styles.legendSwatch} style={{ background: colorOf(c.category) }} />{c.category}</span>)}
       </div>
     </>
   );
@@ -227,43 +198,56 @@ export function PriceComparisonSection() {
           ))}
         </div>
 
-        {summary && <div className={pStyles.metrics}>
-          <MetricCard label="표본수" value={summary.sample_count.toLocaleString("ko-KR")} detail="거래완료+거래중+예약중 합계" />
-          <MetricCard label="중위가" value={money(summary.median_price)} detail={`변동계수 ${summary.cv_price.toFixed(1)}%`} />
-          <MetricCard label="월 평균 등록" value={`${summary.listings_per_month.toFixed(1)}건`} detail="전체 수집 기간 기준" />
-          <article className={pStyles.metric}>
-            <span>거래빈도 등급 · 최근 180일 추세</span>
-            <strong>
-              <span className={styles.gradeChip} style={{ background: GRADE_COLOR[summary.frequency_grade] }}>{summary.frequency_grade}</span>
-            </strong>
-            <small className={trendClass}>{GRADE_LABEL[summary.frequency_grade] ?? summary.frequency_grade} · {trendText}</small>
-          </article>
-        </div>}
+        {summary && (
+          <div className={styles.overviewStrip}>
+            <span className={styles.overviewChip}><span>표본수</span><strong>{summary.sample_count.toLocaleString("ko-KR")}</strong></span>
+            <span className={styles.overviewChip}><span>중위가</span><strong>{money(summary.median_price)}</strong></span>
+            <span className={styles.overviewChip}><span>월 평균 등록</span><strong>{summary.listings_per_month.toFixed(1)}건</strong></span>
+            <span className={styles.overviewChip}>
+              <span>거래빈도</span>
+              <strong><span className={styles.gradeChip} style={{ background: GRADE_COLOR[summary.frequency_grade], color: gradeTextColor(GRADE_COLOR[summary.frequency_grade]) }}>{summary.frequency_grade}</span></strong>
+              <span className={trendClass}>{trendText}</span>
+            </span>
+            <span className={styles.overviewChip}><span>완료율</span><strong>{summary.completion_rate.toFixed(1)}%</strong></span>
+            <span className={styles.overviewChip}>
+              <span>가격 변동성</span>
+              <strong><span className={styles.gradeChip} style={{ background: volatilityGrade(summary.cv_price).color, color: gradeTextColor(volatilityGrade(summary.cv_price).color) }}>{volatilityGrade(summary.cv_price).label}</span></strong>
+            </span>
+          </div>
+        )}
 
-        <div className={pStyles.chartGrid} style={{ marginTop: 20 }}>
-          <article className={`${pStyles.card} ${styles.lift}`}>
+        <div className={styles.primaryHeading}>
+          <h2>구별 가격 비교</h2>
+          <span className={styles.primaryBadge}>지역별 비교</span>
+        </div>
+        <div className={pStyles.chartGrid}>
+          <article className={`${pStyles.card} ${styles.lift} ${styles.primaryCard}`}>
             <div className={pStyles.cardHead}><div><h2>구별 중위가</h2><p>막대 색 = 구 · 완료율/매너온도는 툴팁 참고</p></div></div>
-            <RegionBarChart rows={regionRows} />
+            <RegionBarChart rows={regionRows} height={320} />
           </article>
-          <article className={`${pStyles.card} ${styles.lift}`}>
+          <article className={`${pStyles.card} ${styles.lift} ${styles.primaryCard}`}>
             <div className={pStyles.cardHead}><div><h2>구별 통계</h2></div></div>
-            <AdminTable headers={["구", "표본수", "중위가", "완료율", "평균 매너온도"]}>
-              {regionRows.map(r => <tr key={r.gu}>
-                <td>{r.gu}</td><td>{r.sample_count.toLocaleString("ko-KR")}</td><td>{money(r.median_price)}</td>
-                <td>{r.completion_rate.toFixed(1)}%</td><td>{r.avg_manner_temp.toFixed(1)}°C</td>
-              </tr>)}
-            </AdminTable>
+            <div className={styles.regionTable}>
+              <AdminTable headers={["구", "표본수", "중위가", "완료율", "평균 매너온도", "거래빈도", "가격 변동성"]}>
+                {regionRows.map(r => <tr key={r.gu}>
+                  <td>{r.gu}</td><td>{r.sample_count.toLocaleString("ko-KR")}</td><td>{money(r.median_price)}</td>
+                  <td>{r.completion_rate.toFixed(1)}%</td><td>{r.avg_manner_temp.toFixed(1)}°C</td>
+                  <td><span className={styles.gradeChip} style={{ background: GRADE_COLOR[r.frequency_grade], color: gradeTextColor(GRADE_COLOR[r.frequency_grade]) }}>{r.frequency_grade}</span></td>
+                  <td><span className={styles.gradeChip} style={{ background: volatilityGrade(r.cv_price).color, color: gradeTextColor(volatilityGrade(r.cv_price).color) }}>{volatilityGrade(r.cv_price).label}</span></td>
+                </tr>)}
+              </AdminTable>
+            </div>
           </article>
         </div>
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
-          <div className={pStyles.cardHead}><div><h2>가격 x 관심수 분포</h2><p>점 하나 = 매물 하나 · 가로 가격 · 세로 관심수 · 색 = 구(이상치 상위 3% 제외, 구별 최대 600건 표본)</p></div></div>
-          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <PriceInterestScatter samples={samplesState.data.samples} />}
+          <div className={pStyles.cardHead}><div><h2>{selectedCategory} 가격 분포</h2><p>가격 구간별 매물 건수 · 막대 색 = 구</p></div></div>
+          {samplesState.loading ? <Skeleton /> : samplesState.error || !samplesState.data ? <ErrorState message={samplesState.error} retry={retrySamples} /> : <GuPriceHistogram samples={samplesState.data.samples} />}
         </article>
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
-          <div className={pStyles.cardHead}><div><h2>카테고리별 매물 클러스터</h2><p>색 = 카테고리 · 점 하나 = 매물 하나(뭉친 위치는 그룹 표시용, 실제 가격/관심수는 점에 마우스를 올려 확인)</p></div></div>
-          <CategoryPriceInterestScatter categories={categories.filter(c => c.category !== "전체")} />
+          <div className={pStyles.cardHead}><div><h2>{selectedCategory} 구별 시세지도</h2><p>구별 색 = 카테고리 중앙값 대비 편차(파랑 저렴 · 오렌지 비쌈) · 구에 마우스 올리면 개별 매물 가격 표시</p></div></div>
+          <PriceGuMap regions={regionRows} categoryMedianPrice={summary?.median_price ?? 0} samples={samplesState.data?.samples ?? []} />
         </article>
 
         <div style={{ marginTop: 20 }}>
@@ -274,7 +258,9 @@ export function PriceComparisonSection() {
               ))}
             </div>
           </div>
-          {!detailRows.length ? <EmptyState message="세부유형 통계가 없습니다." /> : (
+          {selectedCategory === "전체" ? (
+            <EmptyState message="'전체' 탭은 세부유형 구분이 없어요 — 위에서 카테고리를 하나 선택해주세요." />
+          ) : !detailRows.length ? <EmptyState message="세부유형 통계가 없습니다." /> : (
             <AdminTable headers={["세부유형", "표본수", "중위가", "변동계수"]}>
               {detailRows.map(d => <tr key={`${d.detail_type}-${d.gu}`}>
                 <td>{d.detail_type}</td><td>{d.sample_count.toLocaleString("ko-KR")}</td><td>{money(d.median_price)}</td><td>{d.cv_price.toFixed(1)}%</td>
