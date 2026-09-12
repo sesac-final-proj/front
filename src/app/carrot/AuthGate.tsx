@@ -2,11 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { getMe, AuthRequiredError } from "@/services/authService";
-import { AUTH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
+import { AUTH_TOKEN_STORAGE_KEY, POST_LOGIN_REDIRECT_STORAGE_KEY } from "@/services/tradeService";
 import { DaangnSplash } from "./components/common/DaangnSplash";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1200;
+
+// 결제 QR(/carrot?pay=<id>) 같은 딥링크로 비로그인 상태에서 들어오면 아래서
+// /onboarding으로 풀 페이지 이동하며 쿼리스트링을 통째로 잃어버린다. OAuth 왕복
+// (카카오/네이버) 동안에도 남아있게 URL 대신 localStorage에 목적지를 적어두고,
+// 로그인 완료 콜백(auth/callback)에서 이 값을 읽어 원래 화면으로 돌려보낸다.
+function saveRedirectTarget() {
+  const target = window.location.pathname + window.location.search;
+  if (target === "/carrot") return; // 기본 진입점이면 남길 이유 없음
+  try {
+    window.localStorage.setItem(POST_LOGIN_REDIRECT_STORAGE_KEY, target);
+  } catch {
+    // 스토리지 접근이 막혀 있어도 로그인 자체는 계속 진행돼야 한다.
+  }
+}
 
 // 서비스 전체를 로그인해야만 쓸 수 있게 막는 게이트. 토큰이 없거나(비로그인)
 // 만료/폐기됐으면(getMe 실패) 온보딩(로그인) 화면으로 보낸다 — 게스트 모드는
@@ -22,6 +36,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setShowRetry(false);
     const token = typeof window !== "undefined" ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
     if (!token) {
+      saveRedirectTarget();
       window.location.replace("/onboarding");
       return;
     }
@@ -43,6 +58,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           } catch {
             // 스토리지 접근 자체가 막혀 있어도 리다이렉트는 그대로 진행한다.
           }
+          saveRedirectTarget();
           window.location.replace("/onboarding");
           return;
         }
