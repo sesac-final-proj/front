@@ -3873,6 +3873,14 @@ img.thumbnail {
   justify-items: center;
 }
 
+.paymentStoreImage {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
 .paymentRecipient {
   display: flex;
   align-items: center;
