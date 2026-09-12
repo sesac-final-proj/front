@@ -3,8 +3,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import styles from "./GajiMarketApp.module.css";
+
+// Dynamic map loading for fast initial page load & rendering
+const MapScreen = dynamic(
+  () => import("./components/map/MapScreen").then((mod) => mod.MapScreen),
+  {
+    ssr: false,
+    loading: () => (
+      <div className={styles.mapLoadingSkeleton} role="status" aria-label="지도 로딩 중">
+        <div className={styles.mapSkeletonMap} />
+        <div className={styles.mapSkeletonSheet}>
+          <div className={styles.mapSkeletonHandle} />
+          <div className={styles.mapSkeletonPills}>
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+          </div>
+        </div>
+      </div>
+    ),
+  }
+);
 
 // Components (Barrel Export from ./components)
 import {
@@ -27,8 +51,6 @@ import {
   ApartmentVerificationScreen,
   ApartmentCommunityScreen,
   CommunityFormScreen,
-  // map
-  MapScreen,
   // chat
   ChatsScreen,
   ChatRoomScreen,

@@ -1,4 +1,5 @@
 export type CongestionLevel = "low" | "moderate" | "high" | "severe";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export interface CongestionZone {
   id: string;
@@ -20,6 +21,23 @@ export interface CongestionZone {
   string;
   hourlyTrends?: number[];
   recommendation?: string;
+}
+
+export type TradePlaceCongestionLevel = "여유" | "보통" | "약간 붐빔" | "붐빔" | "매우 붐빔" | "정보없음";
+
+export interface TradePlaceRecommendation {
+  name: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number;
+  congestionLevel: TradePlaceCongestionLevel;
+  congestionMessage?: string | null;
+  recommendationScore?: number | null;
+  recommendationReason?: string | null;
+}
+
+function apiUrl(path: string) {
+  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
 }
 
 /**
@@ -588,7 +606,7 @@ export async function fetchCongestionZones(
     sw_lat: String(bounds.south), sw_lng: String(bounds.west),
     ne_lat: String(bounds.north), ne_lng: String(bounds.east), limit: "30",
   });
-  const response = await fetch(`/api/v1/local/congestion-zones?${params}`, { signal, cache: "no-store" });
+  const response = await fetch(apiUrl(`/api/v1/local/congestion-zones?${params}`), { signal, cache: "no-store" });
   if (!response.ok) throw new Error("혼잡도 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
   const data: unknown = await response.json();
   if (!Array.isArray(data)) throw new Error("혼잡도 응답을 확인하지 못했어요.");
@@ -598,6 +616,33 @@ export async function fetchCongestionZones(
     Number.isFinite(zone.lat) && Number.isFinite(zone.lng) &&
     zone.lat >= bounds.south && zone.lat <= bounds.north &&
     zone.lng >= bounds.west && zone.lng <= bounds.east,
+  );
+}
+
+export async function fetchTradePlaceRecommendations(
+  input: { query?: string; lat?: number; lng?: number; hour?: number },
+  signal?: AbortSignal,
+): Promise<TradePlaceRecommendation[]> {
+  const params = new URLSearchParams();
+  if (input.query) params.set("query", input.query);
+  if (Number.isFinite(input.lat)) params.set("lat", String(input.lat));
+  if (Number.isFinite(input.lng)) params.set("lng", String(input.lng));
+  if (Number.isFinite(input.hour)) params.set("hour", String(input.hour));
+  const response = await fetch(apiUrl(`/api/v1/local/recommend-place?${params}`), {
+    signal,
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("추천 장소를 불러오지 못했어요.");
+  const data: unknown = await response.json();
+  const results = (data as { results?: unknown[] }).results;
+  if (!Array.isArray(results)) return [];
+  return results.filter((place): place is TradePlaceRecommendation =>
+    place !== null &&
+    typeof place === "object" &&
+    typeof (place as TradePlaceRecommendation).name === "string" &&
+    Number.isFinite((place as TradePlaceRecommendation).lat) &&
+    Number.isFinite((place as TradePlaceRecommendation).lng),
   );
 }
 

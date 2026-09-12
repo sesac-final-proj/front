@@ -235,6 +235,9 @@ export function toProductListItem(item: TradeProduct): ProductListItem {
     description: item.description ?? (item.searchKeyword ? `연관 검색어: ${item.searchKeyword}` : ""),
     category: "중고거래",
     thumbnailUrl: item.thumbnailUrl,
+    tradePlace: item.tradePlace,
+    tradePlaceLat: item.tradePlaceLat,
+    tradePlaceLng: item.tradePlaceLng,
   };
 }
 
@@ -279,6 +282,9 @@ export function toChatRoomUi(dto: ChatRoomDto): ChatRoom {
     productThumbnailUrl: dto.productThumbnailUrl ?? undefined,
     productPrice: dto.productPrice,
     productTradeStatus: dto.productTradeStatus ?? undefined,
+    productTradePlace: dto.productTradePlace ?? undefined,
+    productTradePlaceLat: dto.productTradePlaceLat ?? undefined,
+    productTradePlaceLng: dto.productTradePlaceLng ?? undefined,
   };
 }
 

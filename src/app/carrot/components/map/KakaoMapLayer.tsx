@@ -639,22 +639,23 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     };
   }, []);
 
-  // 1-1. 음식점 카테고리 진입 시 즉시 동네 주변 음식점 데이터 호출 (하단 시트 목록 즉시 활성화)
+  // 1-1. 음식점 카테고리 진입 시 즉시 동네 주변(적은 척도 기준) 음식점 데이터 호출 (빠른 초기 렌더링)
   useEffect(() => {
     if (!isRestaurantMode) return;
     const centerCoord = currentLocation ?? coordsMap[activeNeighborhood] ?? coordsMap["송파삼성래미안"] ?? { lat: 37.5029, lng: 127.1194 };
-    const swLat = centerCoord.lat - 0.015;
-    const swLng = centerCoord.lng - 0.02;
-    const neLat = centerCoord.lat + 0.015;
-    const neLng = centerCoord.lng + 0.02;
+    // 적은 지도 척도(상세 줌)에 맞춘 초기 반경(~500m)으로 경량 패치하여 초기 렌더링 지연 차단
+    const swLat = centerCoord.lat - 0.005;
+    const swLng = centerCoord.lng - 0.006;
+    const neLat = centerCoord.lat + 0.005;
+    const neLng = centerCoord.lng + 0.006;
 
-    getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 100 }).then((restaurants) => {
+    getRestaurantsByBounds({ swLat, swLng, neLat, neLng, limit: 30 }).then((restaurants) => {
       allLoadedRestaurantsRef.current = restaurants;
       onRestaurantsLoadedRef.current(restaurants);
     });
   }, [isRestaurantMode, activeNeighborhood, currentLocation, coordsMap]);
 
-  // 2. Map creation and MarkerClusterer setup
+  // 2. Map creation and MarkerClusterer setup (적은 척도 level: 3으로 초기화)
   useEffect(() => {
     const kakao = (window as any).kakao;
     const container = mapElementRef.current;
@@ -666,7 +667,7 @@ export function KakaoMapLayer<T extends { lat: number; lng: number }>({
     if (!mapRef.current) {
       const map = new kakao.maps.Map(container, {
         center: centerLatLng,
-        level: 4,
+        level: 3, // 초기 진입 시 반드시 적은 지도 척도(상세 줌)부터 시작
       });
       mapRef.current = map;
 
