@@ -21,6 +21,8 @@ import {
   ShieldAlert,
   LayoutDashboard,
   LineChart,
+  CircleDollarSign,
+  SlidersHorizontal,
 } from "lucide-react";
 import styles from "./portal.module.css";
 
@@ -30,7 +32,7 @@ const groups = [
     items: [
       ["/admin/trade-dashboard", "거래 대시보드", Activity],
       ["/admin/trades", "거래 데이터 탐색", Search],
-      ["/admin/quality", "수집 품질", Database],
+      ["/admin/price-status", "가격현황", CircleDollarSign],
       ["/admin/price-comparison", "가격 지역별 비교", Map],
     ],
   },
@@ -41,8 +43,6 @@ const groups = [
       ["/admin/market-trends", "외부 변화 추이", LineChart],
       ["/admin/environment", "모델 및 외부 환경 분석", Compass],
       ["/admin/risks", "위험요소 분석", ShieldAlert],
-      ["/admin/sources", "수집원 관리", Download],
-      ["/admin/price-model", "가격 모델", ChartColumn],
     ],
   },
   {
@@ -55,6 +55,7 @@ const groups = [
   {
     label: "시스템",
     items: [
+      ["/admin/management", "관리", SlidersHorizontal],
       ["/admin/notices", "공지·기부", Bell],
       ["/admin/system", "구현 현황", PanelsTopLeft],
       ["/admin/settings", "환경설정", Settings],
@@ -97,7 +98,7 @@ export function AdminSidebar({ open, close }: { open: boolean; close: () => void
               }}
             >
               <LayoutDashboard size={18} color={pathname === "/admin" ? "#D95800" : "#575D54"} />
-              <span>전체 서비스 요약 대시보드</span>
+              <span>홈</span>
             </Link>
           </div>
           {groups.map((group, index) => {

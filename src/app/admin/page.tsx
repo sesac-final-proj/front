@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
 import {
   Activity,
   ArrowRight,
-  Bot,
   Compass,
-  Database,
   HeartHandshake,
   Layers,
   RefreshCw,
   Search,
   ShieldAlert,
-  Sparkles,
-  TrendingUp,
+  CircleDollarSign,
+  SlidersHorizontal,
 } from "lucide-react";
 import { getDashboardOverview } from "@/lib/admin/dashboard-api";
 import { adminAuthorizedFetch, getAdminDreamStatus } from "@/services/adminService";
@@ -27,15 +24,10 @@ import {
   Skeleton,
 } from "@/components/admin/AdminUI";
 import { DataSourceStatus } from "@/components/admin/DataSourceStatus";
-import { HorizontalBars, PriceDistributionChart } from "@/components/admin/DashboardCharts";
+import { HorizontalBars } from "@/components/admin/DashboardCharts";
 import styles from "./dashboard.module.css";
 
 const numberFormat = new Intl.NumberFormat("ko-KR");
-const percentFormat = new Intl.NumberFormat("ko-KR", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
 async function loadExecutiveDashboard() {
   const [overview, dream, risks, pointsRes] = await Promise.allSettled([
     getDashboardOverview(),
@@ -80,69 +72,67 @@ export default function OverallDashboardPage() {
     <div className={styles.dashboardWrapper}>
       {/* Page Header */}
       <AdminPageHeader
-        title="전체 서비스 요약 대시보드"
-        description="당근 마켓플레이스 거래·AI 가격예측·외부 시세·안전 위험신호·꿈가지 나눔 통합 관제 허브"
+        title="운영 현황"
+        description="거래와 가격 데이터를 중심으로 주요 서비스 상태를 확인합니다."
         action={
-          <button onClick={retry} disabled={loading}>
-            <RefreshCw size={14} />
-            새로고침
+          <button type="button" className={styles.dynamicPillBtn} onClick={retry} disabled={loading}>
+            <RefreshCw size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
+            <span>새로고침</span>
           </button>
         }
       />
 
-      {/* 5-Column Core Metrics KPI Strip */}
+      {/* Core metrics */}
       <div className={styles.kpiGrid}>
         <article className={`${styles.kpiCard} ${styles.kpiAccent}`}>
           <span>누적 수집 거래</span>
           <strong>{numberFormat.format(totalTrades)}건</strong>
-          <small>서울 {activeRegions}개 행정동 · 가격 유효율 {priceEligibleRate}%</small>
+          <small>서울 {activeRegions}개 행정동</small>
         </article>
 
         <article className={styles.kpiCard}>
-          <span>AI 가격예측 R² 정확도</span>
-          <strong>0.852</strong>
-          <small>LightGBM 5,909건 검증 통과</small>
+          <span>평균 등록가</span>
+          <strong>{numberFormat.format(avgPrice)}원</strong>
+          <small>가격이 확인된 매물 기준</small>
         </article>
 
         <article className={styles.kpiCard}>
-          <span>외부 시세 비교 품목</span>
-          <strong>12개 품목</strong>
-          <small>중고나라·번개장터 실시간 격차 분석</small>
+          <span>가격 분석 가능</span>
+          <strong>{priceEligibleRate}%</strong>
+          <small>{numberFormat.format(overview?.summary.price_eligible_transactions ?? 0)}건 가격 보유</small>
         </article>
 
         <article className={styles.kpiCard}>
-          <span>감지된 안전 위험신호</span>
+          <span>안전 위험신호</span>
           <strong>{numberFormat.format(totalRisks)}건</strong>
-          <small>서울 25개 구 전역 · 주의보 발령 {activeRiskGu}개 구</small>
+          <small>확인 필요 {activeRiskGu}개 구</small>
         </article>
 
         <article className={styles.kpiCard}>
-          <span>꿈가지 누적 적립 & 시설</span>
+          <span>꿈가지 적립</span>
           <strong>{numberFormat.format(totalPoints)} P</strong>
-          <small>서울 412개 아동복지시설 매칭</small>
+          <small>{numberFormat.format(totalFacilities)}개 아동복지시설 연계</small>
         </article>
       </div>
 
-      {/* 4 Gateway Domain Summary Cards with Direct Navigation Links */}
+      <div className={styles.sectionHeading}>
+        <h2>주요 업무</h2>
+        <p>자주 확인하는 메뉴</p>
+      </div>
+
       <div className={styles.domainGrid}>
-        {/* Card 1: 거래 운영 (Trades & Operations) */}
         <section className={styles.domainCard}>
           <div className={styles.domainHeader}>
-            <div>
-              <div className={styles.domainTagRow}>
-                <span className={`${styles.domainBadge} ${styles.domainBadgeActive}`}>
-                  실시간 거래 연계
-                </span>
-                <span style={{ fontSize: "10px", color: "#8a9085" }}>DG·01 ~ DG·03</span>
-              </div>
+            <div className={styles.domainHeading}>
+              <Activity size={18} />
+              <div>
               <h2 className={styles.domainTitle}>거래 운영 및 데이터 탐색</h2>
-              <p className={styles.domainDesc}>
-                당근마켓 실시간 매물 수집 파이프라인과 영등포·노원·송파 3개 구 중심 거래 표본 및 수집 품질을 점검합니다.
-              </p>
+                <p className={styles.domainDesc}>수집된 매물과 지역별 거래 흐름을 확인합니다.</p>
+              </div>
             </div>
-            <div className={styles.domainIcon}>
-              <Activity size={22} />
-            </div>
+            <Link href="/admin/trade-dashboard" className={styles.primaryLink}>
+              거래 대시보드 <ArrowRight size={14} />
+            </Link>
           </div>
 
           <div className={styles.domainStats}>
@@ -161,14 +151,11 @@ export default function OverallDashboardPage() {
           </div>
 
           <div className={styles.domainActions}>
-            <Link href="/admin/trade-dashboard" className={`${styles.jumpButton} ${styles.jumpButtonPrimary}`}>
-              <Activity size={13} /> 거래 대시보드 바로가기 <ArrowRight size={12} />
-            </Link>
             <Link href="/admin/trades" className={styles.jumpButton}>
               <Search size={13} /> 거래 데이터 탐색
             </Link>
-            <Link href="/admin/quality" className={styles.jumpButton}>
-              <Database size={13} /> 수집 품질 점검
+            <Link href="/admin/management" className={styles.jumpButton}>
+              <SlidersHorizontal size={13} /> 시스템 관리
             </Link>
             <Link href="/admin/price-comparison" className={styles.jumpButton}>
               <Layers size={13} /> 지역별 가격 비교
@@ -176,163 +163,65 @@ export default function OverallDashboardPage() {
           </div>
         </section>
 
-        {/* Card 2: AI 가격 모델 & 외부 비교 (Price AI & External Market Insights) */}
         <section className={styles.domainCard}>
           <div className={styles.domainHeader}>
-            <div>
-              <div className={styles.domainTagRow}>
-                <span className={`${styles.domainBadge} ${styles.domainBadgeActive}`}>
-                  LightGBM & 다중 플랫폼
-                </span>
-                <span style={{ fontSize: "10px", color: "#8a9085" }}>AI & MARKET</span>
+            <div className={styles.domainHeading}>
+              <CircleDollarSign size={18} />
+              <div>
+              <h2 className={styles.domainTitle}>가격현황</h2>
+                <p className={styles.domainDesc}>등록가와 가격대 분포, 최근 매물을 확인합니다.</p>
               </div>
-              <h2 className={styles.domainTitle}>가격 모델 & 외부 시장 비교</h2>
-              <p className={styles.domainDesc}>
-                LightGBM CQR 머신러닝 가격 예측 모델 성능과 중고나라·번개장터 교차 시세 격차 및 매물 문구 감성을 다차원 분석합니다.
-              </p>
             </div>
-            <div className={styles.domainIcon}>
-              <Bot size={22} />
-            </div>
+            <Link href="/admin/price-status" className={styles.primaryLink}>
+              가격현황 <ArrowRight size={14} />
+            </Link>
           </div>
 
           <div className={styles.domainStats}>
             <div className={styles.domainStatItem}>
-              <span>예측 설명력 (R²)</span>
-              <strong>0.852</strong>
+              <span>가격 분석 적격</span>
+              <strong>{priceEligibleRate}%</strong>
             </div>
             <div className={styles.domainStatItem}>
-              <span>평균 오차율 (MAPE)</span>
-              <strong>14.2%</strong>
+              <span>평균 등록가</span>
+              <strong>{numberFormat.format(avgPrice)}원</strong>
             </div>
             <div className={styles.domainStatItem}>
-              <span>공통 비교 품목</span>
-              <strong>12개 카테고리</strong>
+              <span>가격 보유 거래</span>
+              <strong>{numberFormat.format(overview?.summary.price_eligible_transactions ?? 0)}건</strong>
             </div>
           </div>
 
           <div className={styles.domainActions}>
-            <Link href="/admin/market-trends" className={`${styles.jumpButton} ${styles.jumpButtonPrimary}`}>
-              <TrendingUp size={13} /> 외부 변화 추이 바로가기 <ArrowRight size={12} />
+            <Link href="/admin/trades" className={styles.jumpButton}>
+              <Search size={13} /> 거래 데이터 탐색
             </Link>
-            <Link href="/admin/price-model" className={styles.jumpButton}>
-              <Bot size={13} /> AI 가격 모델
-            </Link>
-            <Link href="/admin/insights" className={styles.jumpButton}>
-              <TrendingUp size={13} /> 외부 비교 인사이트
-            </Link>
-            <Link href="/admin/sources" className={styles.jumpButton}>
-              <Database size={13} /> 수집원 관리
+            <Link href="/admin/price-comparison" className={styles.jumpButton}>
+              <Layers size={13} /> 지역별 가격 비교
             </Link>
           </div>
         </section>
+      </div>
 
-        {/* Card 3: 위험요소 및 안전신호 (Risk & Safety Intelligence) */}
-        <section className={styles.domainCard}>
-          <div className={styles.domainHeader}>
-            <div>
-              <div className={styles.domainTagRow}>
-                <span
-                  className={styles.domainBadge}
-                  style={{ background: "#fdf0f0", color: "#d71913", borderColor: "#ffd1d0" }}
-                >
-                  서울안전누리 실시간 연동
-                </span>
-                <span style={{ fontSize: "10px", color: "#8a9085" }}>SAFETY INTEL</span>
-              </div>
-              <h2 className={styles.domainTitle}>위험요소 및 도시 안전신호 분석</h2>
-              <p className={styles.domainDesc}>
-                서울 25개 자치구의 화재, 교통사고, 도로통제, 침수 등 재난안전 피드를 교차 분석하고 직거래 안전 가이드를 제공합니다.
-              </p>
-            </div>
-            <div className={styles.domainIcon} style={{ color: "#d71913", background: "#fff5f5" }}>
-              <ShieldAlert size={22} />
-            </div>
-          </div>
-
-          <div className={styles.domainStats}>
-            <div className={styles.domainStatItem}>
-              <span>감지 위험신호</span>
-              <strong>{numberFormat.format(totalRisks)}건</strong>
-            </div>
-            <div className={styles.domainStatItem}>
-              <span>최다 발생 구</span>
-              <strong>{highestRiskGu}</strong>
-            </div>
-            <div className={styles.domainStatItem}>
-              <span>도시 관제 커버리지</span>
-              <strong>25개 구 100%</strong>
-            </div>
-          </div>
-
-          <div className={styles.domainActions}>
-            <Link
-              href="/admin/risks"
-              className={`${styles.jumpButton} ${styles.jumpButtonPrimary}`}
-              style={{ background: "#d71913", borderColor: "#d71913" }}
-            >
-              <ShieldAlert size={13} /> 위험요소 분석 바로가기 <ArrowRight size={12} />
-            </Link>
-            <Link href="/admin/environment" className={styles.jumpButton}>
-              <Compass size={13} /> 인파 혼잡도 & 환경 분석
-            </Link>
-          </div>
-        </section>
-
-        {/* Card 4: 꿈가지 나눔 및 사회적 가치 (Dream Gaji & Social Value) */}
-        <section className={styles.domainCard}>
-          <div className={styles.domainHeader}>
-            <div>
-              <div className={styles.domainTagRow}>
-                <span
-                  className={styles.domainBadge}
-                  style={{ background: "#eaf5ee", color: "#276c4d", borderColor: "#c3e6d2" }}
-                >
-                  포인트 원장 & 시설 매칭
-                </span>
-                <span style={{ fontSize: "10px", color: "#8a9085" }}>SOCIAL VALUE</span>
-              </div>
-              <h2 className={styles.domainTitle}>꿈가지 운영 및 자치구별 적립 분석</h2>
-              <p className={styles.domainDesc}>
-                중고거래 송금(0.1%) 및 QR결제(1%) 시 자동 적립되는 꿈방울 원장과 서울시 25개 자치구 412개 아동복지시설 매칭을 분석합니다.
-              </p>
-            </div>
-            <div className={styles.domainIcon} style={{ color: "#276c4d", background: "#eaf5ee" }}>
-              <HeartHandshake size={22} />
-            </div>
-          </div>
-
-          <div className={styles.domainStats}>
-            <div className={styles.domainStatItem}>
-              <span>누적 적립 포인트</span>
-              <strong>{numberFormat.format(totalPoints)} P</strong>
-            </div>
-            <div className={styles.domainStatItem}>
-              <span>현재 가용 잔액</span>
-              <strong>{numberFormat.format(activeBalance)} P</strong>
-            </div>
-            <div className={styles.domainStatItem}>
-              <span>연계 아동시설</span>
-              <strong>{numberFormat.format(totalFacilities)}개소</strong>
-            </div>
-          </div>
-
-          <div className={styles.domainActions}>
-            <Link
-              href="/admin/donations"
-              className={`${styles.jumpButton} ${styles.jumpButtonPrimary}`}
-              style={{ background: "#276c4d", borderColor: "#276c4d" }}
-            >
-              <HeartHandshake size={13} /> 꿈가지 분석 바로가기 <ArrowRight size={12} />
-            </Link>
-            <Link href="/admin/notices" className={styles.jumpButton}>
-              <Sparkles size={13} /> 공지·기부 관리
-            </Link>
-            <Link href="/admin/support" className={styles.jumpButton}>
-              고객 문의
-            </Link>
-          </div>
-        </section>
+      <div className={styles.secondaryWork}>
+        <Link href="/admin/risks" className={styles.secondaryRow}>
+          <span className={styles.secondaryIcon}><ShieldAlert size={17} /></span>
+          <span><strong>도시 안전</strong><small>위험신호와 지역별 안전 현황</small></span>
+          <span className={styles.secondaryValue}>{numberFormat.format(totalRisks)}건</span>
+          <ArrowRight size={15} />
+        </Link>
+        <Link href="/admin/environment" className={styles.secondaryRow}>
+          <span className={styles.secondaryIcon}><Compass size={17} /></span>
+          <span><strong>환경 분석</strong><small>인파 혼잡도와 생활 환경</small></span>
+          <span className={styles.secondaryValue}>{highestRiskGu}</span>
+          <ArrowRight size={15} />
+        </Link>
+        <Link href="/admin/donations" className={styles.secondaryRow}>
+          <span className={styles.secondaryIcon}><HeartHandshake size={17} /></span>
+          <span><strong>꿈가지 운영</strong><small>적립금과 연계 시설 관리</small></span>
+          <span className={styles.secondaryValue}>{numberFormat.format(activeBalance)} P</span>
+          <ArrowRight size={15} />
+        </Link>
       </div>
 
       {/* Bottom 2-Column: Recent Feed & Data Pipeline Integrity */}
