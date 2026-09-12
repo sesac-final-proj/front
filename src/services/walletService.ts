@@ -55,8 +55,8 @@ export async function chargeWallet(amount: number): Promise<number> {
   return payload.balance;
 }
 
-// 매장 조회 — 결제 QR(=/carrot?pay=<storeId> URL)을 스캔/진입했을 때 표시할 이름을 받아온다.
-export async function getStore(storeId: number): Promise<{ id: number; name: string }> {
+// 매장 조회 — 결제 QR(=/carrot?pay=<storeId> URL)을 스캔/진입했을 때 표시할 이름/사진을 받아온다.
+export async function getStore(storeId: number): Promise<{ id: number; name: string; image_url: string | null }> {
   const response = await authorizedFetch(`/api/v1/wallet/stores/${storeId}`, {
     headers: { Accept: "application/json" },
   });
