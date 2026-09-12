@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, FormEvent } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, FormEvent } from "react";
 import {
   ChevronLeft,
   Menu,
@@ -9,10 +9,12 @@ import {
   Plus,
   Send,
   Wallet,
+  MapPin,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ChatRoom, ChatMessageUi } from "@/types";
 import type { ChatTradeStatus } from "@/services/chatService";
+import { fetchTradePlaceRecommendations, type TradePlaceRecommendation } from "@/services/congestionService";
 import { ScreenHeader, IconButton } from "../common";
 import { Thumbnail } from "../trade";
 
@@ -59,7 +61,10 @@ export function ChatRoomScreen({
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
+  const [placeRecommendations, setPlaceRecommendations] = useState<TradePlaceRecommendation[]>([]);
+  const [placeRecommendationStatus, setPlaceRecommendationStatus] = useState<"idle" | "loading" | "error">("idle");
   const messageStackRef = useRef<HTMLDivElement>(null);
+  const chatRoomRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const stack = messageStackRef.current;
@@ -67,12 +72,34 @@ export function ChatRoomScreen({
     stack.scrollTo({ top: stack.scrollHeight, behavior: "auto" });
   }, [messages.length]);
 
+  // 모바일 브라우저마다 키보드가 레이아웃 뷰포트를 줄이는 방식이 달라서,
+  // 실제 visual viewport 높이를 채팅 화면에 적용한다. 입력창은 flow 안에 있어
+  // 키보드가 열릴 때 메시지 영역과 함께 자연스럽게 위로 이동한다.
+  useLayoutEffect(() => {
+    const viewport = window.visualViewport;
+    const updateViewportHeight = () => {
+      const height = viewport?.height ?? window.innerHeight;
+      chatRoomRef.current?.style.setProperty("--chat-viewport-height", `${Math.round(height)}px`);
+    };
+
+    updateViewportHeight();
+    viewport?.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("scroll", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => {
+      viewport?.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("scroll", updateViewportHeight);
+      window.removeEventListener("resize", updateViewportHeight);
+    };
+  }, []);
+
   // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
   // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
   const priceLabel = room.productPrice == null ? "나눔" : `${room.productPrice.toLocaleString("ko-KR")}원`;
   const statusLabel =
     room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
   const canSend = draft.trim().length > 0;
+  const canRecommendPlace = Boolean(room.productTradePlaceLat && room.productTradePlaceLng) || Boolean(room.productTradePlace || room.counterpartNeighborhoodName);
   // 카톡식 "1" — 내가 보낸 메시지인데 상대가 아직 안 읽었으면(counterpartLastReadAt보다
   // 늦게 보냈으면, 혹은 상대가 한 번도 안 읽었으면) 표시.
   const isUnreadByCounterpart = (message: ChatMessageUi) =>
@@ -80,8 +107,28 @@ export function ChatRoomScreen({
     (!room.counterpartLastReadAt ||
       new Date(message.createdAt).getTime() > new Date(room.counterpartLastReadAt).getTime());
 
+  function loadPlaceRecommendations() {
+    if (!canRecommendPlace) return;
+    setPlaceRecommendationStatus("loading");
+    fetchTradePlaceRecommendations({
+      lat: room.productTradePlaceLat,
+      lng: room.productTradePlaceLng,
+      query: room.productTradePlace ?? room.counterpartNeighborhoodName,
+      hour: new Date().getHours(),
+    })
+      .then((items) => {
+        setPlaceRecommendations(items);
+        setPlaceRecommendationStatus("idle");
+      })
+      .catch(() => setPlaceRecommendationStatus("error"));
+  }
+
+  function useRecommendation(place: TradePlaceRecommendation) {
+    onDraftChange(`${place.name}에서 거래 어떠세요? 지금 ${place.congestionLevel}이고 ${place.distanceMeters}m 정도예요.`);
+  }
+
   return (
-    <section className={styles.chatRoomScreen}>
+    <section ref={chatRoomRef} className={styles.chatRoomScreen}>
       <ScreenHeader
         compact
         leading={
@@ -224,18 +271,56 @@ export function ChatRoomScreen({
           </span>
         </div>
       </div>
-      {/* 당근페이는 구매자만 보낸다 — 판매자가 자기 자신에게 송금할 일은 없다. */}
-      {room.tradeRole === "BUYER" && (
-        <button
-          type="button"
-          className={styles.chatPayButton}
-          onClick={onOpenPayment}
-          disabled={room.productTradeStatus === "SOLD"}
-          title={room.productTradeStatus === "SOLD" ? "이미 거래가 완료됐어요" : undefined}
-        >
-          <Wallet size={18} />
-          당근페이
-        </button>
+      {(room.tradeRole === "BUYER" || canRecommendPlace) && (
+        <div className={styles.chatQuickActions}>
+          {/* 기존 당근페이 액션 위치를 유지하고, 혼잡도 추천을 같은 행에 둔다. */}
+          {room.tradeRole === "BUYER" && (
+            <button
+              type="button"
+              className={styles.chatPayButton}
+              onClick={onOpenPayment}
+              disabled={room.productTradeStatus === "SOLD"}
+              title={room.productTradeStatus === "SOLD" ? "이미 거래가 완료됐어요" : undefined}
+            >
+              <Wallet size={17} />
+              당근페이
+            </button>
+          )}
+          {canRecommendPlace && (
+            <button
+              type="button"
+              className={styles.chatRecommendButton}
+              onClick={loadPlaceRecommendations}
+              disabled={placeRecommendationStatus === "loading"}
+              aria-expanded={placeRecommendations.length > 0}
+            >
+              <MapPin size={17} />
+              {placeRecommendationStatus === "loading" ? "확인 중" : "혼잡도 추천"}
+            </button>
+          )}
+        </div>
+      )}
+      {canRecommendPlace && (
+        <div className={styles.chatPlaceRecommend} aria-live="polite">
+          {placeRecommendationStatus === "error" && <p>추천 장소를 불러오지 못했어요.</p>}
+          {placeRecommendations.length > 0 && (
+            <div className={styles.chatPlaceRecommendList}>
+              {placeRecommendations.slice(0, 3).map((place) => (
+                <button
+                  type="button"
+                  key={`${place.name}-${place.lat}-${place.lng}`}
+                  onClick={() => useRecommendation(place)}
+                >
+                  <span>
+                    <strong>{place.name}</strong>
+                    <small>{place.recommendationReason ?? place.congestionMessage}</small>
+                  </span>
+                  <em>{place.congestionLevel}</em>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       <div ref={messageStackRef} className={styles.messageStack}>
         {messages.map((message, index) =>
