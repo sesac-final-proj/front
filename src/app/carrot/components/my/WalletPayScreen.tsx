@@ -24,7 +24,7 @@ function parseStoreIdFromQr(text: string): number | null {
 type Step =
   | { name: "scan" }
   | { name: "loading-store" }
-  | { name: "amount"; storeId: number; storeName: string }
+  | { name: "amount"; storeId: number; storeName: string; storeImageUrl: string | null }
   | { name: "done"; storeName: string; amount: number };
 
 export function WalletPayScreen({
@@ -51,7 +51,7 @@ export function WalletPayScreen({
     let cancelled = false;
     getStore(initialStoreId)
       .then((store) => {
-        if (!cancelled) setStep({ name: "amount", storeId: store.id, storeName: store.name });
+        if (!cancelled) setStep({ name: "amount", storeId: store.id, storeName: store.name, storeImageUrl: store.image_url });
       })
       .catch(() => {
         if (!cancelled) setError("가맹점 정보를 불러오지 못했어요.");
@@ -99,7 +99,7 @@ export function WalletPayScreen({
           if (storeId) {
             setStep({ name: "loading-store" });
             getStore(storeId)
-              .then((store) => setStep({ name: "amount", storeId: store.id, storeName: store.name }))
+              .then((store) => setStep({ name: "amount", storeId: store.id, storeName: store.name, storeImageUrl: store.image_url }))
               .catch(() => {
                 setError("가맹점 정보를 불러오지 못했어요.");
                 setStep({ name: "scan" });
@@ -174,6 +174,10 @@ export function WalletPayScreen({
           }
         />
         <div className={styles.paymentAmountBody}>
+          {step.storeImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- 매장 사진은 외부(NCP) 호스팅이라 next/image 최적화 대상이 아님
+            <img src={step.storeImageUrl} alt={step.storeName} className={styles.paymentStoreImage} />
+          )}
           <div className={styles.paymentRecipient}>
             <span>{step.storeName}</span>
           </div>
