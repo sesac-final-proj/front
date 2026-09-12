@@ -63,35 +63,89 @@ export function ChatRoomScreen({
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
   const [placeRecommendations, setPlaceRecommendations] = useState<TradePlaceRecommendation[]>([]);
   const [placeRecommendationStatus, setPlaceRecommendationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const messageStackRef = useRef<HTMLDivElement>(null);
   const chatRoomRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = React.useCallback((smooth = false) => {
     const stack = messageStackRef.current;
     if (!stack) return;
-    stack.scrollTo({ top: stack.scrollHeight, behavior: "auto" });
-  }, [messages.length]);
+    stack.scrollTo({
+      top: stack.scrollHeight,
+      behavior: smooth ? "smooth" : "auto",
+    });
+  }, []);
 
-  // 모바일 브라우저마다 키보드가 레이아웃 뷰포트를 줄이는 방식이 달라서,
-  // 실제 visual viewport 높이를 채팅 화면에 적용한다. 입력창은 flow 안에 있어
-  // 키보드가 열릴 때 메시지 영역과 함께 자연스럽게 위로 이동한다.
+  useEffect(() => {
+    scrollToBottom(false);
+  }, [messages.length, scrollToBottom]);
+
+  // 모바일 브라우저(특히 iOS Safari / Chrome)에서 키보드가 올라올 때
+  // window가 위로 밀려 헤더가 잘려나가는 것을 방지하고,
+  // visualViewport 높이에 맞춰 입력창이 키보드 바로 위에 자연스럽게 슬라이딩 밀착되도록 제어.
   useLayoutEffect(() => {
     const viewport = window.visualViewport;
-    const updateViewportHeight = () => {
-      const height = viewport?.height ?? window.innerHeight;
-      chatRoomRef.current?.style.setProperty("--chat-viewport-height", `${Math.round(height)}px`);
+
+    const handleViewportChange = () => {
+      // iOS Safari window 스크롤 튐 방지
+      if (window.scrollY > 0) {
+        window.scrollTo(0, 0);
+      }
+      if (document.documentElement.scrollTop > 0) {
+        document.documentElement.scrollTop = 0;
+      }
+
+      const totalHeight = window.innerHeight;
+      const currentHeight = viewport?.height ?? totalHeight;
+      const kbActive = totalHeight - currentHeight > 60;
+
+      setKeyboardOpen(kbActive);
+
+      if (chatRoomRef.current) {
+        if (kbActive) {
+          chatRoomRef.current.style.height = `${Math.round(currentHeight)}px`;
+        } else {
+          chatRoomRef.current.style.height = "100%";
+        }
+      }
+
+      // 키보드 높이 변경 시 메시지 목록을 최하단으로 자연스럽게 스크롤
+      setTimeout(() => {
+        scrollToBottom(true);
+      }, 50);
     };
 
-    updateViewportHeight();
-    viewport?.addEventListener("resize", updateViewportHeight);
-    viewport?.addEventListener("scroll", updateViewportHeight);
-    window.addEventListener("resize", updateViewportHeight);
+    handleViewportChange();
+    viewport?.addEventListener("resize", handleViewportChange);
+    viewport?.addEventListener("scroll", handleViewportChange);
+    window.addEventListener("resize", handleViewportChange);
+
     return () => {
-      viewport?.removeEventListener("resize", updateViewportHeight);
-      viewport?.removeEventListener("scroll", updateViewportHeight);
-      window.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("resize", handleViewportChange);
+      viewport?.removeEventListener("scroll", handleViewportChange);
+      window.removeEventListener("resize", handleViewportChange);
     };
-  }, []);
+  }, [scrollToBottom]);
+
+  const handleInputFocus = () => {
+    setKeyboardOpen(true);
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      scrollToBottom(true);
+    }, 100);
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      scrollToBottom(true);
+    }, 280);
+  };
+
+  const handleInputBlur = () => {
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
+  };
 
   // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
   // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
@@ -128,7 +182,11 @@ export function ChatRoomScreen({
   }
 
   return (
-    <section ref={chatRoomRef} className={styles.chatRoomScreen}>
+    <section
+      ref={chatRoomRef}
+      className={styles.chatRoomScreen}
+      data-keyboard-open={keyboardOpen}
+    >
       <ScreenHeader
         compact
         leading={
@@ -367,8 +425,11 @@ export function ChatRoomScreen({
           />
         </label>
         <input
+          ref={inputRef}
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           placeholder="메시지를 입력하세요"
         />
         <button

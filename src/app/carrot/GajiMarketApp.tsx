@@ -1883,7 +1883,7 @@ export default function GajiMarketApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}
             >
               <ChatRoomScreen
                 room={selectedChat}

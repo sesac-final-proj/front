@@ -87,6 +87,7 @@ export default function TradeDashboardSection() {
         <DataSourceStatus source={data.source} />
       </div>
 
+      {/* 가격 예측 모델 섹션 */}
       <PricePredictionSection />
     </>
   );

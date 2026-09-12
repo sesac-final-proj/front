@@ -8,20 +8,22 @@
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  gap: 0;
+  background: #ffffff;
+  border: 1px solid #e2e4df;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .kpiCard {
   min-width: 0;
-  padding: 20px 18px;
+  padding: 18px 20px;
   background: #ffffff;
-  border: 1px solid #e7e8e5;
-  border-radius: 16px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  border-right: 1px solid #e8e9e5;
 }
 
-.kpiCard:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+.kpiCard:last-child {
+  border-right: 0;
 }
 
 .kpiCard span {
@@ -35,7 +37,7 @@
   display: block;
   margin: 12px 0 6px;
   font-size: clamp(20px, 1.8vw, 28px);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   font-weight: 750;
   color: #1a1c20;
   overflow: hidden;
@@ -50,21 +52,29 @@
 }
 
 .kpiAccent {
-  background: #ff6f0f;
-  border-color: #ff6f0f;
-  color: #ffffff;
+  border-top: 3px solid #e85d04;
+  padding-top: 16px;
 }
 
 .kpiAccent span,
 .kpiAccent small {
-  color: #fff2e9;
+  color: #656b60;
 }
 
 .kpiAccent strong {
-  color: #ffffff;
+  color: #1a1c20;
 }
 
-/* Service Domain Cards Grid (4 Gateway Cards) */
+.sectionHeading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 0 -10px;
+}
+
+.sectionHeading h2 { margin: 0; font-size: 16px; color: #20231f; }
+.sectionHeading p { margin: 0; font-size: 11px; color: #8a9085; }
+
 .domainGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -74,16 +84,15 @@
 .domainCard {
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 22px;
   background: #ffffff;
   border: 1px solid #e7e8e5;
-  border-radius: 20px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
 }
 
 .domainCard:hover {
-  border-color: #ffb885;
-  box-shadow: 0 8px 24px rgba(32, 35, 31, 0.05);
+  border-color: #c9ccc5;
 }
 
 .domainHeader {
@@ -91,70 +100,56 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
-.domainTagRow {
+.domainHeading {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.domainBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 750;
-  background: #f4f5f0;
-  color: #555b50;
-}
-
-.domainBadgeActive {
-  background: #fff0e5;
-  color: #df5900;
-  border: 1px solid #ffd8bf;
+  align-items: flex-start;
+  gap: 11px;
+  color: #d95800;
 }
 
 .domainTitle {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 17px;
   font-weight: 750;
   color: #1a1c20;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .domainDesc {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   color: #777d72;
   font-size: 11px;
   line-height: 1.55;
 }
 
-.domainIcon {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: #f7f7f5;
-  color: #ff6f0f;
+.primaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   flex: 0 0 auto;
+  color: #c84f00;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 /* Domain Stat Metrics Inside Card */
 .domainStats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 16px 0;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #fafaf8;
-  border: 1px solid #f0f1ed;
+  gap: 0;
+  margin: 0;
+  padding: 15px 0;
+  border-top: 1px solid #eceee9;
+  border-bottom: 1px solid #eceee9;
 }
+
+.domainStatItem { padding: 0 16px; border-right: 1px solid #eceee9; }
+.domainStatItem:first-child { padding-left: 0; }
+.domainStatItem:last-child { border-right: 0; }
 
 .domainStatItem span {
   display: block;
@@ -168,7 +163,7 @@
   font-size: 14px;
   font-weight: 750;
   color: #1a1c20;
-  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Action Links / Jump Buttons */
@@ -178,42 +173,36 @@
   gap: 8px;
   margin-top: auto;
   padding-top: 14px;
-  border-top: 1px solid #f0f1ed;
 }
 
 .jumpButton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 13px;
-  border-radius: 8px;
+  padding: 5px 0;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 700;
-  background: #ffffff;
+  background: transparent;
   color: #383e33;
-  border: 1px solid #e0e2db;
+  border: 0;
   text-decoration: none;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .jumpButton:hover {
-  background: #fff5ed;
-  border-color: #ff6f0f;
   color: #df5900;
-  transform: translateX(2px);
 }
 
-.jumpButtonPrimary {
-  background: #ff6f0f;
-  color: #ffffff;
-  border-color: #ff6f0f;
-}
-
-.jumpButtonPrimary:hover {
-  background: #df5900;
-  border-color: #df5900;
-  color: #ffffff;
-}
+.secondaryWork { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #e2e4df; border-radius: 8px; background: #fff; }
+.secondaryRow { min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: 12px; padding: 17px 18px; color: #30342e; text-decoration: none; border-right: 1px solid #e8e9e5; }
+.secondaryRow:last-child { border-right: 0; }
+.secondaryRow:hover { background: #fafaf8; }
+.secondaryIcon { color: #777d72; }
+.secondaryRow strong, .secondaryRow small { display: block; }
+.secondaryRow strong { font-size: 13px; }
+.secondaryRow small { margin-top: 3px; color: #858b80; font-size: 10px; }
+.secondaryValue { color: #555b50; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Bottom 2-Column Grid for Recents & System Status */
 .bottomGrid {
@@ -259,6 +248,9 @@
   .domainGrid {
     grid-template-columns: 1fr;
   }
+  .secondaryWork { grid-template-columns: 1fr; }
+  .secondaryRow { border-right: 0; border-bottom: 1px solid #e8e9e5; }
+  .secondaryRow:last-child { border-bottom: 0; }
   .bottomGrid {
     grid-template-columns: 1fr;
   }
@@ -269,6 +261,16 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .domainStats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
+}
+
+@media (max-width: 540px) {
+  .kpiGrid { grid-template-columns: 1fr; }
+  .kpiCard { border-right: 0; border-bottom: 1px solid #e8e9e5; }
+  .kpiCard:last-child { border-bottom: 0; }
+  .domainHeader { display: grid; }
+  .domainStats { grid-template-columns: 1fr; }
+  .domainStatItem { padding: 9px 0; border-right: 0; border-bottom: 1px solid #eceee9; }
+  .domainStatItem:last-child { border-bottom: 0; }
 }
