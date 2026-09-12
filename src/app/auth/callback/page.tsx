@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY } from "@/services/tradeService";
+import { AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY, consumePostLoginRedirect } from "@/services/tradeService";
 import { getMe } from "@/services/authService";
 import { DaangnSplash } from "@/app/carrot/components/common/DaangnSplash";
 
@@ -31,9 +31,10 @@ function AuthCallbackInner() {
     localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
 
-    // 닉네임(+전화번호) 설정을 아직 안 끝냈으면 홈으로 보내지 않고 이어서 받는다.
+    // 닉네임(+전화번호) 설정을 아직 안 끝냈으면 홈으로 보내지 않고 이어서 받는다 —
+    // 이 경우 결제 QR 등 원래 목적지는 onboarding/profile이 이어서 소비하도록 남겨둔다.
     getMe()
-      .then((me) => router.replace(me.nicknameSet ? "/carrot" : "/onboarding/profile"))
+      .then((me) => router.replace(me.nicknameSet ? consumePostLoginRedirect() ?? "/carrot" : "/onboarding/profile"))
       .catch(() => router.replace("/onboarding/profile"));
   }, [params, router]);
 

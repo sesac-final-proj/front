@@ -38,6 +38,23 @@ function apiUrl(path: string) {
 // src/app/auth/callback/page.tsx의 소셜 로그인 콜백이 이 키들에 토큰을 저장한다.
 export const AUTH_TOKEN_STORAGE_KEY = "carrot_access_token";
 export const REFRESH_TOKEN_STORAGE_KEY = "carrot_refresh_token";
+// 결제 QR(/carrot?pay=<id>)처럼 로그인이 필요한 딥링크로 비로그인 상태에서 들어오면
+// AuthGate가 /onboarding으로 풀 페이지 이동시키면서 쿼리스트링을 통째로 잃어버린다.
+// OAuth 왕복(카카오/네이버) 동안 유지되도록 URL 대신 localStorage에 목적지를 잠깐 적어두고,
+// 로그인 완료 콜백(auth/callback)에서 이 값을 읽어 원래 화면으로 되돌린다.
+export const POST_LOGIN_REDIRECT_STORAGE_KEY = "carrot_post_login_redirect";
+
+// AuthGate.saveRedirectTarget()이 남겨둔 목적지를 한 번 읽고 지운다 — 로그인
+// 완료 지점(auth/callback, onboarding/profile) 두 곳에서 공통으로 쓴다.
+export function consumePostLoginRedirect(): string | null {
+  try {
+    const target = window.localStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+    if (target) window.localStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+    return target;
+  } catch {
+    return null;
+  }
+}
 
 export class AuthRequiredError extends Error {
   constructor() {
