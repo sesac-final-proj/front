@@ -1,0 +1,274 @@
+.dashboardWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* 5-Column Core Metrics Strip */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kpiCard {
+  min-width: 0;
+  padding: 20px 18px;
+  background: #ffffff;
+  border: 1px solid #e7e8e5;
+  border-radius: 16px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.kpiCard:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+}
+
+.kpiCard span {
+  display: block;
+  color: #656b60;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.kpiCard strong {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: clamp(20px, 1.8vw, 28px);
+  letter-spacing: -0.04em;
+  font-weight: 750;
+  color: #1a1c20;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiCard small {
+  display: block;
+  color: #91968c;
+  font-size: 10px;
+}
+
+.kpiAccent {
+  background: #ff6f0f;
+  border-color: #ff6f0f;
+  color: #ffffff;
+}
+
+.kpiAccent span,
+.kpiAccent small {
+  color: #fff2e9;
+}
+
+.kpiAccent strong {
+  color: #ffffff;
+}
+
+/* Service Domain Cards Grid (4 Gateway Cards) */
+.domainGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.domainCard {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e7e8e5;
+  border-radius: 20px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.domainCard:hover {
+  border-color: #ffb885;
+  box-shadow: 0 8px 24px rgba(32, 35, 31, 0.05);
+}
+
+.domainHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.domainTagRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.domainBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 750;
+  background: #f4f5f0;
+  color: #555b50;
+}
+
+.domainBadgeActive {
+  background: #fff0e5;
+  color: #df5900;
+  border: 1px solid #ffd8bf;
+}
+
+.domainTitle {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 750;
+  color: #1a1c20;
+  letter-spacing: -0.02em;
+}
+
+.domainDesc {
+  margin: 5px 0 0;
+  color: #777d72;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.domainIcon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #f7f7f5;
+  color: #ff6f0f;
+  flex: 0 0 auto;
+}
+
+/* Domain Stat Metrics Inside Card */
+.domainStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fafaf8;
+  border: 1px solid #f0f1ed;
+}
+
+.domainStatItem span {
+  display: block;
+  font-size: 9px;
+  color: #8b9185;
+}
+
+.domainStatItem strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 14px;
+  font-weight: 750;
+  color: #1a1c20;
+  font-family: ui-monospace, monospace;
+}
+
+/* Action Links / Jump Buttons */
+.domainActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #f0f1ed;
+}
+
+.jumpButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #ffffff;
+  color: #383e33;
+  border: 1px solid #e0e2db;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.jumpButton:hover {
+  background: #fff5ed;
+  border-color: #ff6f0f;
+  color: #df5900;
+  transform: translateX(2px);
+}
+
+.jumpButtonPrimary {
+  background: #ff6f0f;
+  color: #ffffff;
+  border-color: #ff6f0f;
+}
+
+.jumpButtonPrimary:hover {
+  background: #df5900;
+  border-color: #df5900;
+  color: #ffffff;
+}
+
+/* Bottom 2-Column Grid for Recents & System Status */
+.bottomGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr);
+  gap: 16px;
+}
+
+.panel {
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #e7e8e5;
+  border-radius: 20px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.panelHead h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1c20;
+  letter-spacing: -0.02em;
+}
+
+.panelHead p {
+  margin: 4px 0 0;
+  color: #777d72;
+  font-size: 11px;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .domainGrid {
+    grid-template-columns: 1fr;
+  }
+  .bottomGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .domainStats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import { KAKAO_MAP_JS_KEY } from "../../constants";
 import { createEggplantMarkerImage, loadKakaoMapScript } from "../map";
 import { IconButton } from "../common/IconButton";
+import { fetchTradePlaceRecommendations, type TradePlaceRecommendation } from "@/services/congestionService";
 
 // 서울시청 기본 좌표 — 동네 좌표를 못 구한 경우의 최종 폴백.
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 };
@@ -33,9 +34,19 @@ export function TradePlacePickerScreen({
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const markerRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [hasPicked, setHasPicked] = useState(false);
   const [mapError, setMapError] = useState(!KAKAO_MAP_JS_KEY);
+  const [recommendations, setRecommendations] = useState<TradePlaceRecommendation[]>([]);
+  const [recommendError, setRecommendError] = useState<string | null>(null);
+
+  function loadRecommendations(lat: number, lng: number) {
+    setRecommendError(null);
+    fetchTradePlaceRecommendations({ lat, lng, hour: new Date().getHours() })
+      .then(setRecommendations)
+      .catch(() => setRecommendError("혼잡도 추천을 불러오지 못했어요."));
+  }
 
   useEffect(() => {
     if (!KAKAO_MAP_JS_KEY) return;
@@ -63,6 +74,7 @@ export function TradePlacePickerScreen({
         const startLng = initialLng ?? DEFAULT_CENTER.lng;
         const center = new kakaoMaps.LatLng(startLat, startLng);
         const map = new kakaoMaps.Map(mapElementRef.current, { center, level: 4 });
+        mapRef.current = map;
         const marker = new kakaoMaps.Marker({
           position: center,
           map,
@@ -84,6 +96,7 @@ export function TradePlacePickerScreen({
 
         if (initialLat !== undefined && initialLng !== undefined) setHasPicked(true);
         resolvePlaceName(startLat, startLng);
+        loadRecommendations(startLat, startLng);
       })
       .catch(() => {
         if (!cancelled) setMapError(true);
@@ -99,6 +112,18 @@ export function TradePlacePickerScreen({
     if (!marker) return;
     const position = marker.getPosition();
     onConfirm({ name: placeName ?? "직접 선택한 위치", lat: position.getLat(), lng: position.getLng() });
+  }
+
+  function pickRecommendation(place: TradePlaceRecommendation) {
+    const kakaoMaps = (window as any).kakao?.maps;
+    const marker = markerRef.current;
+    if (!kakaoMaps || !marker) return;
+    const next = new kakaoMaps.LatLng(place.lat, place.lng);
+    marker.setPosition(next);
+    mapRef.current?.panTo(next);
+    setHasPicked(true);
+    setPlaceName(place.name);
+    loadRecommendations(place.lat, place.lng);
   }
 
   return (
@@ -124,6 +149,32 @@ export function TradePlacePickerScreen({
               <div className={styles.tradePlacePickerTooltip}>지도를 탭해서 위치를 선택해보세요.</div>
             )}
           </>
+        )}
+      </div>
+      <div className={styles.tradePlaceRecommendations}>
+        <div className={styles.tradePlaceRecommendationHeader}>
+          <MapPin size={17} />
+          <span>혼잡도 기반 추천 장소</span>
+        </div>
+        {recommendError ? (
+          <p className={styles.tradePlaceRecommendationEmpty}>{recommendError}</p>
+        ) : recommendations.length === 0 ? (
+          <p className={styles.tradePlaceRecommendationEmpty}>주변 실시간 혼잡도 장소가 없어요.</p>
+        ) : (
+          recommendations.map((place) => (
+            <button
+              type="button"
+              key={`${place.name}-${place.lat}-${place.lng}`}
+              className={styles.tradePlaceRecommendationCard}
+              onClick={() => pickRecommendation(place)}
+            >
+              <span>
+                <strong>{place.name}</strong>
+                <small>{place.recommendationReason ?? place.congestionMessage}</small>
+              </span>
+              <em>{place.congestionLevel}</em>
+            </button>
+          ))
         )}
       </div>
       <div className={styles.tradePlacePickerFooter}>
