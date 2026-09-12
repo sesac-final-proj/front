@@ -166,7 +166,7 @@ export function WalletPayScreen({
     return (
       <section className={styles.screen}>
         <ScreenHeader
-          title="현장결제"
+          title="당근페이 현장결제"
           leading={
             <IconButton label="뒤로" onClick={onBack}>
               <ChevronLeft size={27} />
