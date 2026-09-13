@@ -1261,13 +1261,12 @@ img.thumbnail {
   background: #ccfbfa;
   color: #0f5c59;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.4;
 }
 
 .priceHintLabel {
   font-size: 17px;
-  font-weight: 800;
 }
 
 .formSectionLabel {
