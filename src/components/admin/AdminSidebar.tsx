@@ -22,7 +22,6 @@ import {
   LayoutDashboard,
   LineChart,
   CircleDollarSign,
-  SlidersHorizontal,
   Building2,
 } from "lucide-react";
 import styles from "./portal.module.css";
@@ -57,7 +56,6 @@ const groups = [
   {
     label: "시스템",
     items: [
-      ["/admin/management", "관리", SlidersHorizontal],
       ["/admin/notices", "공지·기부", Bell],
       ["/admin/system", "구현 현황", PanelsTopLeft],
       ["/admin/settings", "환경설정", Settings],

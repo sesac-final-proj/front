@@ -11,7 +11,6 @@ import {
   Search,
   ShieldAlert,
   CircleDollarSign,
-  SlidersHorizontal,
 } from "lucide-react";
 import { getDashboardOverview } from "@/lib/admin/dashboard-api";
 import { adminAuthorizedFetch, getAdminDreamStatus } from "@/services/adminService";
@@ -153,9 +152,6 @@ export default function OverallDashboardPage() {
           <div className={styles.domainActions}>
             <Link href="/admin/trades" className={styles.jumpButton}>
               <Search size={13} /> 거래 데이터 탐색
-            </Link>
-            <Link href="/admin/management" className={styles.jumpButton}>
-              <SlidersHorizontal size={13} /> 시스템 관리
             </Link>
             <Link href="/admin/price-comparison" className={styles.jumpButton}>
               <Layers size={13} /> 지역별 가격 비교
