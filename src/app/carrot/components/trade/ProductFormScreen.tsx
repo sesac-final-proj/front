@@ -110,7 +110,7 @@ export function ProductFormScreen({
         </label>
         {priceHint?.status === "ok" && (
           <p className={styles.priceHintBanner}>
-            비슷한 제목의 실거래가 중위값 기준 추천가: {priceHint.priceMin?.toLocaleString()}원 ~{" "}
+            AI 추천 실거래가 가격범위: {priceHint.priceMin?.toLocaleString()}원 ~{" "}
             {priceHint.priceMax?.toLocaleString()}원 (표본 {priceHint.sampleCount}건)
           </p>
         )}
