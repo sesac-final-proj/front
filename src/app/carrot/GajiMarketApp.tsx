@@ -3,8 +3,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import styles from "./GajiMarketApp.module.css";
+
+// Dynamic map loading for fast initial page load & rendering
+const MapScreen = dynamic(
+  () => import("./components/map/MapScreen").then((mod) => mod.MapScreen),
+  {
+    ssr: false,
+    loading: () => (
+      <div className={styles.mapLoadingSkeleton} role="status" aria-label="지도 로딩 중">
+        <div className={styles.mapSkeletonMap} />
+        <div className={styles.mapSkeletonSheet}>
+          <div className={styles.mapSkeletonHandle} />
+          <div className={styles.mapSkeletonPills}>
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+            <div className={styles.mapSkeletonPill} />
+          </div>
+        </div>
+      </div>
+    ),
+  }
+);
 
 // Components (Barrel Export from ./components)
 import {
@@ -27,8 +51,6 @@ import {
   ApartmentVerificationScreen,
   ApartmentCommunityScreen,
   CommunityFormScreen,
-  // map
-  MapScreen,
   // chat
   ChatsScreen,
   ChatRoomScreen,
@@ -1743,7 +1765,7 @@ export default function GajiMarketApp() {
     >
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""} ${subPage?.type === "chat-room" || subPage?.type === "payment-amount" || subPage?.type === "payment-detail" ? styles.chatRoomViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (
@@ -1861,7 +1883,7 @@ export default function GajiMarketApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+              style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}
             >
               <ChatRoomScreen
                 room={selectedChat}

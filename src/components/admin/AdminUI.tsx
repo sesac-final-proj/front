@@ -2,6 +2,20 @@ import type { ReactNode } from "react";
 import { Database, RefreshCw, Search } from "lucide-react";
 import styles from "./portal.module.css";
 
+export function RefreshButton({ onClick, loading = false, label = "새로고침" }: { onClick: () => void; loading?: boolean; label?: string }) {
+  return (
+    <button
+      type="button"
+      className={styles.dynamicPillBtn}
+      onClick={onClick}
+      disabled={loading}
+    >
+      <RefreshCw size={13} style={loading ? { animation: "pulse 1s linear infinite" } : undefined} />
+      <span>{loading ? "불러오는 중..." : label}</span>
+    </button>
+  );
+}
+
 export function AdminPageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return <header className={styles.pageHeader}><div><h1>{title}</h1><p>{description}</p></div>{action}</header>;
 }

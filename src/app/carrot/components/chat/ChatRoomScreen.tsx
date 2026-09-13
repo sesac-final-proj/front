@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, FormEvent } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, FormEvent } from "react";
 import {
   ChevronLeft,
   Menu,
@@ -9,10 +9,12 @@ import {
   Plus,
   Send,
   Wallet,
+  MapPin,
 } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ChatRoom, ChatMessageUi } from "@/types";
 import type { ChatTradeStatus } from "@/services/chatService";
+import { fetchTradePlaceRecommendations, type TradePlaceRecommendation } from "@/services/congestionService";
 import { ScreenHeader, IconButton } from "../common";
 import { Thumbnail } from "../trade";
 
@@ -59,13 +61,91 @@ export function ChatRoomScreen({
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
+  const [placeRecommendations, setPlaceRecommendations] = useState<TradePlaceRecommendation[]>([]);
+  const [placeRecommendationStatus, setPlaceRecommendationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const messageStackRef = useRef<HTMLDivElement>(null);
+  const chatRoomRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = React.useCallback((smooth = false) => {
     const stack = messageStackRef.current;
     if (!stack) return;
-    stack.scrollTo({ top: stack.scrollHeight, behavior: "auto" });
-  }, [messages.length]);
+    stack.scrollTo({
+      top: stack.scrollHeight,
+      behavior: smooth ? "smooth" : "auto",
+    });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom(false);
+  }, [messages.length, scrollToBottom]);
+
+  // 모바일 브라우저(특히 iOS Safari / Chrome)에서 키보드가 올라올 때
+  // window가 위로 밀려 헤더가 잘려나가는 것을 방지하고,
+  // visualViewport 높이에 맞춰 입력창이 키보드 바로 위에 자연스럽게 슬라이딩 밀착되도록 제어.
+  useLayoutEffect(() => {
+    const viewport = window.visualViewport;
+
+    const handleViewportChange = () => {
+      // iOS Safari window 스크롤 튐 방지
+      if (window.scrollY > 0) {
+        window.scrollTo(0, 0);
+      }
+      if (document.documentElement.scrollTop > 0) {
+        document.documentElement.scrollTop = 0;
+      }
+
+      const totalHeight = window.innerHeight;
+      const currentHeight = viewport?.height ?? totalHeight;
+      const kbActive = totalHeight - currentHeight > 60;
+
+      setKeyboardOpen(kbActive);
+
+      if (chatRoomRef.current) {
+        if (kbActive) {
+          chatRoomRef.current.style.height = `${Math.round(currentHeight)}px`;
+        } else {
+          chatRoomRef.current.style.height = "100%";
+        }
+      }
+
+      // 키보드 높이 변경 시 메시지 목록을 최하단으로 자연스럽게 스크롤
+      setTimeout(() => {
+        scrollToBottom(true);
+      }, 50);
+    };
+
+    handleViewportChange();
+    viewport?.addEventListener("resize", handleViewportChange);
+    viewport?.addEventListener("scroll", handleViewportChange);
+    window.addEventListener("resize", handleViewportChange);
+
+    return () => {
+      viewport?.removeEventListener("resize", handleViewportChange);
+      viewport?.removeEventListener("scroll", handleViewportChange);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [scrollToBottom]);
+
+  const handleInputFocus = () => {
+    setKeyboardOpen(true);
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      scrollToBottom(true);
+    }, 100);
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      scrollToBottom(true);
+    }, 280);
+  };
+
+  const handleInputBlur = () => {
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
+  };
 
   // room.title은 백엔드가 상품명으로 채워준다(카드/헤더 둘 다 room 응답 하나로 그림 —
   // 상세 목록(products)에서 따로 찾을 필요 없어서, 그 상품이 홈 목록에 없어도 안 깨진다).
@@ -73,6 +153,7 @@ export function ChatRoomScreen({
   const statusLabel =
     room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
   const canSend = draft.trim().length > 0;
+  const canRecommendPlace = Boolean(room.productTradePlaceLat && room.productTradePlaceLng) || Boolean(room.productTradePlace || room.counterpartNeighborhoodName);
   // 카톡식 "1" — 내가 보낸 메시지인데 상대가 아직 안 읽었으면(counterpartLastReadAt보다
   // 늦게 보냈으면, 혹은 상대가 한 번도 안 읽었으면) 표시.
   const isUnreadByCounterpart = (message: ChatMessageUi) =>
@@ -80,8 +161,32 @@ export function ChatRoomScreen({
     (!room.counterpartLastReadAt ||
       new Date(message.createdAt).getTime() > new Date(room.counterpartLastReadAt).getTime());
 
+  function loadPlaceRecommendations() {
+    if (!canRecommendPlace) return;
+    setPlaceRecommendationStatus("loading");
+    fetchTradePlaceRecommendations({
+      lat: room.productTradePlaceLat,
+      lng: room.productTradePlaceLng,
+      query: room.productTradePlace ?? room.counterpartNeighborhoodName,
+      hour: new Date().getHours(),
+    })
+      .then((items) => {
+        setPlaceRecommendations(items);
+        setPlaceRecommendationStatus("idle");
+      })
+      .catch(() => setPlaceRecommendationStatus("error"));
+  }
+
+  function useRecommendation(place: TradePlaceRecommendation) {
+    onDraftChange(`${place.name}에서 거래 어떠세요? 지금 ${place.congestionLevel}이고 ${place.distanceMeters}m 정도예요.`);
+  }
+
   return (
-    <section className={styles.chatRoomScreen}>
+    <section
+      ref={chatRoomRef}
+      className={styles.chatRoomScreen}
+      data-keyboard-open={keyboardOpen}
+    >
       <ScreenHeader
         compact
         leading={
@@ -224,18 +329,56 @@ export function ChatRoomScreen({
           </span>
         </div>
       </div>
-      {/* 당근페이는 구매자만 보낸다 — 판매자가 자기 자신에게 송금할 일은 없다. */}
-      {room.tradeRole === "BUYER" && (
-        <button
-          type="button"
-          className={styles.chatPayButton}
-          onClick={onOpenPayment}
-          disabled={room.productTradeStatus === "SOLD"}
-          title={room.productTradeStatus === "SOLD" ? "이미 거래가 완료됐어요" : undefined}
-        >
-          <Wallet size={18} />
-          당근페이
-        </button>
+      {(room.tradeRole === "BUYER" || canRecommendPlace) && (
+        <div className={styles.chatQuickActions}>
+          {/* 기존 당근페이 액션 위치를 유지하고, 혼잡도 추천을 같은 행에 둔다. */}
+          {room.tradeRole === "BUYER" && (
+            <button
+              type="button"
+              className={styles.chatPayButton}
+              onClick={onOpenPayment}
+              disabled={room.productTradeStatus === "SOLD"}
+              title={room.productTradeStatus === "SOLD" ? "이미 거래가 완료됐어요" : undefined}
+            >
+              <Wallet size={17} />
+              당근페이
+            </button>
+          )}
+          {canRecommendPlace && (
+            <button
+              type="button"
+              className={styles.chatRecommendButton}
+              onClick={loadPlaceRecommendations}
+              disabled={placeRecommendationStatus === "loading"}
+              aria-expanded={placeRecommendations.length > 0}
+            >
+              <MapPin size={17} />
+              {placeRecommendationStatus === "loading" ? "확인 중" : "혼잡도 추천"}
+            </button>
+          )}
+        </div>
+      )}
+      {canRecommendPlace && (
+        <div className={styles.chatPlaceRecommend} aria-live="polite">
+          {placeRecommendationStatus === "error" && <p>추천 장소를 불러오지 못했어요.</p>}
+          {placeRecommendations.length > 0 && (
+            <div className={styles.chatPlaceRecommendList}>
+              {placeRecommendations.slice(0, 3).map((place) => (
+                <button
+                  type="button"
+                  key={`${place.name}-${place.lat}-${place.lng}`}
+                  onClick={() => useRecommendation(place)}
+                >
+                  <span>
+                    <strong>{place.name}</strong>
+                    <small>{place.recommendationReason ?? place.congestionMessage}</small>
+                  </span>
+                  <em>{place.congestionLevel}</em>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       <div ref={messageStackRef} className={styles.messageStack}>
         {messages.map((message, index) =>
@@ -282,8 +425,11 @@ export function ChatRoomScreen({
           />
         </label>
         <input
+          ref={inputRef}
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           placeholder="메시지를 입력하세요"
         />
         <button

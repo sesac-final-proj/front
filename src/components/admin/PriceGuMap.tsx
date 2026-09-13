@@ -2,39 +2,25 @@
 import { useMemo, useState } from "react";
 import { geoMercator, geoPath } from "d3-geo";
 import seoulDong from "@/data/seoul-dong.json";
-import type { PriceComparisonRegionItem, PriceComparisonSample } from "@/services/adminService";
+import type { PriceComparisonRegionItem, PriceComparisonSample, PriceDongStatItem } from "@/services/adminService";
 import { EmptyState } from "./AdminUI";
 import styles from "./PriceGuMap.module.css";
 
-// SeoulGuMap.tsx(거래건수 지도)과 같은 경계 데이터·기법(geoMercator+geoPath)을
-// 쓴다 — 다만 seoul-dong.json엔 구 단위 경계가 따로 없어서(동 63개뿐), 동 폴리곤을
-// 그대로 그리되 색은 그 동이 속한 "구" 값 하나로만 칠한다(동별로 안 갈림). 그래서
-// 같은 구 안의 동끼리는 전부 같은 색 — 결과적으로 구 3개짜리 지도로 보인다.
 const dongFeatures = (seoulDong as any).features as any[];
-
-// 그라데이션(편차 크기에 따라 색 농도를 다르게)은 구가 3개뿐이라 크기 구분이
-// 잘 안 되고, 오히려 흐린 색 때문에 "잘 안 보인다"는 피드백만 반복됐다 —
-// 그래서 농도 계산을 버리고 방향(싸다/비싸다)만 완전 채도의 고정 두 색으로
-// 칠한다. 정확한 편차 %는 어차피 라벨 숫자가 보여주니 색은 "어느 쪽인지"만
-// 최대한 또렷하게 전달하면 된다. 0%(카테고리 중앙값과 정확히 같음)만 무채색.
+const GU_ORDER = ["송파구", "영등포구", "노원구"] as const;
 const COLOR_ABOVE = "#FF6F0F"; // 브랜드 오렌지 — 카테고리 중앙값보다 비쌈
 const COLOR_BELOW = "#3B6FA8"; // 진한 블루 — 카테고리 중앙값보다 저렴
 const COLOR_EQUAL = "#F0F1ED";
-// 순색 대신 은은한 방사형 그라데이션(동 하나하나가 유리 타일처럼 살짝 광택나게) —
-// 색이 나타내는 의미(방향)는 그대로 고정 두 색이고, 그라데이션은 순수 장식이다.
 function fillForDev(devPct: number) {
   if (devPct === 0) return COLOR_EQUAL;
-  return devPct > 0 ? "url(#guGradAbove)" : "url(#guGradBelow)";
+  return devPct > 0 ? COLOR_ABOVE : COLOR_BELOW;
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
+const normalizeDong = (name: string) => name.replace(/제/g, "");
 
-// 지도 색은 구 하나당 값이 하나(중위가)라 개별 매물 가격은 안 보인다 — 호버하면
-// 그 구의 실제 매물 가격을 점 하나하나로 눈금 위에 찍은 띠(스트립 플롯)를 커서
-// 옆에 띄워서 보여준다. 위쪽 "가격 분포" 히스토그램이 이미 불러온 표본을 그대로
-// 재사용 — 새 API 호출 없음.
 function PriceStrip({ prices }: { prices: number[] }) {
-  if (!prices.length) return <p style={{ margin: 0, fontSize: 11, color: "#8b9184" }}>표본 없음</p>;
+  if (!prices.length) return <p className={styles.muted}>표본 없음</p>;
   const w = 220;
   const h = 30;
   const min = Math.min(...prices);
@@ -48,7 +34,7 @@ function PriceStrip({ prices }: { prices: number[] }) {
           <line key={i} x1={xOf(p)} x2={xOf(p)} y1={5} y2={h - 5} stroke="#FF6F0F" strokeOpacity={0.35} strokeWidth={1.5} />
         ))}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#8b9184" }}>
+      <div className={styles.stripScale}>
         <span>{money(min)}</span>
         <span>{money(max)}</span>
       </div>
@@ -56,17 +42,30 @@ function PriceStrip({ prices }: { prices: number[] }) {
   );
 }
 
-export function PriceGuMap({ regions, categoryMedianPrice, samples = [] }: { regions: PriceComparisonRegionItem[]; categoryMedianPrice: number; samples?: PriceComparisonSample[] }) {
+export function PriceGuMap({ regions, categoryMedianPrice, samples = [], dongStats = [] }: { regions: PriceComparisonRegionItem[]; categoryMedianPrice: number; samples?: PriceComparisonSample[]; dongStats?: PriceDongStatItem[] }) {
   const [hover, setHover] = useState<string | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [selectedDong, setSelectedDong] = useState<string | null>(null);
+
+  const availableGu = useMemo(
+    () => GU_ORDER.filter(gu => regions.some(r => r.gu === gu)),
+    [regions],
+  );
+  const [selectedGu, setSelectedGu] = useState<string>(GU_ORDER[0]);
+  const activeGu = availableGu.includes(selectedGu as any) ? selectedGu : availableGu[0];
+
+  const activeFeatures = useMemo(
+    () => dongFeatures.filter(f => f.properties.gu === activeGu),
+    [activeGu],
+  );
 
   const { width, height, pathGenerator } = useMemo(() => {
     const w = 560;
-    const h = 520;
-    const fc = { type: "FeatureCollection", features: dongFeatures } as any;
+    const h = 380;
+    const fc = { type: "FeatureCollection", features: activeFeatures } as any;
     const projection = geoMercator().fitSize([w, h], fc);
     return { width: w, height: h, pathGenerator: geoPath(projection) };
-  }, []);
+  }, [activeFeatures]);
 
   const statByGu = useMemo(() => {
     const map = new Map<string, { median_price: number; dev_pct: number; sample_count: number }>();
@@ -77,21 +76,14 @@ export function PriceGuMap({ regions, categoryMedianPrice, samples = [] }: { reg
     return map;
   }, [regions, categoryMedianPrice]);
 
-  // 라벨은 동마다 찍으면 같은 값이 63번 반복돼 지저분하다 — 구당 하나만,
-  // 그 구에 속한 동들 중심점의 평균 위치(폴리곤 정식 합집합은 아니지만 라벨
-  // 위치로는 충분)에 띄운다.
-  const labelPointByGu = useMemo(() => {
-    const sums = new Map<string, { x: number; y: number; n: number }>();
-    dongFeatures.forEach(f => {
-      const gu = f.properties.gu as string;
+  const labelPoint = useMemo(() => {
+    if (!activeFeatures.length) return null;
+    const sum = activeFeatures.reduce((acc, f) => {
       const [cx, cy] = pathGenerator.centroid(f);
-      const cur = sums.get(gu) ?? { x: 0, y: 0, n: 0 };
-      sums.set(gu, { x: cur.x + cx, y: cur.y + cy, n: cur.n + 1 });
-    });
-    const points = new Map<string, { x: number; y: number }>();
-    sums.forEach((v, gu) => points.set(gu, { x: v.x / v.n, y: v.y / v.n }));
-    return points;
-  }, [pathGenerator]);
+      return { x: acc.x + cx, y: acc.y + cy, n: acc.n + 1 };
+    }, { x: 0, y: 0, n: 0 });
+    return { x: sum.x / sum.n, y: sum.y / sum.n };
+  }, [activeFeatures, pathGenerator]);
 
   const pricesByGu = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -99,92 +91,102 @@ export function PriceGuMap({ regions, categoryMedianPrice, samples = [] }: { reg
     return map;
   }, [samples]);
 
+  const dongStatByName = useMemo(() => {
+    const map = new Map<string, PriceDongStatItem>();
+    dongStats.filter(row => row.gu === activeGu).forEach(row => map.set(normalizeDong(row.dong), row));
+    return map;
+  }, [dongStats, activeGu]);
+
   if (!regions.length) return <EmptyState message="이 카테고리는 지역별 시세 데이터가 없습니다." />;
+  const activeStat = statByGu.get(activeGu);
+  const activePrices = pricesByGu.get(activeGu) ?? [];
+  const selectedStat = selectedDong ? dongStatByName.get(normalizeDong(selectedDong)) : null;
 
   return (
     <div
-      style={{ position: "relative" }}
+      className={styles.mapShell}
       onMouseMove={e => {
         const rect = e.currentTarget.getBoundingClientRect();
         setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }}
     >
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="420" style={{ maxWidth: "100%", display: "block" }} preserveAspectRatio="xMidYMid meet" role="img" aria-label="구별 가격 시세지도">
-        <defs>
-          <radialGradient id="guGradAbove" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stopColor="#FFB27A" />
-            <stop offset="100%" stopColor={COLOR_ABOVE} />
-          </radialGradient>
-          <radialGradient id="guGradBelow" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stopColor="#8FB4D9" />
-            <stop offset="100%" stopColor={COLOR_BELOW} />
-          </radialGradient>
-        </defs>
-        {dongFeatures.map((f, i) => {
+      <div className={styles.guTabs} aria-label="자치구 선택">
+        {availableGu.map(gu => (
+          <button key={gu} type="button" className={gu === activeGu ? styles.guTabActive : ""} onClick={() => { setSelectedGu(gu); setSelectedDong(null); }}>
+            {gu}
+          </button>
+        ))}
+      </div>
+      <div className={styles.mapBody}>
+        <svg viewBox={`0 0 ${width} ${height}`} className={styles.mapSvg} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${activeGu} 가격 시세지도`}>
+        {activeFeatures.map((f, i) => {
           const rawName = f.properties.name as string;
           const gu = f.properties.gu as string;
-          const stat = statByGu.get(gu);
-          const isHovered = hover === gu;
+          const dongStat = dongStatByName.get(normalizeDong(rawName));
+          const isHovered = hover === rawName;
+          const isSelected = selectedDong === rawName;
           return (
             <g
               key={`${gu}-${rawName}`}
-              onMouseEnter={() => setHover(gu)}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              onMouseEnter={() => setHover(rawName)}
               onMouseLeave={() => setHover(null)}
-              className={`${styles.guShape} ${isHovered ? styles.guShapeHover : ""}`}
+              onClick={() => setSelectedDong(isSelected ? null : rawName)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setSelectedDong(isSelected ? null : rawName);
+              }}
+              className={`${styles.guShape} ${isHovered || isSelected ? styles.guShapeHover : ""}`}
               style={{ animationDelay: `${Math.min(i, 40) * 8}ms` }}
             >
-              <path d={pathGenerator(f) ?? undefined} fill={stat ? fillForDev(stat.dev_pct) : "#F0F1ED"} stroke="#fff" strokeWidth={1}>
+              <path d={pathGenerator(f) ?? undefined} fill={dongStat ? fillForDev(dongStat.dev_pct) : "#F0F1ED"} stroke={isSelected ? "#1A1C20" : "#fff"} strokeWidth={isSelected ? 2.4 : 1}>
                 <title>
-                  {gu}
-                  {stat ? ` · 중위가 ${stat.median_price.toLocaleString("ko-KR")}원 · 카테고리 대비 ${stat.dev_pct > 0 ? "+" : ""}${stat.dev_pct}% · 표본 ${stat.sample_count}건` : " · 데이터 없음"}
+                  {rawName}
+                  {dongStat ? ` · 중위가 ${dongStat.median_price.toLocaleString("ko-KR")}원 · 구 중위가 대비 ${dongStat.dev_pct > 0 ? "+" : ""}${dongStat.dev_pct}% · 표본 ${dongStat.sample_count}건` : " · 데이터 없음"}
                 </title>
               </path>
             </g>
           );
         })}
-        {Array.from(labelPointByGu.entries()).map(([gu, { x, y }]) => {
-          const stat = statByGu.get(gu);
-          if (!stat) return null;
-          // 채도 높은 오렌지 위에 흰 글자만 놓으면 밝기 대비가 약해서(예: FF6F0F
-          // 위 흰색은 명도대비 ~2.8:1로 WCAG 기준 미달) 잘 안 읽힌다 — 반투명
-          // 헤일로 대신 완전 불투명한 진한 테두리를 둘러서 배경색과 무관하게
-          // 항상 또렷하게 만든다.
-          const textFill = stat.dev_pct === 0 ? "#1A1C20" : "#fff";
-          const haloProps = { paintOrder: "stroke" as const, stroke: textFill === "#fff" ? "#1A1C20" : "#fff", strokeWidth: 3, strokeLinejoin: "round" as const };
-          return (
-            <g key={`label-${gu}`} style={{ pointerEvents: "none" }}>
-              <text x={x} y={y - 6} textAnchor="middle" fontSize={15} fontWeight={800} fill={textFill} {...haloProps}>{gu}</text>
-              <text x={x} y={y + 12} textAnchor="middle" fontSize={12} fontWeight={700} fill={textFill} {...haloProps}>
-                {money(stat.median_price)} ({stat.dev_pct > 0 ? "+" : ""}{stat.dev_pct}%)
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10, fontSize: 11, color: "#8b9184" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 12, borderRadius: 3, background: COLOR_BELOW, display: "inline-block" }} />중앙값보다 저렴</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 12, borderRadius: 3, background: COLOR_EQUAL, border: "1px solid #E7E8E5", display: "inline-block" }} />중앙값과 같음</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 12, borderRadius: 3, background: COLOR_ABOVE, display: "inline-block" }} />중앙값보다 비쌈</span>
+        {labelPoint && activeStat && (
+          <g style={{ pointerEvents: "none" }}>
+            <text x={labelPoint.x} y={labelPoint.y - 8} textAnchor="middle" className={styles.mapLabel}>{activeGu}</text>
+            <text x={labelPoint.x} y={labelPoint.y + 15} textAnchor="middle" className={styles.mapSubLabel}>
+              {money(activeStat.median_price)} ({activeStat.dev_pct > 0 ? "+" : ""}{activeStat.dev_pct}%)
+            </text>
+          </g>
+        )}
+        </svg>
+        <aside className={styles.summaryPanel}>
+          <span>{selectedDong ? `${activeGu} ${selectedDong}` : activeGu}</span>
+          <strong>{selectedStat ? money(selectedStat.median_price) : activeStat ? money(activeStat.median_price) : "데이터 없음"}</strong>
+          {selectedStat ? (
+            <p>구 중위가 대비 {selectedStat.dev_pct > 0 ? "+" : ""}{selectedStat.dev_pct}% · 표본 {selectedStat.sample_count.toLocaleString("ko-KR")}건 · 클릭하면 선택 해제</p>
+          ) : activeStat && (
+            <p>카테고리 중앙값 대비 {activeStat.dev_pct > 0 ? "+" : ""}{activeStat.dev_pct}% · 표본 {activeStat.sample_count.toLocaleString("ko-KR")}건 · 동을 클릭해 상세 보기</p>
+          )}
+          <PriceStrip prices={activePrices} />
+        </aside>
+      </div>
+      <div className={styles.legend}>
+        <span><i style={{ background: COLOR_BELOW }} />중앙값보다 저렴</span>
+        <span><i style={{ background: COLOR_EQUAL, border: "1px solid #E7E8E5" }} />중앙값과 같음</span>
+        <span><i style={{ background: COLOR_ABOVE }} />중앙값보다 비쌈</span>
       </div>
       {hover && hoverPos && (
         <div
           className={styles.tooltip}
           style={{
-            position: "absolute",
             left: hoverPos.x + 14,
             top: hoverPos.y + 14,
-            pointerEvents: "none",
-            background: "#fff",
-            border: "1px solid #E7E8E5",
-            borderRadius: 10,
-            padding: "10px 12px",
-            boxShadow: "0 12px 28px -10px rgba(26,28,32,.35)",
-            zIndex: 10,
           }}
         >
-          <b style={{ fontSize: 12 }}>{hover}</b>
-          <p style={{ margin: "2px 0 6px", fontSize: 11, color: "#8b9184" }}>매물 {(statByGu.get(hover)?.sample_count ?? 0).toLocaleString("ko-KR")}건 · 가격 실측(표본 {(pricesByGu.get(hover) ?? []).length.toLocaleString("ko-KR")}건 표시)</p>
-          <PriceStrip prices={pricesByGu.get(hover) ?? []} />
+          <b>{hover}</b>
+          {(() => {
+            const stat = dongStatByName.get(normalizeDong(hover));
+            return <p>{stat ? `중위가 ${money(stat.median_price)} · 구 대비 ${stat.dev_pct > 0 ? "+" : ""}${stat.dev_pct}% · 표본 ${stat.sample_count.toLocaleString("ko-KR")}건` : "동별 시세 데이터 없음"}</p>;
+          })()}
         </div>
       )}
     </div>

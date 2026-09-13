@@ -160,6 +160,9 @@ export type ChatRoom = {
   productThumbnailUrl?: string;
   productPrice?: number | null;
   productTradeStatus?: TradeStatus;
+  productTradePlace?: string;
+  productTradePlaceLat?: number;
+  productTradePlaceLng?: number;
   // 카톡식 "1" 표시용 — 상대가 메시지함을 마지막으로 연 시각. 메시지 목록을 불러올 때만
   // 같이 온다(채팅방 목록 API엔 없음), 그래서 채팅방에 들어가기 전엔 undefined.
   counterpartLastReadAt?: string | null;
@@ -218,11 +221,13 @@ export type MapSearchBounds = { south: number; north: number; west: number; east
 export type NaverMapInstance = {
   autoResize?: () => void;
   setCenter: (center: unknown) => void;
+  panTo?: (center: unknown) => void;
   setZoom: (zoom: number) => void;
   getZoom: () => number;
   getBounds: () => {
     getSW: () => { lat: () => number; lng: () => number };
     getNE: () => { lat: () => number; lng: () => number };
+    hasLatLng?: (latlng: unknown) => boolean;
   };
 };
 

@@ -109,10 +109,14 @@ export function comparisonDecisions(input: PricePlatformComparisonItem[]) {
     const gapPercent = carrot.median_price > 0 ? (externalMedian / carrot.median_price - 1) * 100 : 0;
     const spreadPercent = carrot.median_price > 0 ? (carrot.p75_price - carrot.p25_price) * 100 / carrot.median_price : 0;
     const externalSamples = external.reduce((sum, row) => sum + row.sample_count, 0);
-    const priority = Math.abs(gapPercent) >= 20 && Math.min(carrot.sample_count, externalSamples) >= 20 ? "높음" : Math.abs(gapPercent) >= 10 ? "중간" : "관찰";
+    const enoughSamples = Math.min(carrot.sample_count, externalSamples) >= 20;
+    const priority = Math.abs(gapPercent) >= 20 && enoughSamples ? "높음" : Math.abs(gapPercent) >= 10 && enoughSamples ? "중간" : "관찰";
     const action = gapPercent >= 10 ? "가격 경쟁력 홍보" : gapPercent <= -10 ? "권장가 하향 점검" : "현 수준 유지";
-    return { category, carrotMedian: carrot.median_price, externalMedian, gapPercent, spreadPercent,
-      carrotSamples: carrot.sample_count, externalSamples, priority, action };
+    const confidence = enoughSamples ? (Math.abs(gapPercent) >= 10 ? "판단 가능" : "안정") : "판단 보류";
+    return { category, carrotMedian: carrot.median_price, carrotQ1: carrot.p25_price, carrotQ3: carrot.p75_price,
+      externalMedian, externalQ1: external.reduce((sum, row) => sum + row.p25_price, 0) / external.length,
+      externalQ3: external.reduce((sum, row) => sum + row.p75_price, 0) / external.length,
+      gapPercent, spreadPercent, carrotSamples: carrot.sample_count, externalSamples, priority, confidence, action };
   }).sort((a, b) => Math.abs(b.gapPercent) - Math.abs(a.gapPercent));
   const totalSamples = reviewed.rows.reduce((sum, row) => sum + row.sample_count, 0);
   const coverage = reviewed.categories.length ? reviewed.comparable.length * 100 / reviewed.categories.length : 0;

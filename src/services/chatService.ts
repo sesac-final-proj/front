@@ -21,6 +21,9 @@ export interface ChatRoomDto {
   productThumbnailUrl: string | null;
   productPrice: number | null;
   productTradeStatus: ChatTradeStatus | null;
+  productTradePlace: string | null;
+  productTradePlaceLat: number | null;
+  productTradePlaceLng: number | null;
 }
 
 export type MessageType = "TEXT" | "IMAGE" | "PAYMENT";
@@ -61,6 +64,9 @@ interface ApiChatRoom {
   product_thumbnail_url: string | null;
   product_price: number | null;
   product_trade_status: ChatTradeStatus | null;
+  product_trade_place: string | null;
+  product_trade_place_lat: number | null;
+  product_trade_place_lng: number | null;
 }
 
 interface ApiChatRoomPage {
@@ -109,6 +115,9 @@ function toChatRoom(item: ApiChatRoom): ChatRoomDto {
     productThumbnailUrl: item.product_thumbnail_url,
     productPrice: item.product_price,
     productTradeStatus: item.product_trade_status,
+    productTradePlace: item.product_trade_place,
+    productTradePlaceLat: item.product_trade_place_lat,
+    productTradePlaceLng: item.product_trade_place_lng,
   };
 }
 

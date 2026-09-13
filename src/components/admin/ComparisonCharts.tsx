@@ -70,6 +70,10 @@ export function ComparisonCharts({ rows, regions, detailTypes }: { rows: PricePl
   const radarCategories = useMemo(() => [...new Set([...reviewed.categories, ...regions.map(row => row.category)])]
     .filter(category => category !== "전체")
     .sort((a, b) => a.localeCompare(b, "ko")), [regions, reviewed.categories]);
+  const [selectedRadarCategory, setSelectedRadarCategory] = useState("");
+  const activeRadarCategory = radarCategories.includes(selectedRadarCategory)
+    ? selectedRadarCategory
+    : radarCategories[0];
 
   useEffect(() => {
     const { rows: valid, gaps } = reviewComparisons(rows);
@@ -116,12 +120,15 @@ export function ComparisonCharts({ rows, regions, detailTypes }: { rows: PricePl
       <header className={styles.radarHeader}>
         <div>
           <h3 id="radar-title">품목별 거래 기준 비교</h3>
-          <p id="radar-description">품목마다 레이더를 분리했습니다. 외부 비교는 당근을 100으로, 구별 비교는 같은 품목의 지역별 가격·거래 양상을 보여줍니다.</p>
+          <p id="radar-description">선택한 품목 하나를 기준으로 플랫폼 또는 지역별 가격·거래 양상을 비교합니다.</p>
         </div>
-        <label className={styles.radarControl}>비교 기준<select value={radarMode} onChange={event => setRadarMode(event.target.value as RadarMode)}><option value="external">외부 플랫폼 비교</option><option value="regions">구별 비교</option></select></label>
+        <div className={styles.radarControls}>
+          <label className={styles.radarControl}>품목<select value={activeRadarCategory ?? ""} onChange={event => setSelectedRadarCategory(event.target.value)}>{radarCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+          <label className={styles.radarControl}>비교 기준<select value={radarMode} onChange={event => setRadarMode(event.target.value as RadarMode)}><option value="external">외부 플랫폼 비교</option><option value="regions">구별 비교</option></select></label>
+        </div>
       </header>
       <p className={styles.radarModeNote}>{radarMode === "external" ? "주황 기준선(당근)=100 · 100보다 크면 당근보다 높은 값입니다." : "구별 지표는 해당 품목 안에서 비교합니다. 가격 안정성은 세부유형별 변동계수로 계산합니다."}</p>
-      <div className={styles.radarGrid}>{radarCategories.map(category => <CategoryRadar key={`${category}-${radarMode}`} category={category} mode={radarMode} platformRows={reviewed.rows.filter(row => row.category === category)} regionRows={regions.filter(row => row.category === category)} detailRows={detailTypes.filter(row => row.category === category)} />)}</div>
+      {activeRadarCategory ? <CategoryRadar key={`${activeRadarCategory}-${radarMode}`} category={activeRadarCategory} mode={radarMode} platformRows={reviewed.rows.filter(row => row.category === activeRadarCategory)} regionRows={regions.filter(row => row.category === activeRadarCategory)} detailRows={detailTypes.filter(row => row.category === activeRadarCategory)} /> : <p className={styles.radarEmpty}>비교 가능한 품목이 없습니다.</p>}
     </section>
 
     <h3>오늘 확인할 외부 시장 변화</h3><p>현재 스냅샷에서 당근 대비 가격 격차 · 과거 스냅샷이 없어 전일 증감은 미산출.</p>

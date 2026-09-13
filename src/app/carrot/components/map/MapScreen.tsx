@@ -34,6 +34,10 @@ import { WorkoutFacilitySection } from "./WorkoutFacilitySection";
 import { WorkoutClusterListSheet, WorkoutDetailSheet } from "./WorkoutMapSheets";
 import { useWorkoutFacilities } from "./useWorkoutFacilities";
 import type { WorkoutFacility } from "@/services/workoutService";
+import { fetchNeighborhoodWeather, type NeighborhoodWeather } from "@/services/weatherService";
+import { analyzeWeather } from "./weatherAnalysis";
+
+const COMING_SOON_CATEGORIES = new Set(["class", "academy", "delivery"]);
 
 export function createDangerMarkerContent(
   business: LocalBusiness,
@@ -110,8 +114,22 @@ export function MapScreen({
   }, []);
   const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const isCongestionMode = selectedCategory === "congestion";
+  const isWeatherMode = selectedCategory === "weather";
   const isWorkoutMode = selectedCategory === "workout";
+  const [weather, setWeather] = useState<NeighborhoodWeather | null>(null);
+  const [weatherError, setWeatherError] = useState("");
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const coords = currentLocation ?? NEIGHBORHOOD_COORDS[activeNeighborhood] ?? { lat: 37.5665, lng: 126.978 };
+    fetchNeighborhoodWeather(coords.lat, coords.lng, controller.signal)
+      .then((value) => { setWeather(value); setWeatherError(""); })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setWeatherError(error instanceof Error ? error.message : "날씨 정보를 불러오지 못했어요.");
+      })
+    return () => controller.abort();
+  }, [activeNeighborhood, currentLocation]);
   const workout = useWorkoutFacilities({
     enabled: isWorkoutMode,
     activeNeighborhood,
@@ -571,6 +589,19 @@ export function MapScreen({
         : businesses,
     [businesses, isCongestionMode, liveDangerSignals, query, restaurantBusinesses, selectedCategory],
   );
+  const weatherChartItems = useMemo(() => weather?.forecast.slice(0, 8) ?? [], [weather]);
+  const weatherChartPoints = useMemo(() => {
+    if (!weatherChartItems.length) return "";
+    const temperatures = weatherChartItems.map((item) => item.temperature);
+    const min = Math.min(...temperatures);
+    const max = Math.max(...temperatures);
+    const range = Math.max(1, max - min);
+    return weatherChartItems.map((item, index) => `${24 + index * 72},${64 - ((item.temperature - min) / range) * 34}`).join(" ");
+  }, [weatherChartItems]);
+  const weatherAnalysis = useMemo(
+    () => weather ? analyzeWeather(weather, liveDangerSignals) : null,
+    [liveDangerSignals, weather],
+  );
 
   function changeCategory(id: string) {
     setSelectedTransitId(null);
@@ -695,7 +726,7 @@ export function MapScreen({
             <UserRound size={25} />
           </button>
         </div>
-        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode && !isWorkoutMode ? (
+        {sheetState !== "expanded" && selectedCategory !== "food" && !isCongestionMode && !isTransitMode && !isWorkoutMode && !isWeatherMode ? (
           <RealtimeDangerTicker
             dangerSignals={liveDangerSignals}
             onSelectDanger={selectDanger}
@@ -735,11 +766,9 @@ export function MapScreen({
             <Crosshair size={25} />
           </button>
         </div>
-        {!isCongestionMode && !isTransitMode && selectedCategory !== "food" && (
-          <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
-            <currentCategory.icon size={26} />
-          </button>
-        )}
+        <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
+          <currentCategory.icon size={26} />
+        </button>
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
         ) : null}
@@ -825,6 +854,9 @@ export function MapScreen({
                       <CategoryIcon size={27} />
                     </span>
                     <span className={styles.localCategoryLabel}>{category.name}</span>
+                    {COMING_SOON_CATEGORIES.has(category.id) && (
+                      <small className={styles.localCategoryComingSoon}>구현 예정이에요</small>
+                    )}
                   </button>
                 );
               })}
@@ -833,7 +865,58 @@ export function MapScreen({
               <span />
               <span />
             </div>
-            {isWorkoutMode ? (
+            {isWeatherMode ? (
+              <section className={`${styles.localResults} ${styles.weatherSection}`}>
+                <h2>우리 동네 날씨</h2>
+                {!weather && !weatherError ? <StateBlock title="날씨를 확인하고 있어요" body={`${activeNeighborhood} 예보를 불러오는 중이에요.`} /> : weatherError ? <StateBlock title="날씨 정보를 불러오지 못했어요" body={weatherError} /> : weather ? (
+                  <>
+                    <article className={styles.weatherCurrent}>
+                      <span className={styles.weatherIcon} aria-hidden="true">{weather.current.condition.includes("비") ? "🌧️" : weather.current.condition.includes("눈") ? "🌨️" : weather.current.condition === "맑음" ? "☀️" : "☁️"}</span>
+                      <div><strong>{Math.round(weather.current.temperature)}°</strong><p>{activeNeighborhood} · {weather.current.condition} · 습도 {weather.current.humidity}%</p></div>
+                      <small>강수 {weather.current.precipitationProbability}%</small>
+                    </article>
+                    {weather.airQuality?.grade === "좋음" ? (
+                      <p className={styles.weatherNotice} role="status">
+                        미세먼지 좋은 날이에요. {weather.airQuality.scope} PM2.5 {weather.airQuality.pm25}μg/m³
+                      </p>
+                    ) : null}
+                    {weatherAnalysis ? (
+                      <div className={styles.weatherInsightGrid}>
+                        <article>
+                          <div><small>동네 날씨 위험도</small><strong>{weatherAnalysis.risks[0]?.level ?? "양호"}</strong></div>
+                          {weatherAnalysis.risks.length ? (
+                            <ul>{weatherAnalysis.risks.map((risk) => <li key={risk.type}><b>{risk.type}</b>{risk.message}</li>)}</ul>
+                          ) : <p>침수·결빙·폭염 주의 신호가 없어요.</p>}
+                          {weatherAnalysis.risks.length ? <button type="button" onClick={() => changeCategory(weatherAnalysis.risks.some((risk) => risk.type === "침수") ? "danger" : "subway")}>안전 장소 보기</button> : null}
+                        </article>
+                        <article>
+                          <div><small>거래 적합도</small><strong>{weatherAnalysis.tradeScore}점</strong></div>
+                          <p><b>{weatherAnalysis.bestTime}</b> 추천 · {weatherAnalysis.tradeMessage}</p>
+                          <span>강수·기온·풍속 기반 안내이며 실제 거래 성사율은 아닙니다.</span>
+                        </article>
+                      </div>
+                    ) : null}
+                    <div className={styles.weatherTimeline} aria-label="시간별 동네 기온 그래프">
+                      <div className={styles.weatherChartPlot}>
+                        <svg viewBox="0 0 552 88" role="img" aria-label="시간별 기온 변화">
+                          <defs><linearGradient id="weather-line" x1="0" x2="1"><stop stopColor="#ff7a45" /><stop offset="1" stopColor="#58aee8" /></linearGradient></defs>
+                          <polyline points={weatherChartPoints} fill="none" stroke="url(#weather-line)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                          {weatherChartItems.map((item, index) => {
+                            const temperatures = weatherChartItems.map((entry) => entry.temperature);
+                            const min = Math.min(...temperatures), max = Math.max(...temperatures), range = Math.max(1, max - min);
+                            const x = 24 + index * 72, y = 64 - ((item.temperature - min) / range) * 34;
+                            return <g key={item.dateTime}><circle cx={x} cy={y} r="5" fill={index === 0 ? "#ff6f0f" : "#fff"} stroke={index === 0 ? "#ff6f0f" : "#67aeda"} strokeWidth="3" /><text x={x} y={y - 13} textAnchor="middle">{Math.round(item.temperature)}°</text></g>;
+                          })}
+                        </svg>
+                        <div className={styles.weatherTimeRow}>
+                          {weatherChartItems.map((item, index) => <div key={item.dateTime}><span>{item.condition.includes("비") ? "🌧️" : item.condition.includes("눈") ? "🌨️" : item.condition === "맑음" ? "☀️" : "☁️"}</span><time>{index === 0 ? "지금" : `${item.dateTime.slice(8, 10)}시`}</time><small>강수 {item.precipitationProbability}%</small><em>{item.precipitationProbability < 30 && item.temperature > 1 && item.temperature < 33 ? "활동 추천" : "실내 추천"}</em></div>)}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </section>
+            ) : isWorkoutMode ? (
               <WorkoutFacilitySection
                 facilities={workoutClusterFacilities ?? workout.facilities}
                 selectedId={workout.selectedId}

@@ -45,13 +45,17 @@ async function openRadar(width) {
   return page;
 }
 
-test("every product has a radar and comparison mode changes all cards", async () => {
+test("selected product controls one radar", async () => {
   const page = await openRadar(1440);
   assert.equal(await page.getByLabel("비교 기준").inputValue(), "external");
-  assert.equal(await page.locator("[class*='radarCard']").count(), categories.length);
-  assert.equal(await page.getByText("당근 = 100 기준").count(), categories.length);
+  assert.equal(await page.locator("[class*='radarCard']").count(), 1);
+  assert.equal(await page.getByText("당근 = 100 기준").count(), 1);
+  const productSelect = page.locator("label").filter({ hasText: /^품목/ }).locator("select");
+  await productSelect.selectOption("청소기");
+  await page.getByRole("heading", { name: "청소기", exact: true }).waitFor();
   await page.getByLabel("비교 기준").selectOption("regions");
-  assert.equal(await page.getByText("3개 구 비교").count(), categories.length);
+  assert.equal(await page.getByText("3개 구 비교").count(), 1);
+  assert.equal(await productSelect.inputValue(), "청소기");
   assert.equal(await page.locator("canvas").first().isVisible(), true);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
   await page.close();
@@ -61,6 +65,6 @@ test("radar section has no horizontal overflow on mobile", async () => {
   const page = await openRadar(390);
   await page.getByLabel("비교 기준").selectOption("regions");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
-  assert.equal(await page.locator("[class*='radarCard']").count(), categories.length);
+  assert.equal(await page.locator("[class*='radarCard']").count(), 1);
   await page.close();
 });

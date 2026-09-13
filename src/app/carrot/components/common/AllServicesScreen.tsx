@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -49,6 +49,7 @@ export function AllServicesScreen({
   onOpenApartment?: () => void;
   onOpenGame?: () => void;
 }) {
+  const [comingSoonService, setComingSoonService] = useState<string | null>(null);
   const serviceCategories = [
     {
       title: "최근 사용",
@@ -136,6 +137,30 @@ export function AllServicesScreen({
     },
   ];
 
+  if (comingSoonService) {
+    return (
+      <section className={styles.comingSoonScreen}>
+        <ScreenHeader
+          title={comingSoonService}
+          leading={
+            <IconButton label="뒤로" onClick={() => setComingSoonService(null)}>
+              <ChevronLeft size={27} />
+            </IconButton>
+          }
+        />
+        <div className={styles.comingSoonContent}>
+          <span className={styles.comingSoonMascot}>
+            <img src="/brand/daangn-mark.svg" alt="당근" />
+          </span>
+          <p>서비스를 준비중이에요</p>
+          <strong>COMING SOON</strong>
+          <small>{comingSoonService}</small>
+          <button type="button" onClick={() => setComingSoonService(null)}>돌아가기</button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={styles.screen}>
       <ScreenHeader
@@ -158,7 +183,7 @@ export function AllServicesScreen({
                     type="button"
                     key={`${item.label}-${idx}`}
                     className={styles.serviceItemButton}
-                    onClick={item.onClick}
+                    onClick={item.onClick ?? (() => setComingSoonService(item.label))}
                   >
                     <span className={styles.serviceItemIcon} style={{ color: item.color }}>
                       <ItemIcon size={22} />
