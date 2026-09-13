@@ -1256,8 +1256,10 @@ img.thumbnail {
   margin: -4px 0 0;
   padding: 10px 14px;
   border-radius: 13px;
-  background: var(--color-primary-container);
-  color: var(--color-primary);
+  /* 고정 배경색 요청이라 라이트/다크 테마 변수 대신 하드코딩 — 밝은 색이라
+     텍스트는 테마 무관하게 어두운 색으로 고정해야 대비가 유지된다. */
+  background: #ccfbfa;
+  color: #0f5c59;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
