@@ -3688,6 +3688,12 @@ img.thumbnail {
   z-index: 30;
 }
 
+/* 키보드가 열려 fixed로 뷰포트에 고정되면 .phoneShell의 safe-area padding-top을
+   벗어나 노치 아래로 내용이 밀려 올라간다 — 그만큼을 여기서 직접 보충. */
+.chatRoomScreen[data-keyboard-open="true"] {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 .chatProductCard {
   min-height: 76px;
   border-radius: 16px;

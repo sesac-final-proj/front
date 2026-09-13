@@ -90,6 +90,8 @@ export function ChatRoomScreen({
     const el = chatRoomRef.current;
     if (!viewport || !el) return;
 
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
     const applyViewport = () => {
       const kbActive = window.innerHeight - viewport.height > 60;
       setKeyboardOpen(kbActive);
@@ -111,13 +113,23 @@ export function ChatRoomScreen({
       scrollToBottom(false);
     };
 
-    applyViewport();
-    viewport.addEventListener("resize", applyViewport);
-    viewport.addEventListener("scroll", applyViewport);
+    // iOS는 키보드가 다 올라오기 전, 애니메이션 도중에도 resize 이벤트를 쏜다 — 그
+    // 중간값으로 높이를 고정해버리면 키보드가 완전히 올라온 뒤 실제 여백과 어긋나
+    // 입력창과 키보드 사이에 빈 틈이 남는다. 애니메이션이 끝날 시점에 한 번 더 확정값으로 재적용.
+    const applyAndSettle = () => {
+      applyViewport();
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(applyViewport, 300);
+    };
+
+    applyAndSettle();
+    viewport.addEventListener("resize", applyAndSettle);
+    viewport.addEventListener("scroll", applyAndSettle);
 
     return () => {
-      viewport.removeEventListener("resize", applyViewport);
-      viewport.removeEventListener("scroll", applyViewport);
+      clearTimeout(settleTimer);
+      viewport.removeEventListener("resize", applyAndSettle);
+      viewport.removeEventListener("scroll", applyAndSettle);
     };
   }, [scrollToBottom]);
 
