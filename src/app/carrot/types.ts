@@ -221,11 +221,13 @@ export type MapSearchBounds = { south: number; north: number; west: number; east
 export type NaverMapInstance = {
   autoResize?: () => void;
   setCenter: (center: unknown) => void;
+  panTo?: (center: unknown) => void;
   setZoom: (zoom: number) => void;
   getZoom: () => number;
   getBounds: () => {
     getSW: () => { lat: () => number; lng: () => number };
     getNE: () => { lat: () => number; lng: () => number };
+    hasLatLng?: (latlng: unknown) => boolean;
   };
 };
 

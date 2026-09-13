@@ -80,6 +80,7 @@ export default function ExternalComparisonSection() {
         </article>
       </div>
 
+
       {/* Guide Banner to Market Trends Section */}
       <div
         style={{

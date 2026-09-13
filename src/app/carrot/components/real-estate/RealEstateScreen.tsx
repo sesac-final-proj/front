@@ -218,26 +218,14 @@ export function RealEstateScreen({ activeNeighborhood, onBack }: RealEstateScree
         {SEOUL_DISTRICTS.map((district) => <option key={district} value={district} />)}
       </datalist>
 
-      <div style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "0 16px 12px", scrollbarWidth: "none" }}>
+      <div className={styles.realEstateDistrictScroller}>
         {SEOUL_DISTRICTS.map((dist) => {
           const isSelected = selectedDistrict === dist;
           return (
             <button
               key={dist}
               type="button"
-              style={{
-                padding: "6px 13px",
-                borderRadius: "20px",
-                fontSize: "13px",
-                fontWeight: isSelected ? 700 : 500,
-                backgroundColor: isSelected ? "#ff6f0f" : "#f1f3f5",
-                color: isSelected ? "#ffffff" : "#495057",
-                border: isSelected ? "1px solid #ff6f0f" : "1px solid transparent",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                transition: "all 0.15s ease",
-              }}
+              className={isSelected ? styles.realEstateDistrictChipActive : styles.realEstateDistrictChip}
               onClick={() => {
                 setSelectedDistrict(dist);
                 setQuery("");

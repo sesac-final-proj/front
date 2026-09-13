@@ -27,8 +27,11 @@ import {
   type RiskAnalysisData,
   type DistrictRiskSummary,
 } from "@/services/adminRiskService";
+import { TARGET_DISTRICTS } from "@/services/adminCongestionService";
+import { fetchNeighborhoodWeather, getWeatherDistributionUrl, type NeighborhoodWeather } from "@/services/weatherService";
 import { useAdminResource } from "../useAdminResource";
 import { Skeleton, ErrorState } from "../AdminUI";
+import pStyles from "../portal.module.css";
 import styles from "./risk-analysis.module.css";
 
 const numberFormat = new Intl.NumberFormat("ko-KR");
@@ -37,8 +40,35 @@ const percentFormat = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
 
+interface RiskAndWeatherData {
+  risk: RiskAnalysisData;
+  weatherByDistrict: Record<string, NeighborhoodWeather>;
+}
+
+async function loadRiskAndWeather(): Promise<RiskAndWeatherData> {
+  const [risk, weatherResults] = await Promise.all([
+    fetchAdminRiskAnalysis(),
+    Promise.allSettled(
+      TARGET_DISTRICTS.map((district) =>
+        fetchNeighborhoodWeather(
+          (district.bounds.south + district.bounds.north) / 2,
+          (district.bounds.west + district.bounds.east) / 2
+        )
+      )
+    ),
+  ]);
+  const weatherByDistrict = Object.fromEntries(
+    weatherResults.flatMap((result, index) =>
+      result.status === "fulfilled" ? [[TARGET_DISTRICTS[index].id, result.value]] : []
+    )
+  );
+  return { risk, weatherByDistrict };
+}
+
 export default function RiskAnalysisSection() {
-  const { data, loading, error, retry } = useAdminResource(fetchAdminRiskAnalysis);
+  const { data: combinedData, loading, error, retry } = useAdminResource(loadRiskAndWeather);
+  const data = combinedData?.risk ?? null;
+  const weatherByDistrict = combinedData?.weatherByDistrict ?? {};
 
   const [selectedGu, setSelectedGu] = useState<string>("영등포구");
   const [activeTab, setActiveTab] = useState<string>("ALL");
@@ -116,6 +146,32 @@ export default function RiskAnalysisSection() {
 
   return (
     <div className={styles.riskWrapper}>
+      {/* Weather Comparison Panel (가장 상단 배치) */}
+      <article className={`${pStyles.comparisonPanel} ${pStyles.weatherComparisonPanel}`} style={{ borderRadius: "16px" }}>
+        <header>
+          <div>
+            <h2>기상청 날씨 비교</h2>
+            <p>주요 자치구 현재 날씨와 수도권 초단기 기온 분포도</p>
+          </div>
+          <span>기상청 API 실시간</span>
+        </header>
+        <div className={pStyles.weatherComparisonColumns}>
+          {TARGET_DISTRICTS.map((district) => {
+            const weather = weatherByDistrict[district.id]?.current;
+            return (
+              <section key={district.id} style={{ borderRadius: "12px" }}>
+                <span aria-hidden="true">{weather?.condition === "맑음" ? "☀️" : weather?.condition.includes("비") ? "🌧️" : weather?.condition.includes("눈") ? "🌨️" : "☁️"}</span>
+                <div><h3>{district.name}</h3><strong>{weather ? `${Math.round(weather.temperature)}°` : "—"}</strong><p>{weather ? `${weather.condition} · 강수 ${weather.precipitationProbability}% · 습도 ${weather.humidity}%` : "기상 데이터 확인 중"}</p></div>
+              </section>
+            );
+          })}
+        </div>
+        <figure className={pStyles.weatherComparisonMap} style={{ borderRadius: "12px", overflow: "hidden" }}>
+          <img src={getWeatherDistributionUrl()} alt="기상청 수도권 초단기 기온 분포도" />
+          <figcaption>수도권 초단기 기온 분포도 · 기상청 API허브</figcaption>
+        </figure>
+      </article>
+
       {/* Section Header */}
       <div className={styles.sectionHeader}>
         <div className={styles.headerLeft}>

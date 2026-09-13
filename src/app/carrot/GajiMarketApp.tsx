@@ -1765,7 +1765,7 @@ export default function GajiMarketApp() {
     >
       <div className={styles.phoneShell}>
         <main
-          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""}`}
+          className={`${styles.appViewport} ${activeTab === "map" && !subPage ? styles.mapViewport : ""} ${subPage?.type === "real-estate" ? styles.realEstateViewport : ""} ${subPage?.type === "merge-game" ? styles.mergeGameViewport : ""} ${subPage?.type === "alba" ? styles.albaViewport : ""} ${subPage?.type === "chat-room" || subPage?.type === "payment-amount" || subPage?.type === "payment-detail" ? styles.chatRoomViewport : ""}`}
           data-app-scroll
         >
           {subPage?.type === "product-detail" && selectedProduct ? (

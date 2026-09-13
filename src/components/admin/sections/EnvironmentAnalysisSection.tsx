@@ -179,7 +179,8 @@ export default function EnvironmentAnalysisSection() {
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(loadData, 0);
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
   // 시간대별 차트 결합 데이터
