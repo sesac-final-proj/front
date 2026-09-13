@@ -81,50 +81,32 @@ export function ChatRoomScreen({
     scrollToBottom(false);
   }, [messages.length, scrollToBottom]);
 
-  // 모바일 브라우저(특히 iOS Safari)에서 키보드가 올라오면 실제로는 문서가 스크롤되는 게
-  // 아니라 "visualViewport"만 위로 pan된다. 이 화면은 position:relative라 pan을 안 따라가서,
-  // 화면은 그대로 위(원래 자리)에 남고 keyboard 위 빈 공간만 눈에 보여 입력창이 사라져 보였다.
-  // → 키보드가 떴을 때는 이 화면을 visualViewport에 맞춰 fixed로 고정시켜 pan을 그대로 따라가게 한다.
-  //
-  // resize/scroll 이벤트에 기대어 값을 한 번 고정하는 방식은 실기기에서 여전히 입력창-키보드
-  // 사이에 빈 틈을 남겼다 — 키보드 열림/닫힘 애니메이션 중 이벤트가 몇 번 오는지가
-  // 기기·iOS 버전마다 달라 중간값에 걸려 굳어버리는 듯하다. 이벤트를 아예 안 믿고 화면이 떠
-  // 있는 동안 매 프레임 재측정해서 항상 실제 visualViewport 값으로 맞춘다.
+  // 모바일 브라우저에서 키보드가 뜨면 visualViewport만 줄어들고(pan) 문서 자체는 안 바뀐다.
+  // 화면 전체를 키보드 크기에 맞춰 다시 그리는 대신(전에 그렇게 했다가 safe-area/offset 계산이
+  // 계속 어긋나 틈이 남았다), 입력창(.messageComposer)만 그 틈만큼 위로 translateY로 들어올린다.
+  // 입력창은 원래 화면 맨 아래(position:absolute, bottom:0)에 고정돼 있으므로, 이 값만
+  // CSS 변수로 흘려주면 된다 — 키보드 애니메이션 중간값이 와도 다음 이벤트에서 다시 보정되고,
+  // translate는 레이아웃을 안 건드리므로 화면 전체를 다시 배치하는 것보다 훨씬 덜 깨진다.
   useLayoutEffect(() => {
     const viewport = window.visualViewport;
     const el = chatRoomRef.current;
     if (!viewport || !el) return;
 
-    let rafId = 0;
-    let wasActive = false;
-
-    const tick = () => {
-      const kbActive = window.innerHeight - viewport.height > 60;
-      if (kbActive !== wasActive) {
-        wasActive = kbActive;
-        setKeyboardOpen(kbActive);
-        scrollToBottom(true);
-      }
-
-      if (kbActive) {
-        el.style.position = "fixed";
-        el.style.left = "0";
-        el.style.width = "100%";
-        el.style.top = `${Math.round(viewport.offsetTop)}px`;
-        el.style.height = `${Math.round(viewport.height)}px`;
-      } else if (el.style.position) {
-        el.style.position = "";
-        el.style.left = "";
-        el.style.width = "";
-        el.style.top = "";
-        el.style.height = "";
-      }
-
-      rafId = requestAnimationFrame(tick);
+    const syncKeyboard = () => {
+      const gap = Math.max(0, Math.round(window.innerHeight - (viewport.height + viewport.offsetTop)));
+      el.style.setProperty("--kb", `${gap}px`);
+      setKeyboardOpen(gap > 50);
+      scrollToBottom(false);
     };
 
-    tick();
-    return () => cancelAnimationFrame(rafId);
+    syncKeyboard();
+    viewport.addEventListener("resize", syncKeyboard);
+    viewport.addEventListener("scroll", syncKeyboard);
+
+    return () => {
+      viewport.removeEventListener("resize", syncKeyboard);
+      viewport.removeEventListener("scroll", syncKeyboard);
+    };
   }, [scrollToBottom]);
 
   const handleInputFocus = () => {
