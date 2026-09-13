@@ -1252,6 +1252,17 @@ img.thumbnail {
   resize: vertical;
 }
 
+.priceHintBanner {
+  margin: -4px 0 0;
+  padding: 10px 14px;
+  border-radius: 13px;
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .formSectionLabel {
   font-size: 0.85rem;
   font-weight: 700;

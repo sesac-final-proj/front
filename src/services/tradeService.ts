@@ -206,6 +206,46 @@ export async function listProducts(
   return { items: payload.items.map(toTradeProduct), total: payload.total };
 }
 
+export interface PriceHint {
+  status: "ok" | "insufficient_data";
+  medianPrice: number | null;
+  priceMin: number | null;
+  priceMax: number | null;
+  sampleCount: number;
+}
+
+// 글쓰기 화면에서 제목 입력만으로 실시간 시세 힌트를 보여준다("다이슨 V8" vs
+// "다이슨 V10"처럼 모델명이 제목에 그대로 들어있으면 모델별로 다른 범위가 나옴).
+// 비로그인도 볼 필요 없는 화면이지만 굳이 인증 없이도 되는 조회라 authorizedFetch 안 씀.
+export async function getPriceHint(
+  title: string,
+  category?: string,
+  signal?: AbortSignal,
+): Promise<PriceHint> {
+  const params = new URLSearchParams({ title });
+  if (category) params.set("category", category);
+  const response = await fetch(apiUrl(`/api/v1/trades/products/price-hint?${params}`), {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("시세 힌트를 불러오지 못했습니다.");
+
+  const payload: {
+    status: "ok" | "insufficient_data";
+    median_price: number | null;
+    price_min: number | null;
+    price_max: number | null;
+    sample_count: number;
+  } = await response.json();
+  return {
+    status: payload.status,
+    medianPrice: payload.median_price,
+    priceMin: payload.price_min,
+    priceMax: payload.price_max,
+    sampleCount: payload.sample_count,
+  };
+}
+
 // 실제 존재하는 카테고리 목록. 프론트에 하드코딩하면 데이터가 바뀔 때마다
 // 같이 배포해야 해서, 서버에서 그때그때 실제 값을 받아온다.
 export async function listCategories(signal?: AbortSignal): Promise<string[]> {
