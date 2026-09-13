@@ -1260,9 +1260,14 @@ img.thumbnail {
      텍스트는 테마 무관하게 어두운 색으로 고정해야 대비가 유지된다. */
   background: #ccfbfa;
   color: #0f5c59;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.priceHintLabel {
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .formSectionLabel {
