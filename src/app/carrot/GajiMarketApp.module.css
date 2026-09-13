@@ -1266,8 +1266,15 @@ img.thumbnail {
 }
 
 .priceHintLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 17px;
   font-weight: 800;
+}
+
+.priceHintIcon {
+  flex-shrink: 0;
 }
 
 .formSectionLabel {
