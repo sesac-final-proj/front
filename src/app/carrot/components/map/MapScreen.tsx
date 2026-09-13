@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
-import { Search, UserRound, House, Crosshair, X, CloudSun } from "lucide-react";
+import { Search, UserRound, House, Crosshair, X } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type {
   LocalCategory,
@@ -112,6 +112,7 @@ export function MapScreen({
     setTransitBounds((previous: TransitBounds | null) => previous &&
       (Object.keys(bounds) as (keyof TransitBounds)[]).every((key) => Math.abs(previous[key] - bounds[key]) < 0.000001) ? previous : bounds);
   }, []);
+  const currentCategory = categories.find((category) => category.id === selectedCategory) ?? categories[0];
   const isCongestionMode = selectedCategory === "congestion";
   const isWeatherMode = selectedCategory === "weather";
   const isWorkoutMode = selectedCategory === "workout";
@@ -765,14 +766,8 @@ export function MapScreen({
             <Crosshair size={25} />
           </button>
         </div>
-        <button
-          type="button"
-          className={styles.mapWeatherBadge}
-          aria-label={weather ? `${activeNeighborhood} ${Math.round(weather.current.temperature)}도, ${weather.current.condition}` : `${activeNeighborhood} 날씨`}
-          onClick={() => changeCategory("weather")}
-        >
-          <CloudSun size={23} aria-hidden="true" />
-          <strong>{weather ? `${Math.round(weather.current.temperature)}°` : "--°"}</strong>
+        <button type="button" className={styles.mapCategoryFab} aria-label={currentCategory.name}>
+          <currentCategory.icon size={26} />
         </button>
         {visibleSelectedDanger ? (
           <DangerSignalCallout business={visibleSelectedDanger} onClose={() => setSelectedDanger(null)} />
