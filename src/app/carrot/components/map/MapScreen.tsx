@@ -732,6 +732,24 @@ export function MapScreen({
             onSelectDanger={selectDanger}
           />
         ) : null}
+        {sheetState !== "expanded" && isWeatherMode && weather ? (
+          <aside className={`${styles.realtimeNewsCard} ${styles.weatherTicker}`} role="status" aria-label="실시간 날씨 소식">
+            <div className={styles.realtimeNewsHeader}>
+              <span className={styles.realtimeDot} />
+              <strong>날씨 소식</strong>
+            </div>
+            <div className={styles.realtimeNewsSlider}>
+              <div className={styles.realtimeNewsRow}>
+                <p className={styles.realtimeNewsText}>지금 {weather.current.condition} · {Math.round(weather.current.temperature)}°</p>
+                <small className={styles.realtimeNewsTag}>강수 {weather.current.precipitationProbability}%</small>
+              </div>
+              <div className={styles.realtimeNewsRow}>
+                <p className={styles.realtimeNewsText}>다음 {weather.forecast[1]?.condition ?? weather.current.condition}</p>
+                <small className={styles.realtimeNewsTag}>강수 {weather.forecast[1]?.precipitationProbability ?? weather.current.precipitationProbability}%</small>
+              </div>
+            </div>
+          </aside>
+        ) : null}
         {locationError && <p className={styles.mapLocationError} role="alert">{locationError}</p>}
         {isLocating && <p className={styles.mapLocationError} role="status">현재 위치를 확인하고 있어요...</p>}
         {isCongestionMode && selectedCongestion ? (() => {
