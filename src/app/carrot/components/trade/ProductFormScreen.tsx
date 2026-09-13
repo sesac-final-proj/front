@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ChevronLeft, ChevronRight, Plus, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, WandSparkles } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem } from "../../types";
 import { getPriceHint, type PriceHint } from "@/services/tradeService";
@@ -121,7 +121,7 @@ export function ProductFormScreen({
         {priceHint?.status === "ok" && (
           <p className={styles.priceHintBanner}>
             <span className={styles.priceHintLabel}>
-              <Sparkles size={16} className={styles.priceHintIcon} />
+              <WandSparkles size={16} className={styles.priceHintIcon} />
               AI 추천 실거래가 가격범위
             </span>
             : {priceHint.priceMin?.toLocaleString()}원 ~ {priceHint.priceMax?.toLocaleString()}원
