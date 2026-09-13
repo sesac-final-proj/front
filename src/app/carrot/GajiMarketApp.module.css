@@ -1269,8 +1269,7 @@ img.thumbnail {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 17px;
-  font-weight: 800;
+  /* 배너 안 문구는 전부 같은 크기/굵기로 통일 — font-size/weight는 .priceHintBanner를 그대로 상속 */
 }
 
 .priceHintIcon {
