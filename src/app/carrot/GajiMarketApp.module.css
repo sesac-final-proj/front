@@ -3685,6 +3685,13 @@ img.thumbnail {
   flex-direction: column;
   overflow: hidden;
   background: var(--color-bg);
+  z-index: 30;
+}
+
+/* 키보드가 열려 fixed로 뷰포트에 고정되면 .phoneShell의 safe-area padding-top을
+   벗어나 노치 아래로 내용이 밀려 올라간다 — 그만큼을 여기서 직접 보충. */
+.chatRoomScreen[data-keyboard-open="true"] {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .chatProductCard {
@@ -3868,7 +3875,7 @@ img.thumbnail {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 8px 17px calc(96px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 17px 16px;
   scrollbar-width: none;
   overscroll-behavior: contain;
 }
@@ -3934,14 +3941,7 @@ img.thumbnail {
 }
 
 .messageComposer {
-  /* .detailActionBar와 같은 패턴: chatRoomScreen(position:relative) 기준 absolute라
-     phoneShell 폭을 그대로 상속한다. 평소엔 bottom:0에 붙어있다가, 키보드가 뜨면
-     --kb(visualViewport로 구한 키보드 높이)만큼 translateY로 들어올린다. */
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  transform: translateY(calc(var(--kb, 0px) * -1));
+  width: 100%;
   margin: 0;
   min-height: 64px;
   padding: 10px 17px calc(10px + env(safe-area-inset-bottom, 0px));
@@ -3951,7 +3951,9 @@ img.thumbnail {
   align-items: center;
   background: var(--color-bg);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex: 0 0 auto;
   z-index: 20;
+  transition: padding-bottom 0.2s ease;
 }
 
 .chatRoomScreen[data-keyboard-open="true"] .messageComposer {
