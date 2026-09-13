@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import AdminSectionPage from "@/components/admin/AdminSectionPage";
-const sections = ["trade-dashboard","trades","price-status","management","quality","insights","market-trends","sources","price-model","price-comparison","environment","risks","real-estate-analysis","donations","notices","system"];
+const sections = ["trade-dashboard","trades","price-status","quality","insights","market-trends","sources","price-model","price-comparison","environment","risks","real-estate-analysis","donations","notices","system"];
 export function generateStaticParams() { return sections.map(section => ({ section })); }
 export default async function SectionPage({ params }: { params: Promise<{ section: string }> }) {
  const { section } = await params;
