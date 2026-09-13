@@ -1256,11 +1256,24 @@ img.thumbnail {
   margin: -4px 0 0;
   padding: 10px 14px;
   border-radius: 13px;
-  background: var(--color-primary-container);
-  color: var(--color-primary);
-  font-size: 13px;
+  /* 고정 배경색 요청이라 라이트/다크 테마 변수 대신 하드코딩 — 밝은 색이라
+     텍스트는 테마 무관하게 어두운 색으로 고정해야 대비가 유지된다. */
+  background: #ccfbfa;
+  color: #0f5c59;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.priceHintLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* 배너 안 문구는 전부 같은 크기/굵기로 통일 — font-size/weight는 .priceHintBanner를 그대로 상속 */
+}
+
+.priceHintIcon {
+  flex-shrink: 0;
 }
 
 .formSectionLabel {
