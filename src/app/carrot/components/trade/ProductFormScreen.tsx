@@ -108,12 +108,6 @@ export function ProductFormScreen({
             <option>기타 서비스</option>
           </select>
         </label>
-        {priceHint?.status === "ok" && (
-          <p className={styles.priceHintBanner}>
-            <span className={styles.priceHintLabel}>AI 추천 실거래가 가격범위</span>:{" "}
-            {priceHint.priceMin?.toLocaleString()}원 ~ {priceHint.priceMax?.toLocaleString()}원
-          </p>
-        )}
         <label>
           가격
           <input
@@ -124,6 +118,12 @@ export function ProductFormScreen({
             defaultValue={initialProduct?.price ?? 30000}
           />
         </label>
+        {priceHint?.status === "ok" && (
+          <p className={styles.priceHintBanner}>
+            <span className={styles.priceHintLabel}>AI 추천 실거래가 가격범위</span>:{" "}
+            {priceHint.priceMin?.toLocaleString()}원 ~ {priceHint.priceMax?.toLocaleString()}원
+          </p>
+        )}
         <label className={styles.checkRow}>
           <input name="free" type="checkbox" defaultChecked={initialProduct?.tradeType === "FREE"} />
           나눔으로 등록
