@@ -85,16 +85,26 @@ export function ChatRoomScreen({
   // 아니라 "visualViewport"만 위로 pan된다. 이 화면은 position:relative라 pan을 안 따라가서,
   // 화면은 그대로 위(원래 자리)에 남고 keyboard 위 빈 공간만 눈에 보여 입력창이 사라져 보였다.
   // → 키보드가 떴을 때는 이 화면을 visualViewport에 맞춰 fixed로 고정시켜 pan을 그대로 따라가게 한다.
+  //
+  // resize/scroll 이벤트에 기대어 값을 한 번 고정하는 방식은 실기기에서 여전히 입력창-키보드
+  // 사이에 빈 틈을 남겼다 — 키보드 열림/닫힘 애니메이션 중 이벤트가 몇 번 오는지가
+  // 기기·iOS 버전마다 달라 중간값에 걸려 굳어버리는 듯하다. 이벤트를 아예 안 믿고 화면이 떠
+  // 있는 동안 매 프레임 재측정해서 항상 실제 visualViewport 값으로 맞춘다.
   useLayoutEffect(() => {
     const viewport = window.visualViewport;
     const el = chatRoomRef.current;
     if (!viewport || !el) return;
 
-    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let rafId = 0;
+    let wasActive = false;
 
-    const applyViewport = () => {
+    const tick = () => {
       const kbActive = window.innerHeight - viewport.height > 60;
-      setKeyboardOpen(kbActive);
+      if (kbActive !== wasActive) {
+        wasActive = kbActive;
+        setKeyboardOpen(kbActive);
+        scrollToBottom(true);
+      }
 
       if (kbActive) {
         el.style.position = "fixed";
@@ -102,7 +112,7 @@ export function ChatRoomScreen({
         el.style.width = "100%";
         el.style.top = `${Math.round(viewport.offsetTop)}px`;
         el.style.height = `${Math.round(viewport.height)}px`;
-      } else {
+      } else if (el.style.position) {
         el.style.position = "";
         el.style.left = "";
         el.style.width = "";
@@ -110,27 +120,11 @@ export function ChatRoomScreen({
         el.style.height = "";
       }
 
-      scrollToBottom(false);
+      rafId = requestAnimationFrame(tick);
     };
 
-    // iOS는 키보드가 다 올라오기 전, 애니메이션 도중에도 resize 이벤트를 쏜다 — 그
-    // 중간값으로 높이를 고정해버리면 키보드가 완전히 올라온 뒤 실제 여백과 어긋나
-    // 입력창과 키보드 사이에 빈 틈이 남는다. 애니메이션이 끝날 시점에 한 번 더 확정값으로 재적용.
-    const applyAndSettle = () => {
-      applyViewport();
-      clearTimeout(settleTimer);
-      settleTimer = setTimeout(applyViewport, 300);
-    };
-
-    applyAndSettle();
-    viewport.addEventListener("resize", applyAndSettle);
-    viewport.addEventListener("scroll", applyAndSettle);
-
-    return () => {
-      clearTimeout(settleTimer);
-      viewport.removeEventListener("resize", applyAndSettle);
-      viewport.removeEventListener("scroll", applyAndSettle);
-    };
+    tick();
+    return () => cancelAnimationFrame(rafId);
   }, [scrollToBottom]);
 
   const handleInputFocus = () => {
