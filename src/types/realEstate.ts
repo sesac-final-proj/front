@@ -45,6 +45,15 @@ export interface PropertyDongGroup {
   buildings: PropertyBuilding[];
 }
 
+export interface PropertyDistrictGroup {
+  district: string;
+  lat: number;
+  lng: number;
+  transactionCount: number;
+  buildingCount: number;
+  buildings: PropertyBuilding[];
+}
+
 export interface RealEstateBounds {
   south: number;
   north: number;

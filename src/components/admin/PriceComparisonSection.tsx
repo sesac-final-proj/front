@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   getPriceComparisonOverview,
+  getPriceComparisonDongMap,
   getPriceComparisonSamples,
   type PriceComparisonRegionItem,
   type PriceComparisonSample,
@@ -172,11 +173,17 @@ export function PriceComparisonSection() {
     [selectedCategory],
   );
   const { retry: retrySamples, ...samplesState } = useAdminResource(samplesLoader);
+  const dongMapLoader = useCallback(
+    () => (selectedCategory ? getPriceComparisonDongMap(selectedCategory) : Promise.resolve({ category: "", dongs: [] })),
+    [selectedCategory],
+  );
+  const { retry: retryDongMap, ...dongMapState } = useAdminResource(dongMapLoader);
 
   const refreshAll = useCallback(() => {
     retry();
     retrySamples();
-  }, [retry, retrySamples]);
+    retryDongMap();
+  }, [retry, retrySamples, retryDongMap]);
 
   const trend = summary?.price_trend_pct ?? null;
   const trendClass = trend === null ? styles.trendFlat : trend < 0 ? styles.trendGood : trend > 0 ? styles.trendBad : styles.trendFlat;
@@ -247,7 +254,9 @@ export function PriceComparisonSection() {
 
         <article className={`${pStyles.card} ${styles.lift}`} style={{ marginTop: 20 }}>
           <div className={pStyles.cardHead}><div><h2>{selectedCategory} 구별 시세지도</h2><p>구별 색 = 카테고리 중앙값 대비 편차(파랑 저렴 · 오렌지 비쌈) · 구에 마우스 올리면 개별 매물 가격 표시</p></div></div>
-          <PriceGuMap regions={regionRows} categoryMedianPrice={summary?.median_price ?? 0} samples={samplesState.data?.samples ?? []} />
+          {dongMapState.loading ? <Skeleton /> : dongMapState.error || !dongMapState.data ? <ErrorState message={dongMapState.error} retry={retryDongMap} /> : (
+            <PriceGuMap regions={regionRows} categoryMedianPrice={summary?.median_price ?? 0} samples={samplesState.data?.samples ?? []} dongStats={dongMapState.data.dongs} />
+          )}
         </article>
 
         <div style={{ marginTop: 20 }}>

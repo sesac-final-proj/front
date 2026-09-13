@@ -9,6 +9,7 @@ import MarketTrendsSection from "./sections/MarketTrendsSection";
 import ExternalComparisonSection from "./sections/ExternalComparisonSection";
 import EnvironmentAnalysisSection from "./sections/EnvironmentAnalysisSection";
 import RiskAnalysisSection from "./sections/RiskAnalysisSection";
+import RealEstateAnalysisSection from "./sections/RealEstateAnalysisSection";
 import TradeDashboardSection from "./sections/TradeDashboardSection";
 import TradesSection from "./sections/TradesSection";
 import QualitySection from "./sections/QualitySection";
@@ -32,6 +33,7 @@ export const sectionTitles: Record<string, string> = {
   "market-trends": "외부 변화 추이",
   environment: "모델 및 외부 환경 분석",
   risks: "위험요소 및 안전신호 분석",
+  "real-estate-analysis": "부동산 분석",
   sources: "수집원 관리",
   "price-model": "가격 모델",
   "price-comparison": "가격 지역별 비교",
@@ -69,6 +71,8 @@ export default function AdminSectionPage({ section }: { section: string }) {
             ? "서울시 실시간 도시데이터 혼잡도 모델 & 기상·유동인구 외부 환경 융합 분석 결과를 확인하세요."
             : section === "risks"
             ? "서울안전누리 및 실시간 도시데이터 기반 자치구별 위험신호 점유율과 안전 위협 요소를 정밀 분석합니다."
+            : section === "real-estate-analysis"
+            ? "서울시 전월세 실거래 데이터를 기반으로 최근 거래 집중 지역과 잠재 거래 활성도를 분석합니다."
             : section === "market-trends"
             ? "품목별 거래 기준 비교 및 당근 대비 외부시장(중고나라·번개장터) 가격 변화 추이와 사분위수 분포를 정밀 분석합니다."
             : section === "management"
@@ -112,6 +116,7 @@ export default function AdminSectionPage({ section }: { section: string }) {
           {section === "market-trends" && <MarketTrendsSection />}
           {section === "environment" && <EnvironmentAnalysisSection />}
           {section === "risks" && <RiskAnalysisSection />}
+          {section === "real-estate-analysis" && <RealEstateAnalysisSection />}
           {section === "sources" && <SourceOperationsSection insights={data.insights} />}
           {section === "price-model" && <PriceModelSection validation={data.validation} />}
           {section === "price-comparison" && <PriceComparisonSection />}

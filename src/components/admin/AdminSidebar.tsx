@@ -23,6 +23,7 @@ import {
   LineChart,
   CircleDollarSign,
   SlidersHorizontal,
+  Building2,
 } from "lucide-react";
 import styles from "./portal.module.css";
 
@@ -43,6 +44,7 @@ const groups = [
       ["/admin/market-trends", "외부 변화 추이", LineChart],
       ["/admin/environment", "모델 및 외부 환경 분석", Compass],
       ["/admin/risks", "위험요소 분석", ShieldAlert],
+      ["/admin/real-estate-analysis", "부동산 분석", Building2],
     ],
   },
   {

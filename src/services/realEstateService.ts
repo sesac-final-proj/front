@@ -1,6 +1,7 @@
 import type {
   HouseTypeFilter,
   PropertyBuilding,
+  PropertyDistrictGroup,
   PropertyDongGroup,
   RealEstateBounds,
   RentTransaction,
@@ -140,6 +141,19 @@ export function groupBuildingsByDong(buildings: PropertyBuilding[]): PropertyDon
   buildings.forEach((building) => groups.set(building.dong, [...(groups.get(building.dong) ?? []), building]));
   return [...groups.entries()].map(([dong, items]) => ({
     dong,
+    lat: items.reduce((sum, item) => sum + item.lat, 0) / items.length,
+    lng: items.reduce((sum, item) => sum + item.lng, 0) / items.length,
+    transactionCount: items.reduce((sum, item) => sum + item.transactionCount, 0),
+    buildingCount: items.length,
+    buildings: items,
+  }));
+}
+
+export function groupBuildingsByDistrict(buildings: PropertyBuilding[]): PropertyDistrictGroup[] {
+  const groups = new Map<string, PropertyBuilding[]>();
+  buildings.forEach((building) => groups.set(building.district, [...(groups.get(building.district) ?? []), building]));
+  return [...groups.entries()].map(([district, items]) => ({
+    district,
     lat: items.reduce((sum, item) => sum + item.lat, 0) / items.length,
     lng: items.reduce((sum, item) => sum + item.lng, 0) / items.length,
     transactionCount: items.reduce((sum, item) => sum + item.transactionCount, 0),
