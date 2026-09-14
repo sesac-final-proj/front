@@ -62,7 +62,9 @@ export function ChatRoomScreen({
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState(chatReportReasons[0]);
   const [placeRecommendations, setPlaceRecommendations] = useState<TradePlaceRecommendation[]>([]);
-  const [placeRecommendationStatus, setPlaceRecommendationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [placeRecommendationStatus, setPlaceRecommendationStatus] = useState<"idle" | "loading" | "empty" | "error">("idle");
+  const [placeRecommendationRoomId, setPlaceRecommendationRoomId] = useState("");
+  const placeRecommendationRequestRef = useRef<AbortController | null>(null);
   const messageStackRef = useRef<HTMLDivElement>(null);
   const chatRoomRef = useRef<HTMLElement>(null);
 
@@ -99,7 +101,8 @@ export function ChatRoomScreen({
   const statusLabel =
     room.productTradeStatus === "RESERVED" ? "예약중" : room.productTradeStatus === "SOLD" ? "거래완료" : "판매중";
   const canSend = draft.trim().length > 0;
-  const canRecommendPlace = Boolean(room.productTradePlaceLat && room.productTradePlaceLng) || Boolean(room.productTradePlace || room.counterpartNeighborhoodName);
+  const hasTradePlaceCoordinates = Number.isFinite(room.productTradePlaceLat) && Number.isFinite(room.productTradePlaceLng);
+  const canRecommendPlace = hasTradePlaceCoordinates || Boolean(room.productTradePlace || room.counterpartNeighborhoodName);
   // 카톡식 "1" — 내가 보낸 메시지인데 상대가 아직 안 읽었으면(counterpartLastReadAt보다
   // 늦게 보냈으면, 혹은 상대가 한 번도 안 읽었으면) 표시.
   const isUnreadByCounterpart = (message: ChatMessageUi) =>
@@ -107,23 +110,49 @@ export function ChatRoomScreen({
     (!room.counterpartLastReadAt ||
       new Date(message.createdAt).getTime() > new Date(room.counterpartLastReadAt).getTime());
 
+  useEffect(() => {
+    placeRecommendationRequestRef.current?.abort();
+    placeRecommendationRequestRef.current = null;
+
+    return () => placeRecommendationRequestRef.current?.abort();
+  }, [room.id]);
+
+  const currentPlaceRecommendationStatus = placeRecommendationRoomId === room.id ? placeRecommendationStatus : "idle";
+  const currentPlaceRecommendations = placeRecommendationRoomId === room.id ? placeRecommendations : [];
+
   function loadPlaceRecommendations() {
     if (!canRecommendPlace) return;
+    placeRecommendationRequestRef.current?.abort();
+    const controller = new AbortController();
+    placeRecommendationRequestRef.current = controller;
+    setPlaceRecommendationRoomId(room.id);
     setPlaceRecommendationStatus("loading");
     fetchTradePlaceRecommendations({
       lat: room.productTradePlaceLat,
       lng: room.productTradePlaceLng,
       query: room.productTradePlace ?? room.counterpartNeighborhoodName,
       hour: new Date().getHours(),
-    })
+    }, controller.signal)
       .then((items) => {
-        setPlaceRecommendations(items);
-        setPlaceRecommendationStatus("idle");
+        const rankedItems = [...items].sort(
+          (a, b) => (b.recommendationScore ?? 0) - (a.recommendationScore ?? 0),
+        );
+        setPlaceRecommendations(rankedItems);
+        setPlaceRecommendationStatus(rankedItems.length > 0 ? "idle" : "empty");
       })
-      .catch(() => setPlaceRecommendationStatus("error"));
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setPlaceRecommendations([]);
+        setPlaceRecommendationStatus("error");
+      })
+      .finally(() => {
+        if (placeRecommendationRequestRef.current === controller) {
+          placeRecommendationRequestRef.current = null;
+        }
+      });
   }
 
-  function useRecommendation(place: TradePlaceRecommendation) {
+  function handleRecommendationSelect(place: TradePlaceRecommendation) {
     onDraftChange(`${place.name}에서 거래 어떠세요? 지금 ${place.congestionLevel}이고 ${place.distanceMeters}m 정도예요.`);
   }
 
@@ -291,25 +320,27 @@ export function ChatRoomScreen({
               type="button"
               className={styles.chatRecommendButton}
               onClick={loadPlaceRecommendations}
-              disabled={placeRecommendationStatus === "loading"}
-              aria-expanded={placeRecommendations.length > 0}
+              disabled={currentPlaceRecommendationStatus === "loading"}
+              aria-expanded={currentPlaceRecommendations.length > 0}
             >
               <MapPin size={17} />
-              {placeRecommendationStatus === "loading" ? "확인 중" : "혼잡도 추천"}
+              {currentPlaceRecommendationStatus === "loading" ? "추천 분석 중" : "혼잡도 분석"}
             </button>
           )}
         </div>
       )}
       {canRecommendPlace && (
         <div className={styles.chatPlaceRecommend} aria-live="polite">
-          {placeRecommendationStatus === "error" && <p>추천 장소를 불러오지 못했어요.</p>}
-          {placeRecommendations.length > 0 && (
+          {currentPlaceRecommendationStatus === "error" && <p>추천 장소를 불러오지 못했어요.</p>}
+          {currentPlaceRecommendationStatus === "empty" && <p>주변에서 혼잡도를 확인할 수 있는 추천 장소가 없어요.</p>}
+          {currentPlaceRecommendations.length > 0 && (
             <div className={styles.chatPlaceRecommendList}>
-              {placeRecommendations.slice(0, 3).map((place) => (
+              <p>거리와 실시간 혼잡도를 반영한 추천이에요.</p>
+              {currentPlaceRecommendations.slice(0, 3).map((place) => (
                 <button
                   type="button"
                   key={`${place.name}-${place.lat}-${place.lng}`}
-                  onClick={() => useRecommendation(place)}
+                  onClick={() => handleRecommendationSelect(place)}
                 >
                   <span>
                     <strong>{place.name}</strong>

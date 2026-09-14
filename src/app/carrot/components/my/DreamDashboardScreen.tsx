@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, History, Sprout } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { DonationFacility } from "@/types";
 import { NEIGHBORHOOD_DISTRICTS } from "../../constants";
-import { getDreamFacilities, getDreamPointsHistory, type DreamPointTransaction } from "@/services";
+import {
+  getDreamDistrictSummary,
+  getDreamFacilities,
+  getDreamPointsHistory,
+  type DreamPointTransaction,
+} from "@/services";
 import { ScreenHeader, IconButton } from "../common";
 import { DreamMapLayer } from "./DreamMapLayer";
 
@@ -12,6 +17,10 @@ const POINT_SOURCE_LABEL: Record<DreamPointTransaction["source"], string> = {
   general_payment: "일반결제 적립",
   trade: "중고거래 적립",
 };
+
+// ponytail: 시설별 목표 모금액은 실제로 정해진 값이 없어 데모용 고정 목표 —
+// 실제 기부 집행 기준이 생기면 여기만 바꾸면 된다. 1방울=1원으로 취급.
+const DEMO_TARGET_AMOUNT_PER_FACILITY = 100_000;
 
 export interface DreamDashboardScreenProps {
   activeNeighborhood: string;
@@ -68,16 +77,42 @@ export function DreamDashboardScreen({
       });
     return () => controller.abort();
   }, [district]);
-  const visibleSelectedFacilityId = visibleFacilities.some((facility) => facility.id === selectedFacilityId)
+  // "기부 참여"/"동네 기부 진행률" — 예전엔 프론트에 0으로 하드코딩돼 있어서 실제
+  // 중고거래/현장결제로 꿈방울이 쌓여도 반영이 안 됐다. 동네(구) 단위 실적립 집계로 교체.
+  const [districtSummary, setDistrictSummary] = useState<{ district: string; participationCount: number; totalPoints: number } | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    getDreamDistrictSummary(district, controller.signal)
+      .then(({ participationCount, totalPoints }) => setDistrictSummary({ district, participationCount, totalPoints }))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("동네 기부 현황을 불러오지 못했습니다.", error);
+      });
+    return () => controller.abort();
+  }, [district]);
+  const totalDonationCount = districtSummary?.district === district ? districtSummary.participationCount : 0;
+  const totalRaisedPoints = districtSummary?.district === district ? districtSummary.totalPoints : 0;
+
+  // 시설별 모금액은 개별 집계가 없어 동네 합계를 시설 수만큼 균등 배분(데모 단순화).
+  const facilitiesWithDonations = useMemo(() => {
+    if (visibleFacilities.length === 0) return visibleFacilities;
+    const perFacility = Math.round(totalRaisedPoints / visibleFacilities.length);
+    return visibleFacilities.map((facility) => ({
+      ...facility,
+      currentAmount: perFacility,
+      targetAmount: DEMO_TARGET_AMOUNT_PER_FACILITY,
+    }));
+  }, [visibleFacilities, totalRaisedPoints]);
+
+  const visibleSelectedFacilityId = facilitiesWithDonations.some((facility) => facility.id === selectedFacilityId)
     ? selectedFacilityId
     : null;
-  const selectedFacility = visibleFacilities.find((facility) => facility.id === visibleSelectedFacilityId) ?? null;
+  const selectedFacility = facilitiesWithDonations.find((facility) => facility.id === visibleSelectedFacilityId) ?? null;
   const selectFacility = useCallback((facility: DonationFacility | null) => {
     setSelectedFacilityId(facility ? facility.id : null);
   }, []);
-  const totalCurrentAmount = visibleFacilities.reduce((sum, facility) => sum + facility.currentAmount, 0);
-  const totalTargetAmount = visibleFacilities.reduce((sum, facility) => sum + facility.targetAmount, 0);
-  const totalDonationCount = visibleFacilities.reduce((sum, facility) => sum + facility.donationCount, 0);
+  const totalCurrentAmount = facilitiesWithDonations.reduce((sum, facility) => sum + facility.currentAmount, 0);
+  const totalTargetAmount = facilitiesWithDonations.reduce((sum, facility) => sum + facility.targetAmount, 0);
   const neighborhoodProgress = totalTargetAmount > 0 ? Math.round((totalCurrentAmount / totalTargetAmount) * 100) : 0;
 
   return (
@@ -170,7 +205,7 @@ export function DreamDashboardScreen({
         {facilityStatus === "loading" && <p className={styles.dreamEmpty}>어린이 센터를 불러오는 중이에요.</p>}
         {facilityStatus === "error" && <p className={styles.dreamEmpty}>어린이 센터를 불러오지 못했어요.</p>}
         {facilityStatus === "ready" && visibleFacilities.length === 0 && <p className={styles.dreamEmpty}>이 구에서 확인된 어린이 센터가 없어요.</p>}
-        {visibleFacilities.map((facility) => {
+        {facilitiesWithDonations.map((facility) => {
           const progress = facility.targetAmount > 0 ? Math.round((facility.currentAmount / facility.targetAmount) * 100) : 0;
           const isSelected = facility.id === visibleSelectedFacilityId;
           return (

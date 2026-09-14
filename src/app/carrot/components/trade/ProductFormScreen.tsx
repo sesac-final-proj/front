@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, WandSparkles } from "lucide-react";
 import styles from "../../GajiMarketApp.module.css";
 import type { ProductListItem } from "../../types";
+import { getPriceHint, type PriceHint } from "@/services/tradeService";
 import { IconButton } from "../common/IconButton";
 import { ScreenHeader } from "../common/ScreenHeader";
 import { TradePlacePickerScreen } from "./TradePlacePickerScreen";
@@ -29,6 +30,32 @@ export function ProductFormScreen({
       : undefined,
   );
   const [showPlacePicker, setShowPlacePicker] = useState(false);
+  const [title, setTitle] = useState(initialProduct?.title ?? "");
+  const [category, setCategory] = useState(initialProduct?.category ?? "중고거래");
+  const [description, setDescription] = useState(initialProduct?.description ?? "");
+  const [priceHint, setPriceHint] = useState<PriceHint | null>(null);
+
+  // 제목(+카테고리) 입력에 맞는 시세 힌트를 실시간으로 불러온다 — 설명까지 채워야
+  // 뜨도록 게이트를 걸었다(제목만으로는 너무 일찍/자주 뜨는 게 부담스럽다는 요청).
+  // 타이핑마다 호출하면 낭비니 400ms 디바운스, 이전 요청은 중단(AbortController).
+  useEffect(() => {
+    if (title.trim().length < 2 || description.trim().length === 0) {
+      setPriceHint(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      getPriceHint(title, category, controller.signal)
+        .then(setPriceHint)
+        .catch(() => {
+          // ponytail: 힌트는 부가기능이라 실패해도 화면엔 영향 없음, 조용히 무시.
+        });
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [title, category, description]);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -65,11 +92,18 @@ export function ProductFormScreen({
         </label>
         <label>
           제목
-          <input name="title" maxLength={40} placeholder="물건 이름을 입력하세요" defaultValue={initialProduct?.title} required />
+          <input
+            name="title"
+            maxLength={40}
+            placeholder="물건 이름을 입력하세요"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            required
+          />
         </label>
         <label>
           카테고리
-          <select name="category" defaultValue={initialProduct?.category ?? "중고거래"}>
+          <select name="category" value={category} onChange={(event) => setCategory(event.target.value)}>
             <option>중고거래</option>
             <option>중고차</option>
             <option>알바</option>
@@ -86,6 +120,15 @@ export function ProductFormScreen({
             defaultValue={initialProduct?.price ?? 30000}
           />
         </label>
+        {priceHint?.status === "ok" && (
+          <p className={styles.priceHintBanner}>
+            <span className={styles.priceHintLabel}>
+              <WandSparkles size={16} className={styles.priceHintIcon} />
+              AI 추천 실거래가 가격범위
+            </span>
+            : {priceHint.priceMin?.toLocaleString()}원 ~ {priceHint.priceMax?.toLocaleString()}원
+          </p>
+        )}
         <label className={styles.checkRow}>
           <input name="free" type="checkbox" defaultChecked={initialProduct?.tradeType === "FREE"} />
           나눔으로 등록
@@ -96,7 +139,8 @@ export function ProductFormScreen({
             name="description"
             maxLength={2000}
             placeholder="상태, 거래 희망 장소, 가격 제안 가능 여부를 적어주세요."
-            defaultValue={initialProduct?.description}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
             required
           />
         </label>
