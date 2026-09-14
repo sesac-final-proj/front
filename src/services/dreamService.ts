@@ -1,4 +1,4 @@
-import { authorizedFetch } from "@/services/tradeService";
+import { apiUrl, authorizedFetch } from "@/services/tradeService";
 
 export interface DreamFacility {
   id: string;
@@ -92,6 +92,25 @@ export async function getDreamPointsBalance(signal?: AbortSignal): Promise<numbe
 
   const payload: { balance: number } = await response.json();
   return payload.balance;
+}
+
+export interface DreamDistrictSummary {
+  participationCount: number;
+  totalPoints: number;
+}
+
+// 꿈가지 화면 "기부 참여"/"동네 기부 진행률" — 예전엔 프론트에 0으로 하드코딩돼
+// 있어서 실제 중고거래/현장결제로 꿈방울이 쌓여도 화면에 반영이 안 됐다. 로그인
+// 없이도 보이는 동네 집계라 authorizedFetch(토큰 필요) 대신 공개 조회로 호출.
+export async function getDreamDistrictSummary(district: string, signal?: AbortSignal): Promise<DreamDistrictSummary> {
+  const response = await fetch(apiUrl(`/api/v1/dream/district-summary?district=${encodeURIComponent(district)}`), {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("동네 기부 현황을 불러오지 못했습니다.");
+
+  const payload: { participation_count: number; total_points: number } = await response.json();
+  return { participationCount: payload.participation_count, totalPoints: payload.total_points };
 }
 
 export interface DreamPointTransaction {
