@@ -1,9 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import {
-  getPriceModelShapSummary,
   type PriceFeatureImportanceItem,
   type PriceModelMetricItem,
   type PricePredictionItem,
@@ -51,41 +49,6 @@ function FeatureImportanceCard({ items }: { items: PriceFeatureImportanceItem[] 
     <article className={styles.card}>
       <div className={styles.cardHead}><div><h2>Feature Importance</h2><p>gain 기준 상위 12개 · {bestFeatureSet}</p></div></div>
       <HorizontalBars data={top} />
-    </article>
-  );
-}
-
-function ShapSummaryCard() {
-  const [featureSet, setFeatureSet] = useState<"full" | "no_leak_prone">("full");
-  const loader = useCallback(() => getPriceModelShapSummary(featureSet), [featureSet]);
-  const { data: blob, loading, error, retry } = useAdminResource(loader);
-  const imageUrl = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
-  useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
-
-  return (
-    <article className={styles.card}>
-      <div className={styles.cardHead}>
-        <div><h2>SHAP 분석</h2><p>점 하나 = 매물 하나 · 오른쪽일수록 예측가를 높이는 방향으로 기여</p></div>
-      </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        {(["full", "no_leak_prone"] as const).map(fs => (
-          <button
-            key={fs}
-            type="button"
-            onClick={() => setFeatureSet(fs)}
-            style={{
-              padding: "5px 11px", borderRadius: 999, fontSize: 11, fontWeight: 550,
-              border: "1px solid #E7E8E5", background: featureSet === fs ? "#FF6F0F" : "#fff", color: featureSet === fs ? "#fff" : "#656b60",
-            }}
-          >
-            {fs}
-          </button>
-        ))}
-      </div>
-      {loading ? <Skeleton /> : error || !imageUrl ? <ErrorState message={error || "이미지를 불러오지 못했습니다."} retry={retry} /> : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={`SHAP summary plot (${featureSet})`} style={{ width: "100%", height: "auto", borderRadius: 8, background: "#fff" }} />
-      )}
     </article>
   );
 }
@@ -188,9 +151,6 @@ export function PricePredictionSection() {
           <FeatureImportanceCard items={data.charts.feature_importance} />
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <ShapSummaryCard />
-        </div>
       </>}
     </section>
   );
