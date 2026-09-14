@@ -31,7 +31,7 @@ interface ApiProductPage {
   total: number;
 }
 
-function apiUrl(path: string) {
+export function apiUrl(path: string) {
   return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
 }
 
