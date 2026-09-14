@@ -67,6 +67,7 @@ import {
   DreamDashboardScreen,
   DreamNoticeScreen,
   DreamPointsHistoryScreen,
+  WalletHistoryScreen,
   WalletChargeScreen,
   WalletPayScreen,
   // real-estate
@@ -962,14 +963,20 @@ export default function GajiMarketApp() {
       subPage?.type === "alba-form" ||
       subPage?.type === "sales" ||
       subPage?.type === "favorites" ||
-      subPage?.type === "recently-viewed"
+      subPage?.type === "recently-viewed" ||
+      subPage?.type === "wallet-history"
     ) {
       setActiveTab("my");
       setSubPage(null);
       return;
     }
     if (subPage?.type === "dream-points-history") {
-      setSubPage({ type: "dream-dashboard" });
+      if (subPage.returnTo === "my") {
+        setActiveTab("my");
+        setSubPage(null);
+      } else {
+        setSubPage({ type: "dream-dashboard" });
+      }
       return;
     }
     if (subPage?.type === "alba-detail") {
@@ -1745,7 +1752,7 @@ export default function GajiMarketApp() {
       ? roomMessages[subPage.chatRoomId]?.find((m) => m.payment?.transactionId === subPage.transactionId)
       : undefined;
 
-  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "dream-points-history", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
+  const showBottomNav = !subPage || ["my-menu", "dream-dashboard", "dream-notice", "dream-points-history", "wallet-history", "carrot-notice", "settings", "sales", "favorites", "recently-viewed", "search", "all-services"].includes(subPage.type);
   const isDreamPage =
     subPage?.type === "dream-dashboard" ||
     subPage?.type === "dream-notice" ||
@@ -1993,12 +2000,14 @@ export default function GajiMarketApp() {
               onBack={goBack}
               onChangeNeighborhood={() => setSheet("region")}
               onOpenNotice={() => setSubPage({ type: "dream-notice" })}
-              onOpenPointsHistory={() => setSubPage({ type: "dream-points-history" })}
+              onOpenPointsHistory={() => setSubPage({ type: "dream-points-history", returnTo: "dream-dashboard" })}
             />
           ) : subPage?.type === "dream-notice" ? (
             <DreamNoticeScreen onBack={goBack} />
           ) : subPage?.type === "dream-points-history" ? (
             <DreamPointsHistoryScreen onBack={goBack} />
+          ) : subPage?.type === "wallet-history" ? (
+            <WalletHistoryScreen onBack={goBack} />
           ) : subPage?.type === "alba" ? (
             <AlbaMainScreen
               activeNeighborhood={activeNeighborhood}
@@ -2217,6 +2226,8 @@ export default function GajiMarketApp() {
                   onOpenApartment={openApartmentFlow}
                   onOpenWalletCharge={() => setSubPage({ type: "wallet-charge" })}
                   onOpenWalletPay={() => setSubPage({ type: "wallet-pay" })}
+                  onOpenWalletHistory={() => setSubPage({ type: "wallet-history" })}
+                  onOpenPointsHistory={() => setSubPage({ type: "dream-points-history", returnTo: "my" })}
                 />
               )}
             </motion.div>

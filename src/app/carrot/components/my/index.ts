@@ -13,3 +13,4 @@ export * from "./DreamDashboardScreen";
 export * from "./DreamPointsHistoryScreen";
 export * from "./WalletChargeScreen";
 export * from "./WalletPayScreen";
+export * from "./WalletHistoryScreen";

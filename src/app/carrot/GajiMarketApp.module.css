@@ -5065,6 +5065,62 @@ img.thumbnail {
   font-variant-numeric: tabular-nums;
 }
 
+.walletHistoryList {
+  padding: 4px 16px 24px;
+}
+
+.walletHistoryRow {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 25%, transparent);
+  color: var(--color-text);
+}
+
+.walletHistoryRow > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.walletHistoryRow strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletHistoryRow small {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.walletHistoryRow > span {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.walletHistoryAmountOut {
+  color: var(--color-text);
+}
+
+.walletHistoryAmountIn {
+  color: var(--color-primary);
+}
+
+.walletHistoryEmpty {
+  padding: 20px 16px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
 .dreamFacilityItem {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 48px;
