@@ -290,20 +290,10 @@ export default function PriceStatusSection() {
           </div>
         </div>
 
-        <div className={styles.chartGrid} style={{ marginTop: 24 }}>
-          <article className={styles.card}>
-            <div className={styles.cardHead}><div><h2>플랫폼 가격 비교</h2><p>카테고리별 중위가 · 막대 위아래 선은 p25~p75 구간</p></div></div>
-            <PlatformComparisonChart rows={data.charts.platform_comparisons} />
-          </article>
-          <article className={styles.card}>
-            <div className={styles.cardHead}><div><h2>유의성 검정</h2><p>플랫폼 간 가격차 통계 검정</p></div></div>
-            <AdminTable headers={["카테고리", "비교", "차이", "p-value", "유의"]}>
-              {data.charts.platform_tests.map((row, i) => <tr key={i}>
-                <td>{row.category}</td><td>{row.platform_a} vs {row.platform_b}</td><td>{row.diff_pct.toFixed(1)}%</td><td>{row.p_value.toFixed(3)}</td><td>{row.significant ? "유의함" : "—"}</td>
-              </tr>)}
-            </AdminTable>
-          </article>
-        </div>
+        <article className={styles.card} style={{ marginTop: 24 }}>
+          <div className={styles.cardHead}><div><h2>플랫폼 가격 비교</h2><p>카테고리별 중위가 · 막대 위아래 선은 p25~p75 구간</p></div></div>
+          <PlatformComparisonChart rows={data.charts.platform_comparisons} />
+        </article>
 
         <article className={styles.card} style={{ marginTop: 24 }}>
           <div className={styles.cardHead}><div><h2>가격 군집 (GMM)</h2><p>카테고리별 가격대 구성비 · 100% 스택 막대</p></div></div>
