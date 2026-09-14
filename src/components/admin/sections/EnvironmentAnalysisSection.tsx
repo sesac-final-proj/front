@@ -707,24 +707,7 @@ export default function EnvironmentAnalysisSection() {
         </article>
       )}
 
-      {/* 외부 환경 연계 상태 */}
-      {(viewMode === "both" || viewMode === "environment") && (
-        <article className={styles.analysisPanel}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <span className={styles.panelIconTag}><CloudSun size={16} /></span>
-              <div>
-                <h3>외부 환경 데이터</h3>
-                <p>기상·대기 데이터 연계 상태</p>
-              </div>
-            </div>
-            <span className={styles.panelHeaderBadge}>연계 준비 중</span>
-          </div>
-          <p className={styles.environmentNotice}>
-            현재 화면은 도시데이터 혼잡도만 제공합니다. 기온, 강수, 미세먼지 지표는 원천 API 연계 후 표시됩니다.
-          </p>
-        </article>
-      )}
+    
 
       {/* ── 9. 주요 핫스팟 실시간 모니터링 테이블 (AdminTable 패턴) ── */}
       <article className={pStyles.card} style={{ marginTop: 8 }}>
