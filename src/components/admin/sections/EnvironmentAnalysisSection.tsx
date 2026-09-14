@@ -25,7 +25,6 @@ import {
   Layers,
   Sparkles,
   ArrowUpRight,
-  CloudSun,
   AlertCircle,
   Database,
 } from "lucide-react";
@@ -160,8 +159,8 @@ export default function EnvironmentAnalysisSection() {
 
   // 탭 상태: "all" (전체 비교) 또는 각 구 id
   const [activeTab, setActiveTab] = useState<"all" | "yeongdeungpo" | "nowon" | "songpa">("all");
-  // 뷰 모드: "both" (종합) | "daily" (일 혼잡도) | "hourly" (시간 혼잡도) | "environment" (환경/AI 모델)
-  const [viewMode, setViewMode] = useState<"both" | "daily" | "hourly" | "environment">("both");
+  // 뷰 모드: "both" (종합) | "daily" (일 혼잡도) | "hourly" (시간 혼잡도)
+  const [viewMode, setViewMode] = useState<"both" | "daily" | "hourly">("both");
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -384,14 +383,6 @@ export default function EnvironmentAnalysisSection() {
           >
             <Clock size={13} />
             시간대별 추정
-          </button>
-          <button
-            type="button"
-            className={viewMode === "environment" ? styles.toggleActive : styles.toggleBtn}
-            onClick={() => setViewMode("environment")}
-          >
-            <CloudSun size={13} />
-            외부 환경·예측
           </button>
         </div>
       </div>
@@ -704,25 +695,6 @@ export default function EnvironmentAnalysisSection() {
               </div>
             ))}
           </div>
-        </article>
-      )}
-
-      {/* 외부 환경 연계 상태 */}
-      {(viewMode === "both" || viewMode === "environment") && (
-        <article className={styles.analysisPanel}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <span className={styles.panelIconTag}><CloudSun size={16} /></span>
-              <div>
-                <h3>외부 환경 데이터</h3>
-                <p>기상·대기 데이터 연계 상태</p>
-              </div>
-            </div>
-            <span className={styles.panelHeaderBadge}>연계 준비 중</span>
-          </div>
-          <p className={styles.environmentNotice}>
-            현재 화면은 도시데이터 혼잡도만 제공합니다. 기온, 강수, 미세먼지 지표는 원천 API 연계 후 표시됩니다.
-          </p>
         </article>
       )}
 
