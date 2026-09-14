@@ -80,7 +80,9 @@ export function WalletPayScreen({
         const video = videoRef.current;
         if (!video) return;
         video.srcObject = mediaStream;
-        video.play();
+        // QR을 스캔 시작하자마자 인식해서 컴포넌트가 바로 언마운트되면 play()가
+        // "media was removed from the document"로 reject되는 게 정상 흐름이라 무시한다.
+        video.play().catch(() => {});
 
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext("2d");
