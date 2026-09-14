@@ -55,8 +55,11 @@ export async function chargeWallet(amount: number): Promise<number> {
   return payload.balance;
 }
 
+export type WalletTransactionType = "TRANSFER" | "QR_PAYMENT" | "CHARGE";
+
 export interface WalletTransactionItem {
   id: number;
+  type: WalletTransactionType;
   counterpartNickname: string | null;
   storeName: string | null;
   isSender: boolean;
@@ -66,7 +69,7 @@ export interface WalletTransactionItem {
   createdAt: string;
 }
 
-// 당근머니 거래내역 — 사람 간 송금 + QR 현장결제. 충전은 상대가 없어 내역에 안 남는다(백엔드와 동일 정책).
+// 당근머니 거래내역 — 사람 간 송금 + QR 현장결제 + 충전.
 export async function getWalletTransactions(size = 100, signal?: AbortSignal): Promise<{ balance: number; transactions: WalletTransactionItem[] }> {
   const response = await authorizedFetch(`/api/v1/wallet/transactions?size=${size}`, {
     signal,
@@ -79,6 +82,7 @@ export async function getWalletTransactions(size = 100, signal?: AbortSignal): P
     transactions: {
       items: {
         id: number;
+        type: WalletTransactionType;
         counterpart_nickname: string | null;
         store_name: string | null;
         is_sender: boolean;
@@ -93,6 +97,7 @@ export async function getWalletTransactions(size = 100, signal?: AbortSignal): P
     balance: payload.balance,
     transactions: payload.transactions.items.map((item) => ({
       id: item.id,
+      type: item.type,
       counterpartNickname: item.counterpart_nickname,
       storeName: item.store_name,
       isSender: item.is_sender,
