@@ -42,11 +42,13 @@ export function WalletHistoryScreen({ onBack }: { onBack: () => void }) {
         {items?.map((item) => (
           <div key={item.id} className={styles.walletHistoryRow}>
             <div>
-              <strong>{item.storeName ?? item.productTitle ?? item.counterpartNickname ?? "당근페이"}</strong>
+              <strong>{item.type === "CHARGE" ? "당근머니 충전" : (item.storeName ?? item.productTitle ?? item.counterpartNickname ?? "당근페이")}</strong>
               <small>
-                {item.storeName
-                  ? `현장결제 · ${formatDate(item.createdAt)}`
-                  : `${item.isSender ? "보냄" : "받음"} · ${item.counterpartNickname ?? "상대방"} · ${formatDate(item.createdAt)}`}
+                {item.type === "CHARGE"
+                  ? formatDate(item.createdAt)
+                  : item.storeName
+                    ? `현장결제 · ${formatDate(item.createdAt)}`
+                    : `${item.isSender ? "보냄" : "받음"} · ${item.counterpartNickname ?? "상대방"} · ${formatDate(item.createdAt)}`}
               </small>
             </div>
             <span className={item.isSender ? styles.walletHistoryAmountOut : styles.walletHistoryAmountIn}>
