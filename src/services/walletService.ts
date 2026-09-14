@@ -55,6 +55,55 @@ export async function chargeWallet(amount: number): Promise<number> {
   return payload.balance;
 }
 
+export interface WalletTransactionItem {
+  id: number;
+  counterpartNickname: string | null;
+  storeName: string | null;
+  isSender: boolean;
+  amount: number;
+  balanceAfter: number;
+  productTitle: string | null;
+  createdAt: string;
+}
+
+// 당근머니 거래내역 — 사람 간 송금 + QR 현장결제. 충전은 상대가 없어 내역에 안 남는다(백엔드와 동일 정책).
+export async function getWalletTransactions(size = 100, signal?: AbortSignal): Promise<{ balance: number; transactions: WalletTransactionItem[] }> {
+  const response = await authorizedFetch(`/api/v1/wallet/transactions?size=${size}`, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("거래내역을 불러오지 못했습니다.");
+
+  const payload: {
+    balance: number;
+    transactions: {
+      items: {
+        id: number;
+        counterpart_nickname: string | null;
+        store_name: string | null;
+        is_sender: boolean;
+        amount: number;
+        balance_after: number;
+        product_title: string | null;
+        created_at: string;
+      }[];
+    };
+  } = await response.json();
+  return {
+    balance: payload.balance,
+    transactions: payload.transactions.items.map((item) => ({
+      id: item.id,
+      counterpartNickname: item.counterpart_nickname,
+      storeName: item.store_name,
+      isSender: item.is_sender,
+      amount: item.amount,
+      balanceAfter: item.balance_after,
+      productTitle: item.product_title,
+      createdAt: item.created_at,
+    })),
+  };
+}
+
 // 매장 조회 — 결제 QR(=/carrot?pay=<storeId> URL)을 스캔/진입했을 때 표시할 이름/사진을 받아온다.
 export async function getStore(storeId: number): Promise<{ id: number; name: string; image_url: string | null }> {
   const response = await authorizedFetch(`/api/v1/wallet/stores/${storeId}`, {

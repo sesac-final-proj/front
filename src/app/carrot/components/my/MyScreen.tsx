@@ -44,6 +44,8 @@ export interface MyScreenProps {
   onOpenApartment?: () => void;
   onOpenWalletCharge: () => void;
   onOpenWalletPay: () => void;
+  onOpenWalletHistory: () => void;
+  onOpenPointsHistory: () => void;
 }
 
 export function MyScreen({
@@ -67,6 +69,8 @@ export function MyScreen({
   onOpenApartment,
   onOpenWalletCharge,
   onOpenWalletPay,
+  onOpenWalletHistory,
+  onOpenPointsHistory,
 }: MyScreenProps) {
   const services: IconItem[] = [
     { label: "나의 거래", icon: ShoppingBag, tone: "primary", onClick: onOpenSales },
@@ -127,10 +131,10 @@ export function MyScreen({
           </button>
         </div>
         <div className={styles.payBalance}>
-          <button type="button">
+          <button type="button" onClick={onOpenWalletHistory}>
             머니 <strong>{(walletBalance ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
-          <button type="button">
+          <button type="button" onClick={onOpenPointsHistory}>
             포인트 <strong>{(dreamPoints ?? 0).toLocaleString("ko-KR")}원</strong> <ChevronRight size={18} />
           </button>
         </div>
