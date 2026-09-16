@@ -1,0 +1,275 @@
+.stage {
+  min-height: 100dvh;
+  display: grid;
+  place-items: start center;
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
+
+.glassAmbientBlob1 {
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 111, 15, 0.24) 0%, rgba(255, 179, 71, 0.08) 70%, transparent 100%);
+  filter: blur(45px);
+  animation: floatOrb1 12s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.glassAmbientBlob2 {
+  position: absolute;
+  bottom: 40px;
+  right: -60px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(132, 188, 249, 0.25) 0%, rgba(203, 223, 250, 0.1) 70%, transparent 100%);
+  filter: blur(50px);
+  animation: floatOrb2 15s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.glassAmbientBlob3 {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 138, 69, 0.18) 0%, rgba(255, 195, 106, 0.05) 70%, transparent 100%);
+  filter: blur(35px);
+  animation: floatOrb3 10s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes floatOrb1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(35px, 45px) scale(1.1); }
+  100% { transform: translate(-25px, 60px) scale(0.95); }
+}
+
+@keyframes floatOrb2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-45px, -35px) scale(1.15); }
+  100% { transform: translate(25px, -50px) scale(0.9); }
+}
+
+@keyframes floatOrb3 {
+  0% { transform: translate(-50%, -50%) scale(0.9); }
+  50% { transform: translate(-40%, -60%) scale(1.1); }
+  100% { transform: translate(-60%, -40%) scale(1.05); }
+}
+
+.phoneShell {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: #202124;
+  border-left: 1px solid rgba(255, 255, 255, 0.9);
+  border-right: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 32px rgba(37, 33, 43, 0.05);
+  font-family:
+    "Pretendard",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    system-ui,
+    sans-serif;
+  z-index: 1;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 342px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+}
+
+.brandHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.smallLogoBadge {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 7px;
+  box-sizing: border-box;
+}
+
+.smallLogoImg {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
+}
+
+.brandTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ff6f0f;
+  letter-spacing: -0.5px;
+}
+
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.carousel {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+}
+
+.title {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 36px;
+  letter-spacing: -0.6px;
+  color: #252b37;
+}
+
+.highlight {
+  color: #ff6f0f;
+}
+
+.illustration {
+  display: grid;
+  grid-template-columns: repeat(5, 48px);
+  gap: 5px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.avatarAccent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #d5d7da;
+  cursor: pointer;
+}
+
+.dotActive {
+  background: #ff6f0f;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.socialButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 56px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.45px;
+  cursor: pointer;
+}
+
+.kakaoButton {
+  background: #fee500;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.naverButton {
+  background: #03c75a;
+  color: #ffffff;
+}
+
+.naverMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #03c75a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.helper {
+  padding: 0 8px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: -0.3px;
+  color: #a4a7ae;
+}
+
+.helper a {
+  color: inherit;
+}

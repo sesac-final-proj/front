@@ -1,0 +1,160 @@
+.splashContainer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  background-color: #ffffff;
+  color: var(--splash-text, #212529);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glassAmbientBlob1 {
+  position: absolute;
+  top: 15%;
+  left: 20%;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 111, 15, 0.2) 0%, rgba(255, 179, 71, 0.05) 70%, transparent 100%);
+  filter: blur(40px);
+  animation: floatSplashOrb1 10s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.glassAmbientBlob2 {
+  position: absolute;
+  bottom: 20%;
+  right: 20%;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(132, 188, 249, 0.22) 0%, rgba(203, 223, 250, 0.08) 70%, transparent 100%);
+  filter: blur(45px);
+  animation: floatSplashOrb2 12s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes floatSplashOrb1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, 40px) scale(1.1); }
+}
+
+@keyframes floatSplashOrb2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-30px, -40px) scale(1.1); }
+}
+
+.splashContainer[data-theme="light"] {
+  --splash-bg: #ffffff;
+  --splash-text: #212529;
+  --splash-subtext: #868b94;
+}
+
+.splashContainer[data-theme="dark"] {
+  --splash-bg: #0d0e12;
+  --splash-text: #f8f9fa;
+  --splash-subtext: #90949c;
+}
+
+.logoWrapper {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(320px, calc(100% - 48px));
+  padding: 32px 24px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06);
+}
+
+.logoBadgeWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoBadge {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px;
+}
+
+.logoSvg {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+/* Message & Pulsing Indicator */
+.infoArea {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.titleText {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--splash-text);
+  margin: 0;
+}
+
+.subText {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--splash-subtext);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Animated Pulse Dots */
+.dotsWrapper {
+  display: inline-flex;
+  align-items: center;
+  width: 72px;
+  height: 3px;
+  gap: 0;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--splash-subtext) 20%, transparent);
+}
+
+.dot {
+  width: 24px;
+  height: 3px;
+  border-radius: 999px;
+  background-color: #ff6f0f;
+  animation: loadingLine 1.4s ease-in-out infinite;
+}
+
+@keyframes loadingLine {
+  from { transform: translateX(-24px); }
+  to { transform: translateX(72px); }
+}
